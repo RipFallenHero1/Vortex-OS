@@ -1,346 +1,153 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vortex OS v9.6 - NextGen</title>
-    <link rel="stylesheet" href="style.css">
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Vortex OS v10.0</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
 </head>
 <body>
+<div id="login-screen" class="full-overlay">
+  <div class="auth-card">
+    <div class="brand-mark">V</div><h1>Vortex OS</h1><p>Seu sistema. Seus jogos. Sua rede.</p>
+    <input id="auth-username" placeholder="Nome de usuário" autocomplete="username">
+    <input id="auth-pin" type="password" maxlength="4" inputmode="numeric" placeholder="PIN de 4 dígitos">
+    <input id="auth-email" type="email" placeholder="E-mail (opcional)">
+    <button class="btn primary" onclick="loginUser()">Entrar / Criar conta</button>
+  </div>
+</div>
+<div id="shutdown-screen" class="full-overlay dark" style="display:none"><div class="power-card"><div class="brand-mark">V</div><h1>Vortex OS</h1><p>O sistema está desligado.</p><button class="btn primary" onclick="powerOn()">Ligar PC</button></div></div>
 
-    <!-- TELA DE LOGIN / CONTA FIREBASE -->
-    <div id="login-screen" class="full-overlay">
-        <div class="auth-card">
-            <div class="auth-header">
-                <h2>🌀 Vortex OS</h2>
-                <p>Identifique-se para acessar o sistema</p>
-                <small style="opacity:0.5;">v9.6</small>
-            </div>
-            <div class="auth-form">
-                <input type="text" id="auth-username" placeholder="Nome de Usuário *" required>
-                <input type="password" id="auth-pin" placeholder="PIN de Acesso (4 dígitos) *" maxlength="4" required>
-                <input type="email" id="auth-email" placeholder="E-mail (Opcional)">
-                <button class="btn btn-primary" onclick="loginUser()">Entrar no Vortex OS</button>
-            </div>
-        </div>
-    </div>
+<div id="desktop" class="desktop">
+  <div class="desktop-icon" onclick="openWindow('win-engine')"><div class="app-icon vortex">V</div><span>Vortex Engine</span></div>
+  <div class="desktop-icon" onclick="openWindow('win-vscode')"><div class="app-icon code">&lt;/&gt;</div><span>Vortex Code</span></div>
+  <div class="desktop-icon" onclick="openWindow('win-messenger')"><div class="app-icon msg">M</div><span>Vortex Messenger</span></div>
+  <div class="desktop-icon" onclick="openWindow('win-pix')"><div class="app-icon pay">R$</div><span>Vortex Pay</span></div>
+  <div class="desktop-icon" onclick="openWindow('win-store')"><div class="app-icon store">S</div><span>Loja Vortex</span></div>
+  <div class="desktop-icon" onclick="openWindow('win-files')"><div class="app-icon files">F</div><span>Arquivos</span></div>
+  <div class="desktop-icon" onclick="openWindow('win-settings')"><div class="app-icon settings">⚙</div><span>Configurações</span></div>
+  <div class="desktop-icon" onclick="openWindow('win-terminal')"><div class="app-icon terminal">&gt;_</div><span>Terminal</span></div>
+  <div class="desktop-icon" onclick="openWindow('win-calc')"><div class="app-icon calc">+</div><span>Calculadora</span></div>
+</div>
 
-    <!-- TELA DE DESLIGAMENTO -->
-    <div id="shutdown-screen" class="full-overlay" style="display: none; background: #000;">
-        <div style="text-align: center; color: #fff;">
-            <h1 style="font-size: 3rem; margin-bottom: 20px;">🌀 Vortex OS</h1>
-            <p style="color: #666; margin-bottom: 30px;">O sistema foi desligado com segurança.</p>
-            <button class="btn btn-primary" onclick="powerOn()">🔌 Ligar PC</button>
-        </div>
-    </div>
+<div id="start-menu" class="start-menu">
+  <div class="start-user"><div class="avatar big">V</div><div><b id="start-username">Usuário</b><small id="start-email">online</small></div></div>
+  <div class="start-grid">
+    <button onclick="openWindow('win-engine');toggleStartMenu()">Vortex Engine</button>
+    <button onclick="openWindow('win-vscode');toggleStartMenu()">Vortex Code</button>
+    <button onclick="openWindow('win-messenger');toggleStartMenu()">Messenger</button>
+    <button onclick="openWindow('win-pix');toggleStartMenu()">Vortex Pay</button>
+    <button onclick="openWindow('win-store');toggleStartMenu()">Loja</button>
+    <button onclick="openWindow('win-files');toggleStartMenu()">Arquivos</button>
+    <button onclick="openWindow('win-settings');toggleStartMenu()">Configurações</button>
+    <button onclick="openWindow('win-terminal');toggleStartMenu()">Terminal</button>
+  </div>
+  <button class="shutdown-link" onclick="shutdownPC()">Desligar</button>
+</div>
 
-    <!-- ÁREA DE TRABALHO (DESKTOP) -->
-    <div id="desktop" class="desktop">
-        <div class="desktop-icon" onclick="openWindow('win-engine')">
-            <div class="icon-img">⚡</div>
-            <span>Vortex Engine</span>
+<!-- ENGINE -->
+<div id="win-engine" class="window" style="top:20px;left:25px;width:1100px;height:680px">
+  <div class="window-header" onmousedown="dragWindow(event,'win-engine')"><span>Vortex Engine 2D</span><div class="window-controls"><button onclick="closeWindow('win-engine')">×</button></div></div>
+  <div class="engine-layout">
+    <aside class="panel hierarchy-panel">
+      <div class="panel-title">CENA</div>
+      <button class="add-object" onclick="addEngineObject('square')"><i class="shape square"></i> Quadrado</button>
+      <button class="add-object" onclick="addEngineObject('circle')"><i class="shape circle"></i> Círculo</button>
+      <button class="add-object" onclick="addEngineObject('triangle')"><i class="shape triangle"></i> Triângulo</button>
+      <button class="add-object" onclick="addEngineObject('player')"><i class="shape player"></i> Player</button>
+      <button class="add-object" onclick="addEngineObject('coin')"><i class="shape coin"></i> Moeda</button>
+      <div class="section-label">HIERARQUIA</div><ul id="hierarchy-tree" class="tree-list"></ul>
+      <div class="engine-bottom">
+        <button class="btn" onclick="createVortexScript()">+ Script .vortex</button>
+        <button class="btn danger" onclick="clearScene()">Limpar cena</button>
+        <button class="btn primary" onclick="openPublishModalFromEngine()">Publicar .vexe</button>
+      </div>
+    </aside>
+    <section class="panel viewport-panel">
+      <div class="viewport-header"><b>EDITOR 2D</b><span id="engine-tool-label">Selecionar / Mover</span>
+        <div class="toolbar">
+          <button data-tool="select" onclick="setEngineTool('select')">Mover</button>
+          <button data-tool="scale" onclick="setEngineTool('scale')">Tamanho</button>
+          <button data-tool="square" onclick="setEngineTool('square')">□</button>
+          <button data-tool="circle" onclick="setEngineTool('circle')">○</button>
+          <button data-tool="triangle" onclick="setEngineTool('triangle')">△</button>
+          <button data-tool="erase" onclick="setEngineTool('erase')">Apagar</button>
+          <button id="btn-engine-test" class="test-btn" onclick="toggleEngineTestMode()">▶ TESTAR</button>
         </div>
-        <div class="desktop-icon" onclick="openWindow('win-vscode')">
-            <div class="icon-img">📝</div>
-            <span>Vortex Code Studio</span>
-        </div>
-        <div class="desktop-icon" onclick="openWindow('win-store')">
-            <div class="icon-img">🛒</div>
-            <span>Loja Global</span>
-        </div>
-        <div class="desktop-icon" onclick="openWindow('win-files')">
-            <div class="icon-img">📁</div>
-            <span>Meus Arquivos</span>
-        </div>
-        <div class="desktop-icon" onclick="openWindow('win-settings')">
-            <div class="icon-img">⚙️</div>
-            <span>Configurações</span>
-        </div>
-        <div class="desktop-icon" onclick="openWindow('win-terminal')">
-            <div class="icon-img">💻</div>
-            <span>Terminal</span>
-        </div>
-        <div class="desktop-icon" onclick="openWindow('win-calc')">
-            <div class="icon-img">🧮</div>
-            <span>Calculadora</span>
-        </div>
-    </div>
+      </div>
+      <div id="canvas-2d" class="grid-canvas"></div>
+      <div id="engine-test-screen" class="engine-test-screen" style="display:none"></div>
+      <div id="engine-console" class="engine-console"></div>
+    </section>
+    <aside class="panel inspector-panel"><div class="panel-title">INSPETOR</div><div id="inspector-content"><div class="inspector-empty">Selecione um objeto.</div></div></aside>
+  </div>
+</div>
 
-    <!-- MENU INICIAR -->
-    <div id="start-menu" class="start-menu">
-        <div class="start-header">
-            <h3 id="start-username">Admin User</h3>
-            <small id="start-email">online</small>
-        </div>
-        <div class="start-body">
-            <button onclick="openWindow('win-engine'); toggleStartMenu()">⚡ Vortex Engine 2D</button>
-            <button onclick="openWindow('win-vscode'); toggleStartMenu()">📝 Vortex Code Studio</button>
-            <button onclick="openWindow('win-store'); toggleStartMenu()">🛒 Loja Global (.vexe)</button>
-            <button onclick="openWindow('win-files'); toggleStartMenu()">📁 Meus Arquivos</button>
-            <button onclick="openWindow('win-settings'); toggleStartMenu()">⚙️ Configurações & Wallpaper</button>
-            <button onclick="openWindow('win-terminal'); toggleStartMenu()">💻 Terminal</button>
-            <button onclick="openWindow('win-calc'); toggleStartMenu()">🧮 Calculadora</button>
-            <hr style="border-color: rgba(255,255,255,0.1); margin: 5px 0;">
-            <button style="color: #ff4757;" onclick="shutdownPC()">🔌 Desligar PC</button>
-        </div>
-    </div>
+<!-- CODE -->
+<div id="win-vscode" class="window" style="top:55px;left:180px;width:900px;height:600px">
+  <div class="window-header" onmousedown="dragWindow(event,'win-vscode')"><span>Vortex Code — Linguagem Vortex</span><div class="window-controls"><button onclick="closeWindow('win-vscode')">×</button></div></div>
+  <div class="code-layout">
+    <aside class="api-docs">
+      <h3>VORTEX API</h3><p class="muted">Feita para começar rápido.</p>
+      <h4>Ciclo</h4><code>def _ready():</code><code>def _update():</code>
+      <h4>Player</h4><code>p = vortex.get_player()</code><code>vortex.move_player(x, y)</code><code>vortex.apply_gravity(p, 0.6)</code><code>vortex.move_and_collide(p)</code><code>vortex.is_on_floor(p)</code>
+      <h4>Mundo</h4><code>vortex.get_blocks()</code><code>vortex.get_coins()</code><code>vortex.check_collision(a,b)</code><code>vortex.spawn_at("circle",100,100)</code><code>vortex.destroy(obj)</code>
+      <h4>Input</h4><code>vortex.is_key_down("a")</code><code>vortex.is_key_down("space")</code>
+      <h4>Moedas</h4><code>vortex.collect_coin(c)</code><code>vortex.add_coins(1)</code><code>vortex.get_coins_count()</code>
+      <h4>Câmera / UI</h4><code>vortex.follow_camera(p,300,200)</code><code>vortex.create_text("id","Oi",10,10)</code><code>vortex.set_text("id","Novo")</code>
+      <h4>Nativas</h4><code>str(x) int(x) float(x) len(x)</code><code>lista.append(x)</code>
+      <h4>Scripts</h4><ul id="vscode-scripts-list"></ul>
+    </aside>
+    <main class="code-main">
+      <div class="code-actions"><input id="vortex-filename" placeholder="main"><b>.vortex</b><button class="btn" onclick="saveVortexScript()">Salvar</button><button class="btn primary" onclick="runScriptFromStudio()">Testar</button></div>
+      <textarea id="vortex-code-editor" spellcheck="false" placeholder="Crie seu jogo..."></textarea>
+    </main>
+  </div>
+</div>
 
-    <!-- JANELA: VORTEX ENGINE 2D -->
-    <div id="win-engine" class="window" style="top: 20px; left: 30px; width: 900px; height: 600px;">
-        <div class="window-header" onmousedown="dragWindow(event, 'win-engine')">
-            <span>⚡ Vortex Engine 2D - Criador de Jogos (v9.6)</span>
-            <div class="window-controls">
-                <button onclick="closeWindow('win-engine')">❌</button>
-            </div>
-        </div>
-        <div class="window-body">
-            <div class="engine-layout">
-                <aside class="panel hierarchy-panel">
-                    <h3>📂 Hierarquia</h3>
-                    <div class="panel-actions">
-                        <button onclick="addHierarchyItem('square')">+ Bloco Solido</button>
-                        <button onclick="addHierarchyItem('coin')">+ Item Moeda</button>
-                        <button onclick="createVortexScript()">📝 Criar Script .vortex</button>
-                    </div>
-                    <ul id="hierarchy-tree" class="tree-list"></ul>
-                    <hr style="border-color: rgba(255,255,255,0.1);">
-                    <button class="btn btn-primary" onclick="openPublishModalFromEngine()">🚀 Publicar Build (.vexe)</button>
-                </aside>
-                <section class="panel viewport-panel">
-                    <div class="viewport-header">
-                        <span id="engine-viewport-label">CENA 2D (Clique nas células para pintar)</span>
-                        <div class="map-controls">
-                            <button id="btn-t-block" onclick="setTileMode('block')">🧱 Bloco</button>
-                            <button id="btn-t-coin" onclick="setTileMode('coin')">🪙 Moeda</button>
-                            <button id="btn-t-player" onclick="setTileMode('player')">👾 Player</button>
-                            <button id="btn-t-text" onclick="setTileMode('text')">🔤 Texto</button>
-                            <button id="btn-t-button" onclick="setTileMode('button')">🔘 Botão</button>
-                            <button id="btn-t-erase" onclick="setTileMode('erase')">❌ Apagar</button>
-                            <button id="btn-engine-test" style="background:#22c55e; font-weight:bold;" onclick="toggleEngineTestMode()">▶️ TESTAR</button>
-                        </div>
-                    </div>
-                    <div id="canvas-2d" class="grid-canvas"></div>
-                    <div id="engine-test-screen" style="display:none; width:100%; height:100%; position:relative; background:#87CEEB; overflow:hidden;"></div>
-                </section>
-                <aside class="panel inspector-panel">
-                    <h3>⚙️ Inspetor</h3>
-                    <div id="inspector-content">Selecione uma ferramenta e pinte na cena acima. "🔤 Texto" e "🔘 Botão" abrem um prompt para você definir o conteúdo — o botão pode chamar qualquer função do seu script .vortex pelo nome.</div>
-                    <div id="engine-console" style="margin-top:10px; font-family:monospace; font-size:0.75rem; background:#000; color:#0f0; padding:6px; border-radius:4px; max-height:150px; overflow-y:auto; display:none;"></div>
-                </aside>
-            </div>
-        </div>
-    </div>
+<!-- MESSENGER -->
+<div id="win-messenger" class="window" style="top:40px;left:90px;width:980px;height:650px">
+  <div class="window-header" onmousedown="dragWindow(event,'win-messenger')"><span>Vortex Messenger</span><div class="window-controls"><button onclick="closeWindow('win-messenger')">×</button></div></div>
+  <div class="messenger">
+    <aside class="messenger-side">
+      <div class="messenger-head"><div><b>Conversas</b><small id="messenger-me">@usuário</small></div><button class="icon-btn" onclick="openGroupCreator()">+</button></div>
+      <div class="friend-add"><input id="friend-nick" placeholder="Adicionar por @nick"><button onclick="addFriend()">Adicionar</button></div>
+      <div class="side-label">AMIGOS</div><div id="friends-list"></div>
+      <div class="side-label">GRUPOS</div><div id="groups-list"></div>
+    </aside>
+    <main class="chat">
+      <div class="chat-head"><div class="avatar" id="chat-avatar">V</div><div><b id="chat-title">Vortex Messenger</b><small id="chat-subtitle">Escolha um amigo para conversar</small></div></div>
+      <div id="messages" class="messages"><div class="muted">Suas conversas aparecerão aqui.</div></div>
+      <div class="emoji-bar"><button onclick="sendEmoji('😀')">😀</button><button onclick="sendEmoji('😂')">😂</button><button onclick="sendEmoji('🔥')">🔥</button><button onclick="sendEmoji('❤️')">❤️</button><button onclick="sendEmoji('👍')">👍</button><button onclick="sendEmoji('🎮')">🎮</button></div>
+      <div class="composer"><button onclick="sendImage()" title="Enviar imagem">＋</button><input type="file" id="image-input" accept="image/*" hidden><input id="message-input" placeholder="Digite uma mensagem..."><button class="send-btn" onclick="sendMessage()">Enviar</button></div>
+    </main>
+  </div>
+</div>
 
-    <!-- JANELA: VORTEX CODE STUDIO -->
-    <div id="win-vscode" class="window" style="top: 60px; left: 160px; width: 720px; height: 500px;">
-        <div class="window-header" onmousedown="dragWindow(event, 'win-vscode')">
-            <span>📝 Vortex Code Studio - Linguagem Vortex (Python-Like)</span>
-            <div class="window-controls">
-                <button onclick="closeWindow('win-vscode')">❌</button>
-            </div>
-        </div>
-        <div class="window-body" style="display:flex; background:#1e1e1e; color:#d4d4d4; padding:0;">
-            <!-- SIDEBAR API DOCS -->
-            <div style="width:250px; background:#252526; border-right:1px solid #333; padding:10px; font-size:0.75rem; overflow-y:auto;">
-                <h4 style="color:#a78bfa; margin-bottom:8px;">🐍 API Vortex v2</h4>
-                <p style="color:#999; margin-bottom:10px;">Sintaxe inspirada em Python. Nada é automático: você programa tudo.</p>
+<!-- GROUP -->
+<div id="win-group-create" class="window modal-window" style="top:180px;left:350px;width:430px;height:430px">
+ <div class="window-header" onmousedown="dragWindow(event,'win-group-create')"><span>Novo grupo</span><div class="window-controls"><button onclick="closeWindow('win-group-create')">×</button></div></div>
+ <div class="modal-body"><input id="group-name" class="wide-input" placeholder="Nome do grupo"><p class="muted">Escolha amigos:</p><div id="group-members" class="member-list"></div><button class="btn primary wide" onclick="createGroup()">Criar grupo</button></div>
+</div>
 
-                <p><strong>Funções especiais:</strong></p>
-                <code style="color:#4ec9b0;">def _ready():</code><br>
-                <code style="color:#4ec9b0;">def _update():</code><br>
-                <code style="color:#4ec9b0;">print("texto")</code><br><br>
+<!-- PAY -->
+<div id="win-pix" class="window small-window" style="top:180px;left:430px;width:430px;height:420px">
+ <div class="window-header" onmousedown="dragWindow(event,'win-pix')"><span>Vortex Pay</span><div class="window-controls"><button onclick="closeWindow('win-pix')">×</button></div></div>
+ <div class="pay-card"><div class="balance-big">R$ <span id="pay-balance">0.00</span></div><p class="muted">Envie Vortex Coins para outro usuário.</p><label>Nick do destinatário<input id="pix-recipient" placeholder="@nick"></label><label>Valor<input id="pix-amount" type="number" min="0.01" step="0.01" placeholder="0,00"></label><button class="btn primary wide" onclick="sendPix()">Enviar Pix</button><button class="btn wide" onclick="claimDailyReward()">Receber diária R$ 10</button></div>
+</div>
 
-                <p><strong>Controle:</strong></p>
-                <code style="color:#c586c0;">if x &gt; 5:</code><br>
-                <code style="color:#c586c0;">elif x == 0:</code><br>
-                <code style="color:#c586c0;">else:</code><br>
-                <code style="color:#c586c0;">while cond:</code><br>
-                <code style="color:#c586c0;">for i in range(10):</code><br>
-                <code style="color:#c586c0;">for x in lista:</code><br>
-                <code style="color:#c586c0;">and / or / not</code><br><br>
+<!-- STORE / FILES / SETTINGS / TERMINAL / CALC -->
+<div id="win-store" class="window" style="top:90px;left:180px;width:760px;height:520px"><div class="window-header" onmousedown="dragWindow(event,'win-store')"><span>Loja Vortex</span><div class="window-controls"><button onclick="closeWindow('win-store')">×</button></div></div><div class="window-body"><h2>Jogos .vexe</h2><div id="global-apps-list" class="apps-grid">Carregando...</div></div></div>
+<div id="win-files" class="window" style="top:120px;left:240px;width:650px;height:430px"><div class="window-header" onmousedown="dragWindow(event,'win-files')"><span>Meus arquivos</span><div class="window-controls"><button onclick="closeWindow('win-files')">×</button></div></div><div class="window-body"><div id="files-list" class="apps-grid"></div></div></div>
+<div id="win-settings" class="window" style="top:130px;left:300px;width:500px;height:450px"><div class="window-header" onmousedown="dragWindow(event,'win-settings')"><span>Configurações</span><div class="window-controls"><button onclick="closeWindow('win-settings')">×</button></div></div><div class="window-body"><h3>Aparência</h3><div class="theme-grid"><button onclick="setTheme('purple')">Roxo</button><button onclick="setTheme('dark-purple')">Noturno</button><button onclick="setTheme('cyber-blue')">Cyber Blue</button><button onclick="setTheme('sunset')">Sunset</button></div><hr><p>Usuário: <b id="settings-user">-</b></p><p>E-mail: <span id="settings-email">-</span></p><button class="btn danger wide" onclick="logoutUser()">Sair da conta</button><button class="btn wide" onclick="shutdownPC()">Desligar</button></div></div>
+<div id="win-runner" class="window" style="top:70px;left:150px;width:760px;height:560px"><div class="window-header" onmousedown="dragWindow(event,'win-runner')"><span id="runner-title">Jogo .vexe</span><div class="window-controls"><button onclick="closeWindow('win-runner')">×</button></div></div><div class="window-body runner-body"><div id="runner-canvas" class="runner-canvas"></div></div></div>
+<div id="win-terminal" class="window" style="top:150px;left:320px;width:520px;height:340px"><div class="window-header" onmousedown="dragWindow(event,'win-terminal')"><span>Terminal</span><div class="window-controls"><button onclick="closeWindow('win-terminal')">×</button></div></div><div class="terminal-body"><div id="terminal-output">Vortex OS Kernel v10.0 online.<br>Digite 'help'.</div><input id="terminal-input" onkeydown="handleTerminal(event)" autofocus></div></div>
+<div id="win-calc" class="window" style="top:180px;left:400px;width:250px;height:350px"><div class="window-header" onmousedown="dragWindow(event,'win-calc')"><span>Calculadora</span><div class="window-controls"><button onclick="closeWindow('win-calc')">×</button></div></div><div class="calc-body"><input id="calc-display" disabled><div class="calc-grid"><button onclick="calcInput('7')">7</button><button onclick="calcInput('8')">8</button><button onclick="calcInput('9')">9</button><button onclick="calcInput('/')">÷</button><button onclick="calcInput('4')">4</button><button onclick="calcInput('5')">5</button><button onclick="calcInput('6')">6</button><button onclick="calcInput('*')">×</button><button onclick="calcInput('1')">1</button><button onclick="calcInput('2')">2</button><button onclick="calcInput('3')">3</button><button onclick="calcInput('-')">−</button><button onclick="calcInput('0')">0</button><button onclick="calcInput('.')">.</button><button onclick="calcEval()">=</button><button onclick="calcInput('+')">+</button><button class="danger" style="grid-column:span 4" onclick="calcClear()">Limpar</button></div></div></div>
 
-                <p><strong>Nativas:</strong></p>
-                <code style="color:#dcdcaa;">str(x) int(x) float(x) len(x)</code><br>
-                <code style="color:#dcdcaa;">lista.append(x)</code><br><br>
+<div id="publish-modal" class="modal"><div class="modal-content"><h2>Publicar .vexe</h2><input id="app-title-input" placeholder="Nome do jogo"><input id="app-price-input" type="number" min="0" value="0"><div class="modal-actions"><button class="btn" onclick="closePublishModal()">Cancelar</button><button class="btn primary" onclick="compileAndPublishEngineGame()">Publicar</button></div></div></div>
 
-                <p><strong>Player / entidades:</strong></p>
-                <code style="color:#ce9178;">p = vortex.get_player()</code><br>
-                <code style="color:#ce9178;">p.x / p.y / p.vx / p.vy</code><br>
-                <code style="color:#ce9178;">vortex.get_blocks()</code><br>
-                <code style="color:#ce9178;">vortex.get_coins()</code><br>
-                <code style="color:#ce9178;">vortex.check_collision(a, b)</code><br>
-                <code style="color:#ce9178;">vortex.spawn('coin', gx, gy)</code><br>
-                <code style="color:#ce9178;">vortex.spawn_at('block', x, y)</code><br>
-                <code style="color:#ce9178;">vortex.destroy(entidade)</code><br><br>
-
-                <p><strong>Input:</strong></p>
-                <code style="color:#ce9178;">vortex.is_key_down("a")</code><br><br>
-
-                <p><strong>Moedas:</strong></p>
-                <code style="color:#ce9178;">vortex.collect_coin(moeda)</code><br>
-                <code style="color:#ce9178;">vortex.add_coins(1)</code><br>
-                <code style="color:#ce9178;">vortex.get_coins_count()</code><br><br>
-
-                <p><strong>Câmera:</strong></p>
-                <code style="color:#ce9178;">vortex.set_camera(x, y)</code><br><br>
-
-                <p><strong>UI (via script):</strong></p>
-                <code style="color:#ce9178;">vortex.create_text(id, txt, x, y)</code><br>
-                <code style="color:#ce9178;">vortex.create_button(id, txt, x, y, fn)</code><br>
-                <code style="color:#ce9178;">vortex.set_text(id, txt)</code><br>
-                <code style="color:#ce9178;">vortex.remove_ui(id)</code><br><br>
-
-                <p style="color:#999;">Dica: os botões "🔤 Texto"/"🔘 Botão" da Engine colocam objetos de UI direto no mapa — o botão do mapa chama uma função do seu script pelo nome.</p>
-
-                <hr style="border-color:#333; margin:10px 0;">
-                <p id="vscode-scripts-list-label"><strong>Meus Scripts:</strong></p>
-                <ul id="vscode-scripts-list" style="list-style:none; padding:0; color:#9cdcfe;"></ul>
-            </div>
-
-            <!-- EDITOR AREA -->
-            <div style="flex:1; display:flex; flex-direction:column; padding:10px; gap:8px;">
-                <div style="display:flex; gap:10px; align-items:center;">
-                    <input type="text" id="vortex-filename" placeholder="meu_jogo" style="padding:4px 8px; background:#2d2d2d; border:1px solid #444; color:#fff; border-radius:4px; flex:1;">
-                    <span style="color:#a78bfa; font-weight:bold;">.vortex</span>
-                    <button class="btn" onclick="saveVortexScript()">💾 Salvar</button>
-                    <button class="btn btn-primary" onclick="runScriptFromStudio()">▶️ Testar na Engine</button>
-                </div>
-                <textarea id="vortex-code-editor" style="flex:1; background:#181818; color:#9cdcfe; font-family:monospace; padding:10px; border:1px solid #333; outline:none; resize:none; font-size:0.9rem;" placeholder="# Crie sua lógica em Vortex (Python-like)&#10;&#10;def _ready():&#10;    print('Jogo Carregado com Sucesso')&#10;&#10;def _update():&#10;    p = vortex.get_player()&#10;    if p == None:&#10;        return&#10;    if vortex.is_key_down('d'):&#10;        p.x = p.x + 4"></textarea>
-            </div>
-        </div>
-    </div>
-
-    <!-- JANELA: LOJA GLOBAL -->
-    <div id="win-store" class="window" style="top: 50px; left: 120px; width: 750px; height: 480px;">
-        <div class="window-header" onmousedown="dragWindow(event, 'win-store')">
-            <span>🛒 Loja Global Vortex (.vexe)</span>
-            <div class="window-controls">
-                <button onclick="closeWindow('win-store')">❌</button>
-            </div>
-        </div>
-        <div class="window-body store-layout">
-            <div class="store-header">
-                <h2>Catálogo de Jogos em Nuvem</h2>
-                <small>Para publicar um jogo, use o botão de exportar dentro da Vortex Engine!</small>
-            </div>
-            <div id="global-apps-list" class="apps-grid">
-                <p>Carregando nuvem Firebase...</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- JANELA: GERENCIADOR DE ARQUIVOS (.VEXE) -->
-    <div id="win-files" class="window" style="top: 80px; left: 180px; width: 600px; height: 400px;">
-        <div class="window-header" onmousedown="dragWindow(event, 'win-files')">
-            <span>📁 Meus Arquivos - (.vexe Executáveis)</span>
-            <div class="window-controls">
-                <button onclick="closeWindow('win-files')">❌</button>
-            </div>
-        </div>
-        <div class="window-body">
-            <h3>Jogos e Aplicativos Instalados:</h3>
-            <div id="files-list" class="files-grid" style="margin-top: 15px;">
-                <!-- Lista dinâmica de executáveis .vexe -->
-            </div>
-        </div>
-    </div>
-
-    <!-- JANELA: CONFIGURAÇÕES DO SISTEMA -->
-    <div id="win-settings" class="window" style="top: 100px; left: 220px; width: 500px; height: 420px;">
-        <div class="window-header" onmousedown="dragWindow(event, 'win-settings')">
-            <span>⚙️ Configurações do Sistema</span>
-            <div class="window-controls">
-                <button onclick="closeWindow('win-settings')">❌</button>
-            </div>
-        </div>
-        <div class="window-body">
-            <h3>🎨 Papel de Parede (Gradientes)</h3>
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 15px 0;">
-                <button class="btn" style="background: linear-gradient(135deg, #2e0854, #12002b, #4a154b);" onclick="setTheme('purple')">Roxo Clássico</button>
-                <button class="btn" style="background: linear-gradient(135deg, #0f172a, #1e1b4b, #311042);" onclick="setTheme('dark-purple')">Roxo Noturno</button>
-                <button class="btn" style="background: linear-gradient(135deg, #0284c7, #0f172a, #1e1b4b);" onclick="setTheme('cyber-blue')">Cyber Blue</button>
-                <button class="btn" style="background: linear-gradient(135deg, #831843, #312e81, #0f172a);" onclick="setTheme('sunset')">Sunset Neon</button>
-            </div>
-            <hr style="border-color: rgba(255,255,255,0.1); margin: 15px 0;">
-            <h3>👤 Informações da Conta</h3>
-            <p>Usuário: <strong id="settings-user">-</strong></p>
-            <p>E-mail: <span id="settings-email">-</span></p>
-            <button class="btn btn-primary" style="margin-top: 15px; background: #dc2626;" onclick="shutdownPC()">🔌 Desligar Computador</button>
-        </div>
-    </div>
-
-    <!-- JANELA: RUNNER DE JOGO (.VEXE) -->
-    <div id="win-runner" class="window" style="top: 40px; left: 100px; width: 640px; height: 480px;">
-        <div class="window-header" onmousedown="dragWindow(event, 'win-runner')">
-            <span id="runner-title">🎮 Executando Jogo .vexe</span>
-            <div class="window-controls">
-                <button onclick="closeWindow('win-runner')">❌</button>
-            </div>
-        </div>
-        <div class="window-body" style="background: #000; display: flex; justify-content: center; align-items: center;">
-            <div id="runner-canvas" class="grid-canvas" style="width: 100%; height: 100%;"></div>
-        </div>
-    </div>
-
-    <!-- JANELAS AUXILIARES (TERMINAL E CALC) -->
-    <div id="win-terminal" class="window" style="top: 130px; left: 260px; width: 480px; height: 320px;">
-        <div class="window-header" onmousedown="dragWindow(event, 'win-terminal')">
-            <span>💻 Terminal</span>
-            <div class="window-controls"><button onclick="closeWindow('win-terminal')">❌</button></div>
-        </div>
-        <div class="window-body" style="background: #000; color: #0f0; font-family: monospace;">
-            <div id="terminal-output">Vortex OS Kernel v9.6 Online.<br>Digite 'help' para comandos.<br></div>
-            <div style="display: flex;"><input type="text" id="terminal-input" onkeypress="handleTerminal(event)" style="background: transparent; border: none; color: #0f0; outline: none; flex: 1; font-family: monospace;"></div>
-        </div>
-    </div>
-
-    <div id="win-calc" class="window" style="top: 150px; left: 300px; width: 220px; height: 320px;">
-        <div class="window-header" onmousedown="dragWindow(event, 'win-calc')">
-            <span>🧮 Calc</span>
-            <div class="window-controls"><button onclick="closeWindow('win-calc')">❌</button></div>
-        </div>
-        <div class="window-body" style="display: flex; flex-direction: column; gap: 5px;">
-            <input type="text" id="calc-display" disabled style="height: 40px; font-size: 1.2rem; text-align: right; background: #111; color: #fff; border: 1px solid #444;">
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px;">
-                <button class="btn" onclick="calcInput('7')">7</button><button class="btn" onclick="calcInput('8')">8</button><button class="btn" onclick="calcInput('9')">9</button><button class="btn" onclick="calcInput('/')">/</button>
-                <button class="btn" onclick="calcInput('4')">4</button><button class="btn" onclick="calcInput('5')">5</button><button class="btn" onclick="calcInput('6')">6</button><button class="btn" onclick="calcInput('*')">*</button>
-                <button class="btn" onclick="calcInput('1')">1</button><button class="btn" onclick="calcInput('2')">2</button><button class="btn" onclick="calcInput('3')">3</button><button class="btn" onclick="calcInput('-')">-</button>
-                <button class="btn" onclick="calcInput('0')">0</button><button class="btn" onclick="calcInput('.')">.</button><button class="btn" onclick="calcEval()">=</button><button class="btn" onclick="calcInput('+')">+</button>
-                <button class="btn" style="grid-column: span 4; background:#dc2626;" onclick="calcClear()">C (Limpar)</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- BARRA DE TAREFAS -->
-    <footer class="taskbar">
-        <button class="start-btn" onclick="toggleStartMenu()">🌀 Iniciar</button>
-        <div class="taskbar-apps" id="taskbar-apps"></div>
-        <div class="system-tray">
-            <span class="wallet">💰 R$ <strong id="user-balance">0.00</strong></span>
-            <button class="btn-sm" onclick="claimDailyReward()">🎁 Diária</button>
-            <button class="btn-sm" onclick="simulateIncomingPix()">💸 Pix</button>
-            <span id="os-clock">00:00</span>
-        </div>
-    </footer>
-
-    <!-- MODAL DE PUBLICAÇÃO DE ENGINE -->
-    <div id="publish-modal" class="modal">
-        <div class="modal-content">
-            <h3>🚀 Compilar & Publicar (.vexe)</h3>
-            <label style="font-size: 0.8rem;">Nome do Jogo/App:</label>
-            <input type="text" id="app-title-input" placeholder="Ex: Super Vortex 2D">
-            <label style="font-size: 0.8rem;">Preço de Venda (R$):</label>
-            <input type="number" id="app-price-input" value="10" min="0">
-            <div style="display: flex; gap: 10px; margin-top: 10px;">
-                <button class="btn" onclick="closePublishModal()" style="flex: 1;">Cancelar</button>
-                <button class="btn btn-primary" onclick="compileAndPublishEngineGame()" style="flex: 1;">Compilar .vexe</button>
-            </div>
-        </div>
-    </div>
-
-    <script src="script.js"></script>
-</body>
-</html>
+<footer class="taskbar"><button class="start-btn" onclick="toggleStartMenu()">V</button><div id="taskbar-apps"></div><div class="system-tray"><button onclick="openWindow('win-messenger')">Messenger</button><button onclick="openPix()">Pay</button><span>R$ <b id="user-balance">0.00</b></span><span id="os-clock">00:00</span></div></footer>
+<script src="script.js"></script>
+</body></html>
