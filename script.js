@@ -1,7 +1,7 @@
 // ==========================================
 // 🌀 VORTEX OS - VERSÃO 8.5 (STABLE BUILD)
 // ==========================================
-const OS_VERSION = "8.5";
+const OS_VERSION = "9.0";
 
 // FIREBASE CONFIG
 const firebaseConfig = {
