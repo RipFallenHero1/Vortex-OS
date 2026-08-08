@@ -15,6 +15,10 @@ let currentUser=null, highestZIndex=100, openApps=new Set(), clockInterval=null;
 let currentSceneObjects=[], selectedObjectId=null, engineTool="select";
 let vortexScripts=[], activeScriptId=null, currentGameInstance=null, currentRunnerInstance=null;
 let currentChatId=null, currentChatType="dm", messengerListeners=[], currentGroupId=null, messengerMessageUnsub=null;
+const ADMIN_KEYS=new Set(["rip_fallenhero","king"]);
+let systemListeners=[];
+function isAdmin(){return !!currentUser && ADMIN_KEYS.has(currentUser.key);}
+function isMessengerBanned(){return !!currentUser?.messengerBanned;}
 const globalKeys={};
 const TILE_W=32,TILE_H=35;
 
@@ -53,17 +57,17 @@ function startSession(userKey,data){
   const se=document.getElementById("start-email"), set=document.getElementById("settings-email");
   if(se)se.innerText=data.email||"online"; if(set)set.innerText=data.email||"-";
   updateBalanceUI(); startClock(); loadGlobalStore(); loadUserFiles(); loadFriends();
-  loadEngineLocal(); loadMessengerHome();
+  loadEngineLocal(); loadMessengerHome(); updateAdminVisibility(); startSystemListeners();
 }
 function tryAutoLogin(){
   const k=localStorage.getItem("vortex_current_user"); if(!k)return;
   database.ref("users/"+k).once("value").then(s=>{if(s.exists())startSession(k,s.val());else localStorage.removeItem("vortex_current_user");});
 }
-function logoutUser(){localStorage.removeItem("vortex_current_user");currentUser=null;clearMessengerListeners();document.getElementById("login-screen").style.display="flex";}
+function logoutUser(){localStorage.removeItem("vortex_current_user");currentUser=null;clearMessengerListeners();stopSystemListeners();document.getElementById("login-screen").style.display="flex";}
 function shutdownPC(){closeStartMenuIfOpen();document.getElementById("shutdown-screen").style.display="flex";if(clockInterval)clearInterval(clockInterval);stopEngineTestLoop();stopRunnerInstance();clearMessengerListeners();}
 function powerOn(){document.getElementById("shutdown-screen").style.display="none";if(currentUser){document.getElementById("login-screen").style.display="none";startClock();}else document.getElementById("login-screen").style.display="flex";}
 function startClock(){if(clockInterval)clearInterval(clockInterval);const u=()=>{const e=document.getElementById("os-clock");if(e){const d=new Date();e.innerText=String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");}};u();clockInterval=setInterval(u,30000);}
-function openWindow(id){const w=document.getElementById(id);if(!w)return;w.style.display="flex";bringToFront(w);openApps.add(id);addTaskbarButton(id);if(id==="win-engine")initEngineEditor();if(id==="win-messenger")loadMessengerHome();if(id==="win-vscode")renderScriptsSidebarList();}
+function openWindow(id){if(id==="win-messenger"&&isMessengerBanned())return alert("Seu acesso ao Messenger está bloqueado.");if(id==="win-admin"&&!isAdmin())return alert("Acesso negado.");const w=document.getElementById(id);if(!w)return;w.style.display="flex";bringToFront(w);openApps.add(id);addTaskbarButton(id);if(id==="win-engine")initEngineEditor();if(id==="win-messenger")loadMessengerHome();if(id==="win-vscode")renderScriptsSidebarList();if(id==="win-admin")loadAdminState();}
 function closeWindow(id){const w=document.getElementById(id);if(w)w.style.display="none";openApps.delete(id);removeTaskbarButton(id);if(id==="win-engine")stopEngineTestLoop();if(id==="win-runner")stopRunnerInstance();if(id==="win-messenger")clearMessengerListeners();}
 function bringToFront(w){if(!w)return;w.style.zIndex=++highestZIndex;}
 function dragWindow(e,id){if(e.target.closest("button,input,textarea"))return;const w=document.getElementById(id);if(!w)return;bringToFront(w);let sx=e.clientX,sy=e.clientY,ox=w.offsetLeft,oy=w.offsetTop;const move=ev=>{w.style.left=(ox+ev.clientX-sx)+"px";w.style.top=(oy+ev.clientY-sy)+"px";};const up=()=>{document.removeEventListener("mousemove",move);document.removeEventListener("mouseup",up);};document.addEventListener("mousemove",move);document.addEventListener("mouseup",up);}
@@ -72,6 +76,59 @@ function removeTaskbarButton(id){document.getElementById("task-"+id)?.remove();}
 function toggleStartMenu(){const m=document.getElementById("start-menu");m.classList.toggle("open");m.style.display=m.classList.contains("open")?"block":"none";}
 function closeStartMenuIfOpen(){const m=document.getElementById("start-menu");if(m){m.classList.remove("open");m.style.display="none";}}
 document.addEventListener("click",e=>{const m=document.getElementById("start-menu"),b=document.querySelector(".start-btn");if(m?.classList.contains("open")&&!m.contains(e.target)&&e.target!==b)closeStartMenuIfOpen();});
+
+/* ================= ADMIN / GLOBAL SYSTEM ================= */
+function updateAdminVisibility(){
+  const icon=document.getElementById("admin-desktop-icon"), start=document.getElementById("admin-start-btn");
+  const yes=isAdmin();
+  if(icon) icon.style.display=yes?"block":"none";
+  if(start) start.style.display=yes?"block":"none";
+}
+function startSystemListeners(){
+  stopSystemListeners();
+  const maintenanceRef=database.ref("system/maintenance");
+  const resetRef=database.ref("system/globalResetAt");
+  const banRef=currentUser?database.ref("users/"+currentUser.key+"/messengerBanned"):null;
+  const maintenanceHandler=s=>{const on=!!s.val(); document.body.dataset.maintenance=on?"1":"0"; if(on&&!isAdmin()) showMaintenanceOverlay(); else hideMaintenanceOverlay();};
+  const resetHandler=s=>{const ts=Number(s.val()||0); if(ts && ts!==Number(localStorage.getItem("vortex_last_global_reset")||0)){localStorage.setItem("vortex_last_global_reset",String(ts)); shutdownPC(); alert("O Vortex OS foi reiniciado globalmente por um administrador.");}};
+  const banHandler=s=>{if(!currentUser)return;currentUser.messengerBanned=!!s.val(); if(currentUser.messengerBanned){clearMessengerListeners(); if(document.getElementById("win-messenger")?.style.display!=="none") closeWindow("win-messenger"); alert("Seu acesso ao Vortex Messenger foi bloqueado.");}};
+  maintenanceRef.on("value",maintenanceHandler); resetRef.on("value",resetHandler); if(banRef)banRef.on("value",banHandler);
+  systemListeners.push(()=>maintenanceRef.off("value",maintenanceHandler),()=>resetRef.off("value",resetHandler)); if(banRef)systemListeners.push(()=>banRef.off("value",banHandler));
+}
+function stopSystemListeners(){systemListeners.forEach(fn=>{try{fn();}catch{}});systemListeners=[];}
+function showMaintenanceOverlay(){
+  let e=document.getElementById("maintenance-overlay"); if(!e){e=document.createElement("div");e.id="maintenance-overlay";e.className="full-overlay dark";e.innerHTML='<div class="power-card"><div class="brand-mark">V</div><h1>Vortex OS</h1><p>O sistema está em manutenção.</p><small>Volte em alguns minutos.</small></div>';document.body.appendChild(e);} e.style.display="flex";
+}
+function hideMaintenanceOverlay(){document.getElementById("maintenance-overlay")?.remove();}
+function requireAdmin(){if(!isAdmin()){alert("Acesso negado.");return false;}return true;}
+function openAdminPanel(){if(!requireAdmin())return;openWindow("win-admin");loadAdminUsers();loadAdminApps();loadAdminState();}
+function loadAdminState(){
+  if(!isAdmin())return;
+  database.ref("system/maintenance").once("value").then(s=>{const e=document.getElementById("admin-maintenance");if(e)e.checked=!!s.val();});
+}
+function setMaintenanceMode(on){if(!requireAdmin())return;return database.ref("system/maintenance").set(!!on).then(()=>alert(on?"Modo manutenção ativado globalmente.":"Modo manutenção desativado."));}
+function adminSetMoney(){
+  if(!requireAdmin())return; const nick=document.getElementById("admin-money-user").value.trim(), amount=Number(document.getElementById("admin-money-value").value); if(!nick||!Number.isFinite(amount)||amount<0)return alert("Informe nick e valor válidos.");
+  const key=keyForNick(nick); return database.ref("users/"+key).once("value").then(s=>{if(!s.exists())throw new Error("Usuário não encontrado.");return database.ref("users/"+key+"/balance").set(amount);}).then(()=>alert("Saldo atualizado.")).catch(e=>alert("Erro: "+e.message));
+}
+function adminGlobalReset(){if(!requireAdmin())return;if(!confirm("Reiniciar o Vortex OS de TODOS os usuários agora?"))return database.ref("system/globalResetAt").set(Date.now()).then(()=>alert("Reinicialização global enviada."));}
+function adminBanUser(){
+  if(!requireAdmin())return; const nick=document.getElementById("admin-ban-user").value.trim(), key=keyForNick(nick); if(!key)return alert("Informe um nick."); if(ADMIN_KEYS.has(key))return alert("Não é permitido bloquear um administrador.");
+  return database.ref("users/"+key).once("value").then(s=>{if(!s.exists())throw new Error("Usuário não encontrado.");return database.ref("users/"+key+"/messengerBanned").set(true);}).then(()=>{alert("Usuário bloqueado no Messenger.");loadAdminUsers();}).catch(e=>alert("Erro: "+e.message));
+}
+function adminUnbanUser(){
+  if(!requireAdmin())return; const nick=document.getElementById("admin-ban-user").value.trim(), key=keyForNick(nick); if(!key)return alert("Informe um nick."); return database.ref("users/"+key+"/messengerBanned").set(false).then(()=>{alert("Bloqueio removido.");loadAdminUsers();}).catch(e=>alert("Erro: "+e.message));
+}
+function loadAdminUsers(){
+  const l=document.getElementById("admin-users-list");if(!l||!isAdmin())return; database.ref("users").once("value").then(s=>{l.innerHTML="";if(!s.exists()){l.innerHTML="<div class='muted'>Nenhum usuário.</div>";return;}s.forEach(c=>{const u=c.val()||{},name=safeUserName(u,c.key);const row=document.createElement("div");row.className="admin-row";row.innerHTML=`<span>@${escapeHtml(name)}</span><span>R$ ${Number(u.balance||0).toFixed(2)}</span><span>${u.messengerBanned?"🚫":"✓"}</span>`;l.appendChild(row);});});
+}
+function loadAdminApps(){
+  const l=document.getElementById("admin-apps-list");if(!l||!isAdmin())return; database.ref("publishedApps").once("value").then(s=>{l.innerHTML="";if(!s.exists()){l.innerHTML="<div class='muted'>Nenhum jogo publicado.</div>";return;}s.forEach(c=>{const a=c.val()||{},row=document.createElement("div");row.className="admin-row";row.innerHTML=`<span>${escapeHtml(a.title||c.key)}</span><span>@${escapeHtml(a.author||a.authorKey||"?")}</span><button class="btn danger">Excluir</button>`;row.querySelector("button").onclick=()=>deletePublishedGame(c.key,a,true);l.appendChild(row);});});
+}
+function deletePublishedGame(id,a,admin=false){
+  if(!currentUser)return; const owner=a?.authorKey===currentUser.key; if(!admin&&!owner&&!isAdmin())return alert("Você só pode excluir seus próprios jogos."); if(!confirm(`Excluir "${a?.title||id}" da loja?`))return;
+  return database.ref("publishedApps/"+id).remove().then(()=>database.ref("users/"+(a.authorKey||currentUser.key)+"/files/"+id).remove()).then(()=>{alert("Jogo excluído da loja.");loadGlobalStore();loadUserFiles();if(isAdmin())loadAdminApps();}).catch(e=>alert("Erro: "+e.message));
+}
 
 /* ================= THEME / WALLET / PIX ================= */
 function setTheme(name){const t={purple:"linear-gradient(135deg,#2e0854,#12002b,#4a154b)","dark-purple":"linear-gradient(135deg,#0f172a,#1e1b4b,#311042)","cyber-blue":"linear-gradient(135deg,#0284c7,#0f172a,#1e1b4b)",sunset:"linear-gradient(135deg,#831843,#312e81,#0f172a)"};document.body.style.background=t[name]||t.purple;localStorage.setItem("vortex_theme",name);}
@@ -279,10 +336,12 @@ function buildVortexAPI(inst){
     remove_ui:id=>{inst.uiElements[id]?.el.remove();delete inst.uiElements[id];},
     set_color:(e,c)=>{if(e){e.color=c;if(e.el)e.el.style.background=c;}},
     set_size:(e,w,h)=>{if(e){e.w=Number(w)||e.w;e.h=Number(h)||e.h;}},
+    set_position:(e,x,y)=>{if(e){e.x=Number(x)||0;e.y=Number(y)||0;}},
+    get_position:e=>e?{x:e.x,y:e.y}:null,
     get_delta:()=>1/60
   };return api;
 }
-function syncVortexRender(pd){if(pd.player){applyStyles(pd.player.el,{left:pd.player.x+"px",top:pd.player.y+"px"});}pd.blocks.forEach(b=>applyStyles(b.el,{left:b.x+"px",top:b.y+"px",width:b.w+"px",height:b.h+"px"}));pd.coins.forEach(c=>{if(!c.collected)applyStyles(c.el,{left:c.x+"px",top:c.y+"px"});});}
+function syncVortexRender(pd){if(pd.player)applyStyles(pd.player.el,shapeStyle(pd.player));pd.blocks.forEach(b=>applyStyles(b.el,shapeStyle(b)));pd.coins.forEach(c=>{if(!c.collected)applyStyles(c.el,shapeStyle(c));});}
 function createVortexGameInstance(container,mapData,scriptCode,opts={}){
   container.innerHTML="";
   container.style.position="relative";
@@ -319,10 +378,7 @@ function createVortexGameInstance(container,mapData,scriptCode,opts={}){
     data.forEach(o=>{
       // Editor -> runtime mapping. The editor uses square/circle/triangle/player/coin.
       // Runtime uses block/coin/player for gameplay while preserving the shape/color.
-      const runtimeType =
-        o.type==="player" ? "player" :
-        o.type==="coin" || o.shape==="circle" ? "coin" :
-        "block";
+      const runtimeType = o.type==="player" ? "player" : o.type==="coin" ? "coin" : "block";
       makeVortexEntity(inst,runtimeType,o.x,o.y,o.w,o.h,o.color,o.shape);
     });
   }else{
@@ -429,8 +485,35 @@ function compileAndPublishEngineGame(){
   const appId="app_"+Date.now(),app={title,price,author:currentUser.displayName||currentUser.key,authorKey:currentUser.key,sceneObjects:currentSceneObjects,scriptCode:s?.code||"",createdAt:Date.now()};
   database.ref("publishedApps/"+appId).set(app).then(()=>database.ref("users/"+currentUser.key+"/files/"+appId).set(true)).then(()=>{alert("Publicado com sucesso!");closePublishModal();loadGlobalStore();loadUserFiles();}).catch(e=>alert("Erro: "+e.message));
 }
-function loadGlobalStore(){const l=document.getElementById("global-apps-list");if(!l)return;database.ref("publishedApps").once("value").then(s=>{l.innerHTML="";if(!s.exists()){l.innerHTML="<p>Nenhum jogo publicado ainda.</p>";return;}s.forEach(c=>{const a=c.val(),card=document.createElement("div");card.className="app-card";card.innerHTML=`<h4>${escapeHtml(a.title)}</h4><p>Por ${escapeHtml(a.author)}</p><p>R$ ${Number(a.price||0).toFixed(2)}</p><button class="btn btn-primary">Comprar / Adicionar</button>`;card.querySelector("button").onclick=()=>buyApp(c.key,a);l.appendChild(card);});});}
-function buyApp(id,a){if(!currentUser)return alert("Faça login.");const price=Number(a.price||0);if(Number(currentUser.balance||0)<price)return alert("Saldo insuficiente.");addBalance(-price).then(()=>database.ref("users/"+currentUser.key+"/files/"+id).set(true)).then(()=>{alert("Adicionado aos seus arquivos.");loadUserFiles();}).catch(e=>alert("Erro: "+e.message));}
+function loadGlobalStore(){
+  const l=document.getElementById("global-apps-list"); if(!l)return;
+  database.ref("publishedApps").once("value").then(s=>{
+    l.innerHTML="";
+    if(!s.exists()){l.innerHTML="<p>Nenhum jogo publicado ainda.</p>";return;}
+    s.forEach(c=>{
+      const a=c.val()||{}, card=document.createElement("div"); card.className="app-card";
+      card.innerHTML=`<h4>${escapeHtml(a.title||c.key)}</h4><p>Por ${escapeHtml(a.author||a.authorKey||"Usuário")}</p><p>R$ ${Number(a.price||0).toFixed(2)}</p><div class="store-actions"></div>`;
+      const actions=card.querySelector(".store-actions"), buy=document.createElement("button");
+      buy.className="btn btn-primary"; buy.innerText=(currentUser&&a.authorKey===currentUser.key)?"Comprar / Adicionar":"Comprar"; buy.onclick=()=>buyApp(c.key,a); actions.appendChild(buy);
+      if((currentUser&&a.authorKey===currentUser.key)||isAdmin()){const del=document.createElement("button");del.className="btn danger";del.innerText="Excluir jogo";del.onclick=()=>deletePublishedGame(c.key,a);actions.appendChild(del);}
+      l.appendChild(card);
+    });
+  });
+}
+function buyApp(id,a){
+  if(!currentUser)return alert("Faça login.");
+  const price=Math.max(0,Number(a.price||0));
+  if(a.authorKey===currentUser.key)return alert("Você não pode comprar seu próprio jogo.");
+  if(Number(currentUser.balance||0)<price)return alert("Saldo insuficiente.");
+  const buyerRef=database.ref("users/"+currentUser.key+"/balance"), sellerRef=database.ref("users/"+a.authorKey+"/balance");
+  let oldBuyer;
+  return buyerRef.transaction(v=>{oldBuyer=Number(v||0);if(oldBuyer<price)return;return oldBuyer-price;})
+    .then(r=>{if(!r.committed)throw new Error("Saldo insuficiente.");return sellerRef.transaction(v=>Number(v||0)+price);})
+    .then(()=>database.ref("users/"+currentUser.key+"/files/"+id).set(true))
+    .then(()=>{currentUser.balance=Number((oldBuyer-price).toFixed(2));updateBalanceUI();alert(`Compra concluída! R$ ${price.toFixed(2)} foram enviados ao criador.`);loadUserFiles();})
+    .catch(e=>{if(oldBuyer!==undefined && String(e.message||e)!=="Saldo insuficiente."){return buyerRef.set(oldBuyer).then(()=>{throw e;});}throw e;})
+    .catch(e=>alert("Erro: "+e.message));
+}
 function loadUserFiles(){const l=document.getElementById("files-list");if(!l||!currentUser)return;database.ref("users/"+currentUser.key+"/files").once("value").then(async s=>{l.innerHTML="";if(!s.exists()){l.innerHTML="<p>Nenhum .vexe instalado.</p>";return;}for(const id of Object.keys(s.val())){const a=(await database.ref("publishedApps/"+id).once("value")).val();if(!a)continue;const card=document.createElement("div");card.className="app-card";card.innerHTML=`<h4>${escapeHtml(a.title)}.vexe</h4><p>Por ${escapeHtml(a.author)}</p>`;const b=document.createElement("button");b.className="btn btn-primary";b.innerText="Executar";b.onclick=()=>runVexeApp(a);card.appendChild(b);l.appendChild(card);}});}
 function runVexeApp(app){openWindow("win-runner");document.getElementById("runner-title").innerText="Executando: "+app.title+".vexe";stopRunnerInstance();currentRunnerInstance=createVortexGameInstance(document.getElementById("runner-canvas"),app.sceneObjects||app.mapData||[],app.scriptCode||"");currentRunnerInstance.start();}
 function stopRunnerInstance(){currentRunnerInstance?.stop();currentRunnerInstance=null;}
