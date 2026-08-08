@@ -1,5 +1,5 @@
 /* =========================================================
-   VORTEX OS v10.0 — OS + Vortex Engine + Vortex Messenger + Browser
+   VORTEX OS v10.1 — Complete OS & Engine & Vortex Chromium
    ========================================================= */
 const OS_VERSION = "10.1";
 const firebaseConfig = {
@@ -22,7 +22,12 @@ function isMessengerBanned(){return !!currentUser?.messengerBanned;}
 const globalKeys={};
 const TILE_W=32,TILE_H=35;
 
-/* ================= VORTEX BROWSER DATA ================= */
+/* ================= ENGINE PAN & RESIZE STATE ================= */
+let enginePan = { x: 0, y: 0 };
+let isPanning = false, panStart = { x: 0, y: 0 };
+let activeResizeHandle = null, resizeStart = { x: 0, y: 0, ox: 0, oy: 0, ow: 0, oh: 0 };
+
+/* ================= VORTEX CHROMIUM DATA ================= */
 let browserHistory = [];
 let browserHistoryIndex = -1;
 
@@ -33,6 +38,89 @@ window.addEventListener("beforeunload",()=>saveEngineLocal());
 function keyForNick(n){return String(n||"").trim().toLowerCase().replace(/[.#$/\[\]]/g,"_");}
 function escapeHtml(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));}
 function clamp(n,a,b){return Math.max(a,Math.min(b,n));}
+
+/* ================= INJEÇÃO DINÂMICA DE UI & ESTILOS DA ENGINE ================= */
+function injectDynamicEngineStyles(){
+  if(document.getElementById("vortex-dynamic-styles")) return;
+  const style = document.createElement("style");
+  style.id = "vortex-dynamic-styles";
+  style.innerHTML = `
+    .engine-object.selected-unity {
+      outline: 2px solid #38bdf8 !important;
+      outline-offset: 1px;
+    }
+    .resize-handle {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background: #38bdf8;
+      border: 1px solid #ffffff;
+      border-radius: 2px;
+      z-index: 99;
+      pointer-events: auto;
+    }
+    .handle-nw { top: -6px; left: -6px; cursor: nwse-resize; }
+    .handle-n  { top: -6px; left: calc(50% - 5px); cursor: ns-resize; }
+    .handle-ne { top: -6px; right: -6px; cursor: nesw-resize; }
+    .handle-e  { top: calc(50% - 5px); right: -6px; cursor: ew-resize; }
+    .handle-se { bottom: -6px; right: -6px; cursor: nwse-resize; }
+    .handle-s  { bottom: -6px; left: calc(50% - 5px); cursor: ns-resize; }
+    .handle-sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
+    .handle-w  { top: calc(50% - 5px); left: -6px; cursor: ew-resize; }
+
+    .vort-studio-card {
+      padding: 15px; background: #181825; border-radius: 8px; color: #fff; display: flex; flex-direction: column; gap: 10px;
+    }
+    .vort-studio-card input, .vort-studio-card textarea {
+      background: #11111b; border: 1px solid #313244; color: #cdd6f4; border-radius: 6px; padding: 8px; outline: none; font-family: monospace;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+function ensureDynamicAppWindows(){
+  injectDynamicEngineStyles();
+
+  // Desktop Icon do Criador .vort
+  if(!document.getElementById("icon-vort-studio") && document.getElementById("desktop")){
+    const icon = document.createElement("div");
+    icon.id = "icon-vort-studio";
+    icon.className = "desktop-icon";
+    icon.onclick = () => openWindow("win-vort-studio");
+    icon.innerHTML = `<div class="app-icon" style="background:linear-gradient(135deg,#06b6d4,#3b82f6)">🌐</div><span>Criador .vort</span>`;
+    document.getElementById("desktop").appendChild(icon);
+  }
+
+  // Window do Criador .vort
+  if(!document.getElementById("win-vort-studio")){
+    const win = document.createElement("div");
+    win.id = "win-vort-studio";
+    win.className = "window";
+    win.style.cssText = "top:100px;left:220px;width:700px;height:520px;display:none;";
+    win.innerHTML = `
+      <div class="window-header" onmousedown="dragWindow(event,'win-vort-studio')">
+        <span>Vortex Web Studio — Criador de Sites .vort</span>
+        <div class="window-controls"><button onclick="closeWindow('win-vort-studio')">×</button></div>
+      </div>
+      <div class="window-body" style="padding:15px; background:#1e1e2e; height:calc(100% - 35px); overflow-y:auto;">
+        <div class="vort-studio-card">
+          <h3>🚀 Criar ou Editar seu Site .vort</h3>
+          <label>Nome do Domínio (ex: meujogo.vort ou comunidade.vort)
+            <input id="vort-site-domain" placeholder="exemplo.vort" style="width:100%; margin-top:4px;">
+          </label>
+          <label>Título da Página
+            <input id="vort-site-title" placeholder="Meu Site Incrível" style="width:100%; margin-top:4px;">
+          </label>
+          <label>Conteúdo HTML / CSS do Site
+            <textarea id="vort-site-html" rows="10" style="width:100%; margin-top:4px; height:180px;" placeholder="<h1>Bem-vindo ao meu site .vort!</h1>\n<p>Criado no Vortex OS.</p>"></textarea>
+          </label>
+          <button class="btn primary" onclick="publishVortSite()">Publicar Site na Rede .vort</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(win);
+  }
+}
 
 /* ================= AUTH / OS ================= */
 function loginUser(){
@@ -60,6 +148,7 @@ function startSession(userKey,data){
   ["start-username","settings-user"].forEach(id=>{const e=document.getElementById(id);if(e)e.innerText=data.displayName||userKey;});
   const se=document.getElementById("start-email"), set=document.getElementById("settings-email");
   if(se)se.innerText=data.email||"online"; if(set)set.innerText=data.email||"-";
+  ensureDynamicAppWindows();
   updateBalanceUI(); startClock(); loadGlobalStore(); loadUserFiles(); loadFriends();
   loadEngineLocal(); loadMessengerHome(); updateAdminVisibility(); startSystemListeners();
 }
@@ -71,7 +160,18 @@ function logoutUser(){localStorage.removeItem("vortex_current_user");currentUser
 function shutdownPC(){closeStartMenuIfOpen();document.getElementById("shutdown-screen").style.display="flex";if(clockInterval)clearInterval(clockInterval);stopEngineTestLoop();stopRunnerInstance();clearMessengerListeners();}
 function powerOn(){document.getElementById("shutdown-screen").style.display="none";if(currentUser){document.getElementById("login-screen").style.display="none";startClock();}else document.getElementById("login-screen").style.display="flex";}
 function startClock(){if(clockInterval)clearInterval(clockInterval);const u=()=>{const e=document.getElementById("os-clock");if(e){const d=new Date();e.innerText=String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");}};u();clockInterval=setInterval(u,30000);}
-function openWindow(id){if(id==="win-messenger"&&isMessengerBanned())return alert("Seu acesso ao Messenger está bloqueado.");if(id==="win-admin"&&!isAdmin())return alert("Acesso negado.");const w=document.getElementById(id);if(!w)return;w.style.display="flex";bringToFront(w);openApps.add(id);addTaskbarButton(id);if(id==="win-engine")initEngineEditor();if(id==="win-messenger")loadMessengerHome();if(id==="win-vscode")renderScriptsSidebarList();if(id==="win-admin")loadAdminState();if(id==="win-browser"&&browserHistory.length===0)navigateBrowser("https://www.bing.com");}
+
+function openWindow(id){
+  if(id==="win-messenger"&&isMessengerBanned())return alert("Seu acesso ao Messenger está bloqueado.");
+  if(id==="win-admin"&&!isAdmin())return alert("Acesso negado.");
+  const w=document.getElementById(id);if(!w)return;
+  w.style.display="flex";bringToFront(w);openApps.add(id);addTaskbarButton(id);
+  if(id==="win-engine")initEngineEditor();
+  if(id==="win-messenger")loadMessengerHome();
+  if(id==="win-vscode")renderScriptsSidebarList();
+  if(id==="win-admin")loadAdminState();
+  if(id==="win-browser"&&browserHistory.length===0)navigateBrowser("vortex chromium.vort");
+}
 function closeWindow(id){const w=document.getElementById(id);if(w)w.style.display="none";openApps.delete(id);removeTaskbarButton(id);if(id==="win-engine")stopEngineTestLoop();if(id==="win-runner")stopRunnerInstance();if(id==="win-messenger")clearMessengerListeners();}
 function bringToFront(w){if(!w)return;w.style.zIndex=++highestZIndex;}
 function dragWindow(e,id){if(e.target.closest("button,input,textarea"))return;const w=document.getElementById(id);if(!w)return;bringToFront(w);let sx=e.clientX,sy=e.clientY,ox=w.offsetLeft,oy=w.offsetTop;const move=ev=>{w.style.left=(ox+ev.clientX-sx)+"px";w.style.top=(oy+ev.clientY-sy)+"px";};const up=()=>{document.removeEventListener("mousemove",move);document.removeEventListener("mouseup",up);};document.addEventListener("mousemove",move);document.addEventListener("mouseup",up);}
@@ -81,54 +181,197 @@ function toggleStartMenu(){const m=document.getElementById("start-menu");m.class
 function closeStartMenuIfOpen(){const m=document.getElementById("start-menu");if(m){m.classList.remove("open");m.style.display="none";}}
 document.addEventListener("click",e=>{const m=document.getElementById("start-menu"),b=document.querySelector(".start-btn");if(m?.classList.contains("open")&&!m.contains(e.target)&&e.target!==b)closeStartMenuIfOpen();});
 
-/* ================= VORTEX BROWSER LOGIC ================= */
+/* ================= VORTEX CHROMIUM (NAVEGADOR PRÓPRIO .VORT) ================= */
 function navigateBrowser(targetUrl){
   const input = document.getElementById("browser-url");
   const iframe = document.getElementById("browser-iframe");
   if(!input || !iframe) return;
 
-  let query = targetUrl || input.value.trim();
-  if(!query) query = "https://www.bing.com";
+  let query = (targetUrl !== undefined ? targetUrl : input.value).trim();
+  if(!query) query = "vortex chromium.vort";
 
-  let finalUrl = query;
-  if(!/^https?:\/\//i.test(query)){
-    if(query.includes(".") && !query.includes(" ")){
-      finalUrl = "https://" + query;
-    } else {
-      finalUrl = "https://www.bing.com/search?q=" + encodeURIComponent(query);
-    }
+  let cleanUrl = query.toLowerCase();
+  if(!cleanUrl.endsWith(".vort") && cleanUrl !== "vortex chromium.vort"){
+    cleanUrl = cleanUrl + ".vort";
   }
 
-  input.value = finalUrl;
-  iframe.src = finalUrl;
+  input.value = cleanUrl;
 
-  if(browserHistoryIndex === -1 || browserHistory[browserHistoryIndex] !== finalUrl){
+  if(cleanUrl === "vortex chromium.vort"){
+    renderIframeContent(iframe, getChromiumHomeHTML());
+  } else if(cleanUrl === "vortex.api.vort"){
+    renderIframeContent(iframe, getVortexApiDocHTML());
+  } else {
+    // Busca site .vort personalizado no Firebase
+    const siteKey = cleanUrl.replace(".vort","").replace(/[.#$/\[\]]/g,"_");
+    database.ref("vortSites/"+siteKey).once("value").then(s=>{
+      if(s.exists()){
+        const data = s.val();
+        renderIframeContent(iframe, getCustomVortSiteHTML(data.title, data.html, data.author));
+      } else {
+        renderIframeContent(iframe, getNotFoundVortHTML(cleanUrl));
+      }
+    }).catch(()=>{
+      renderIframeContent(iframe, getNotFoundVortHTML(cleanUrl));
+    });
+  }
+
+  if(browserHistoryIndex === -1 || browserHistory[browserHistoryIndex] !== cleanUrl){
     browserHistory = browserHistory.slice(0, browserHistoryIndex + 1);
-    browserHistory.push(finalUrl);
+    browserHistory.push(cleanUrl);
     browserHistoryIndex = browserHistory.length - 1;
   }
 }
 
-function browserNav(action){
-  const iframe = document.getElementById("browser-iframe");
-  const input = document.getElementById("browser-url");
-  if(!iframe || !input) return;
+function renderIframeContent(iframe, html){
+  iframe.srcdoc = html;
+}
 
+function browserNav(action){
   if(action === "back" && browserHistoryIndex > 0){
     browserHistoryIndex--;
-    const url = browserHistory[browserHistoryIndex];
-    input.value = url;
-    iframe.src = url;
+    navigateBrowser(browserHistory[browserHistoryIndex]);
   } else if(action === "forward" && browserHistoryIndex < browserHistory.length - 1){
     browserHistoryIndex++;
-    const url = browserHistory[browserHistoryIndex];
-    input.value = url;
-    iframe.src = url;
+    navigateBrowser(browserHistory[browserHistoryIndex]);
   } else if(action === "reload"){
-    iframe.src = iframe.src;
+    if(browserHistory[browserHistoryIndex]) navigateBrowser(browserHistory[browserHistoryIndex]);
   } else if(action === "home"){
-    navigateBrowser("https://www.bing.com");
+    navigateBrowser("vortex chromium.vort");
   }
+}
+
+/* --- HTML TEMPLATES DO VORTEX CHROMIUM --- */
+function getChromiumHomeHTML(){
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+    body { margin:0; padding:0; background:#0f0f17; color:#fff; font-family:system-ui,sans-serif; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; }
+    .logo { font-size:42px; font-weight:800; background:linear-gradient(135deg,#a855f7,#38bdf8); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:8px; }
+    .sub { color:#94a3b8; font-size:14px; margin-bottom:28px; }
+    .search-box { width:80%; max-width:540px; display:flex; gap:8px; }
+    input { flex:1; padding:12px 18px; border-radius:24px; border:1px solid #334155; background:#1e293b; color:#fff; font-size:15px; outline:none; box-shadow:0 4px 12px rgba(0,0,0,0.3); }
+    input:focus { border-color:#a855f7; }
+    button { padding:12px 24px; border-radius:24px; border:none; background:#a855f7; color:#fff; font-weight:bold; cursor:pointer; }
+    .shortcuts { display:flex; gap:16px; margin-top:32px; }
+    .card { background:#1e293b; border:1px solid #334155; padding:12px 20px; border-radius:12px; cursor:pointer; transition:0.2s; text-align:center; }
+    .card:hover { transform:translateY(-3px); border-color:#a855f7; }
+  </style></head><body>
+    <div class="logo">Vortex Chromium</div>
+    <div class="sub">Navegador Oficial da Rede .vort</div>
+    <div class="search-box">
+      <input id="q" placeholder="Digite um endereço .vort (ex: vortex.api.vort)" onkeydown="if(event.key==='Enter')go()">
+      <button onclick="go()">Acessar</button>
+    </div>
+    <div class="shortcuts">
+      <div class="card" onclick="location.href='about:blank'; window.parent.navigateBrowser('vortex.api.vort')">📚 Documentação API (vortex.api.vort)</div>
+    </div>
+    <script>function go(){ var v=document.getElementById('q').value; if(v) window.parent.navigateBrowser(v); }</script>
+  </body></html>`;
+}
+
+function getVortexApiDocHTML(){
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+    body { margin:0; padding:24px; background:#11111b; color:#cdd6f4; font-family:sans-serif; line-height:1.6; }
+    h1 { color:#cba6f7; border-bottom:2px solid #313244; padding-bottom:8px; }
+    h2 { color:#89b4fa; margin-top:24px; }
+    code { background:#1e1e2e; color:#f38ba8; padding:3px 7px; border-radius:4px; font-family:monospace; }
+    pre { background:#181825; padding:14px; border-radius:8px; border:1px solid #313244; overflow-x:auto; color:#a6e3a1; font-family:monospace; }
+    .box { background:#1e1e2e; padding:16px; border-radius:8px; border-left:4px solid #cba6f7; margin-bottom:16px; }
+  </style></head><body>
+    <h1>📖 Vortex Engine — Documentação da API</h1>
+    <p>Bem-vindo à documentação oficial dos scripts <code>.vortex</code>. Aqui você encontra todas as funções prontas para usar nos seus jogos!</p>
+    
+    <div class="box">
+      <b>🚀 Ciclo Principal do Jogo:</b>
+      <p>Todo script pode declarar duas funções principais:</p>
+      <code>def _ready():</code> — Executada 1 vez quando o jogo inicia.<br>
+      <code>def _update():</code> — Executada a cada quadro (60 FPS).
+    </div>
+
+    <h2>1. Controle do Jogador e Física</h2>
+    <pre>
+player = vortex.get_player()               # Retorna o objeto do Jogador
+vortex.move_player(dx, dy)                 # Move o jogador (ex: vortex.move_player(4, 0))
+vortex.apply_gravity(player, 0.6)          # Aplica gravidade contínua
+vortex.is_on_floor(player)                 # Retorna True se o jogador toca no chão
+vortex.move_and_collide(player)            # Trata colisões automáticas com blocos
+    </pre>
+
+    <h2>2. Teclado e Entradas (Input)</h2>
+    <pre>
+if vortex.is_key_down("a") or vortex.is_key_down("arrowleft"):
+    vortex.move_player(-4, 0)
+
+if vortex.is_key_down("space") and vortex.is_on_floor(player):
+    player.vy = -12
+    </pre>
+
+    <h2>3. Blocos, Moedas e Spawning</h2>
+    <pre>
+blocks = vortex.get_blocks()                # Lista de todos os blocos sólidos
+coins = vortex.get_coins()                  # Lista de todas as moedas
+vortex.spawn_at("coin", 150, 200)           # Criar objeto dinamicamente
+vortex.destroy(obj)                        # Destruir um objeto
+vortex.collect_coin(moeda)                  # Coletar moeda
+    </pre>
+
+    <h2>4. Interface de Usuário (UI) & HUD</h2>
+    <pre>
+vortex.create_text("hud", "Moedas: 0", 12, 12, "#ffffff")
+vortex.set_text("hud", "Moedas: " + str(vortex.get_coins_count()))
+vortex.create_button("btn1", "Iniciar", 100, 100, minha_funcao)
+    </pre>
+
+    <h2>5. Câmera e Utilitários</h2>
+    <pre>
+vortex.follow_camera(player, 300, 200)      # Faz a câmera seguir o jogador
+vortex.set_color(obj, "#ff0000")            # Altera a cor do objeto
+vortex.set_size(obj, 64, 64)                # Altera o tamanho (largura, altura)
+    </pre>
+  </body></html>`;
+}
+
+function getNotFoundVortHTML(url){
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+    body { margin:0; padding:0; background:#0f0f17; color:#fff; font-family:sans-serif; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; }
+    h1 { font-size:36px; color:#f38ba8; }
+    p { color:#94a3b8; }
+    button { padding:10px 20px; border-radius:8px; border:none; background:#a855f7; color:#fff; cursor:pointer; font-weight:bold; }
+  </style></head><body>
+    <h1>404 — Site .vort não encontrado</h1>
+    <p>O endereço <b>${escapeHtml(url)}</b> ainda não foi publicado na rede Vortex.</p>
+    <button onclick="window.parent.openWindow('win-vort-studio')">Criar este site no Criador .vort</button>
+  </body></html>`;
+}
+
+function getCustomVortSiteHTML(title, contentHtml, author){
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>
+    body { margin:0; padding:20px; background:#1e1e2e; color:#cdd6f4; font-family:sans-serif; }
+    footer { margin-top:40px; font-size:12px; color:#6c7086; border-top:1px solid #313244; padding-top:10px; }
+  </style></head><body>
+    ${contentHtml}
+    <footer>Site hospedado na rede .vort por @${escapeHtml(author||"desconhecido")}</footer>
+  </body></html>`;
+}
+
+/* --- CRIADOR DE SITES .VORT --- */
+function publishVortSite(){
+  if(!currentUser) return alert("Faça login para publicar.");
+  let domain = document.getElementById("vort-site-domain").value.trim().toLowerCase();
+  const title = document.getElementById("vort-site-title").value.trim() || domain;
+  const html = document.getElementById("vort-site-html").value;
+
+  if(!domain) return alert("Digite um domínio .vort.");
+  if(!domain.endsWith(".vort")) domain += ".vort";
+
+  const siteKey = domain.replace(".vort","").replace(/[.#$/\[\]]/g,"_");
+  database.ref("vortSites/"+siteKey).set({
+    domain, title, html, author: currentUser.displayName||currentUser.key, authorKey: currentUser.key, updatedAt: Date.now()
+  }).then(()=>{
+    alert("✅ Site "+domain+" publicado com sucesso!");
+    closeWindow("win-vort-studio");
+    openWindow("win-browser");
+    navigateBrowser(domain);
+  }).catch(e=>alert("Erro ao publicar site: "+e.message));
 }
 
 /* ================= ADMIN / GLOBAL SYSTEM ================= */
@@ -155,34 +398,6 @@ function showMaintenanceOverlay(){
 }
 function hideMaintenanceOverlay(){document.getElementById("maintenance-overlay")?.remove();}
 function requireAdmin(){if(!isAdmin()){alert("Acesso negado.");return false;}return true;}
-function openAdminPanel(){if(!requireAdmin())return;openWindow("win-admin");loadAdminUsers();loadAdminApps();loadAdminState();}
-function loadAdminState(){
-  if(!isAdmin())return;
-  database.ref("system/maintenance").once("value").then(s=>{const e=document.getElementById("admin-maintenance");if(e)e.checked=!!s.val();});
-}
-function setMaintenanceMode(on){if(!requireAdmin())return;return database.ref("system/maintenance").set(!!on).then(()=>alert(on?"Modo manutenção ativado globalmente.":"Modo manutenção desativado."));}
-function adminSetMoney(){
-  if(!requireAdmin())return; const nick=document.getElementById("admin-money-user").value.trim(), amount=Number(document.getElementById("admin-money-value").value); if(!nick||!Number.isFinite(amount)||amount<0)return alert("Informe nick e valor válidos.");
-  const key=keyForNick(nick); return database.ref("users/"+key).once("value").then(s=>{if(!s.exists())throw new Error("Usuário não encontrado.");return database.ref("users/"+key+"/balance").set(amount);}).then(()=>alert("Saldo atualizado.")).catch(e=>alert("Erro: "+e.message));
-}
-function adminGlobalReset(){if(!requireAdmin())return;if(!confirm("Reiniciar o Vortex OS de TODOS os usuários agora?"))return database.ref("system/globalResetAt").set(Date.now()).then(()=>alert("Reinicialização global enviada."));}
-function adminBanUser(){
-  if(!requireAdmin())return; const nick=document.getElementById("admin-ban-user").value.trim(), key=keyForNick(nick); if(!key)return alert("Informe um nick."); if(ADMIN_KEYS.has(key))return alert("Não é permitido bloquear um administrador.");
-  return database.ref("users/"+key).once("value").then(s=>{if(!s.exists())throw new Error("Usuário não encontrado.");return database.ref("users/"+key+"/messengerBanned").set(true);}).then(()=>{alert("Usuário bloqueado no Messenger.");loadAdminUsers();}).catch(e=>alert("Erro: "+e.message));
-}
-function adminUnbanUser(){
-  if(!requireAdmin())return; const nick=document.getElementById("admin-ban-user").value.trim(), key=keyForNick(nick); if(!key)return alert("Informe um nick."); return database.ref("users/"+key).once("value").then(s=>{if(!s.exists())throw new Error("Usuário não encontrado.");return database.ref("users/"+key+"/messengerBanned").set(false);}).then(()=>{alert("Bloqueio removido.");loadAdminUsers();}).catch(e=>alert("Erro: "+e.message));
-}
-function loadAdminUsers(){
-  const l=document.getElementById("admin-users-list");if(!l||!isAdmin())return; database.ref("users").once("value").then(s=>{l.innerHTML="";if(!s.exists()){l.innerHTML="<div class='muted'>Nenhum usuário.</div>";return;}s.forEach(c=>{const u=c.val()||{},name=safeUserName(u,c.key);const row=document.createElement("div");row.className="admin-row";row.innerHTML=`<span>@${escapeHtml(name)}</span><span>R$ ${Number(u.balance||0).toFixed(2)}</span><span>${u.messengerBanned?"🚫":"✓"}</span>`;l.appendChild(row);});});
-}
-function loadAdminApps(){
-  const l=document.getElementById("admin-apps-list");if(!l||!isAdmin())return; database.ref("publishedApps").once("value").then(s=>{l.innerHTML="";if(!s.exists()){l.innerHTML="<div class='muted'>Nenhum jogo publicado.</div>";return;}s.forEach(c=>{const a=c.val()||{},row=document.createElement("div");row.className="admin-row";row.innerHTML=`<span>${escapeHtml(a.title||c.key)}</span><span>@${escapeHtml(a.author||a.authorKey||"?")}</span><button class="btn danger">Excluir</button>`;row.querySelector("button").onclick=()=>deletePublishedGame(c.key,a,true);l.appendChild(row);});});
-}
-function deletePublishedGame(id,a,admin=false){
-  if(!currentUser)return; const owner=a?.authorKey===currentUser.key; if(!admin&&!owner&&!isAdmin())return alert("Você só pode excluir seus próprios jogos."); if(!confirm(`Excluir "${a?.title||id}" da loja?`))return;
-  return database.ref("publishedApps/"+id).remove().then(()=>database.ref("users/"+(a.authorKey||currentUser.key)+"/files/"+id).remove()).then(()=>{alert("Jogo excluído da loja.");loadGlobalStore();loadUserFiles();if(isAdmin())loadAdminApps();}).catch(e=>alert("Erro: "+e.message));
-}
 
 /* ================= THEME / WALLET / PIX ================= */
 function setTheme(name){const t={purple:"linear-gradient(135deg,#2e0854,#12002b,#4a154b)","dark-purple":"linear-gradient(135deg,#0f172a,#1e1b4b,#311042)","cyber-blue":"linear-gradient(135deg,#0284c7,#0f172a,#1e1b4b)",sunset:"linear-gradient(135deg,#831843,#312e81,#0f172a)"};document.body.style.background=t[name]||t.purple;localStorage.setItem("vortex_theme",name);}
@@ -219,75 +434,329 @@ function calcEval(){const d=document.getElementById("calc-display");try{if(!/^[0
 function uid(){return "obj_"+Date.now()+"_"+Math.random().toString(36).slice(2,7);}
 function defaultObject(type="square"){
   const n=currentSceneObjects.length;
-  const types={square:{shape:"square",color:"#8b5cf6",w:64,h:64},circle:{shape:"circle",color:"#facc15",w:48,h:48},triangle:{shape:"triangle",color:"#22c55e",w:60,h:60},player:{shape:"square",color:"#38bdf8",w:48,h:56},coin:{shape:"circle",color:"#facc15",w:32,h:32}};
+  const types={
+    square:{shape:"square",color:"#8b5cf6",w:64,h:64},
+    circle:{shape:"circle",color:"#facc15",w:48,h:48},
+    triangle:{shape:"triangle",color:"#22c55e",w:60,h:60},
+    player:{shape:"square",color:"#38bdf8",w:48,h:56},
+    coin:{shape:"circle",color:"#facc15",w:32,h:32},
+    ui_text:{shape:"ui_text",color:"#ffffff",w:120,h:32,text:"Novo Texto",fontSize:20},
+    ui_button:{shape:"ui_button",color:"#a855f7",w:100,h:36,text:"Botão",textColor:"#ffffff",fontSize:14},
+    ui_panel:{shape:"ui_panel",color:"rgba(30, 30, 46, 0.8)",w:180,h:120}
+  };
   const t=types[type]||types.square;
-  return {id:uid(),name:(type==="player"?"Player":type==="coin"?"Coin":"Object")+" "+(n+1),type,shape:t.shape,color:t.color,x:80+n*12,y:80+n*8,w:t.w,h:t.h,z:n};
+  return {
+    id:uid(), name:(type.startsWith("ui_")?type.replace("ui_","UI ").toUpperCase():type.toUpperCase())+" "+(n+1),
+    type, shape:t.shape, color:t.color, x:80+n*12, y:80+n*8, w:t.w, h:t.h, z:n,
+    text:t.text||"", fontSize:t.fontSize||16, textColor:t.textColor||"#ffffff"
+  };
 }
-function initEngineEditor(){renderEngineScene();renderHierarchy();updateInspector();}
-function setEngineTool(t){engineTool=t;document.querySelectorAll("[data-tool]").forEach(b=>b.classList.toggle("active",b.dataset.tool===t));const e=document.getElementById("engine-tool-label");if(e)e.innerText={select:"Selecionar / Mover",scale:"Aumentar / Reduzir",square:"Quadrado",circle:"Círculo",triangle:"Triângulo",player:"Player",coin:"Moeda",erase:"Apagar"}[t]||t;}
-function addEngineObject(type){const o=defaultObject(type);currentSceneObjects.push(o);selectedObjectId=o.id;saveEngineLocal();renderEngineScene();renderHierarchy();updateInspector();}
-function selectObject(id){selectedObjectId=id;setEngineTool("select");renderEngineScene();renderHierarchy();updateInspector();}
+
+function initEngineEditor(){
+  injectDynamicEngineStyles();
+  renderEngineScene();
+  renderHierarchy();
+  updateInspector();
+}
+
+function setEngineTool(t){
+  engineTool=t;
+  document.querySelectorAll("[data-tool]").forEach(b=>b.classList.toggle("active",b.dataset.tool===t));
+  const e=document.getElementById("engine-tool-label");
+  if(e)e.innerText={select:"Selecionar / Mover",scale:"Dimensionar (Unity Style)",square:"Quadrado",circle:"Círculo",triangle:"Triângulo",player:"Player",coin:"Moeda",ui_text:"Texto UI",ui_button:"Botão UI",ui_panel:"Painel UI",erase:"Apagar"}[t]||t;
+}
+
+function addEngineObject(type){
+  const o=defaultObject(type);
+  currentSceneObjects.push(o);
+  selectedObjectId=o.id;
+  saveEngineLocal();
+  renderEngineScene();
+  renderHierarchy();
+  updateInspector();
+}
+
+function duplicateSelectedObject(){
+  const o=getSelected(); if(!o) return;
+  const copy=JSON.parse(JSON.stringify(o));
+  copy.id=uid(); copy.name=o.name+" (Cópia)"; copy.x+=20; copy.y+=20;
+  currentSceneObjects.push(copy);
+  selectedObjectId=copy.id;
+  saveEngineLocal(); renderEngineScene(); renderHierarchy(); updateInspector();
+}
+
+function deleteSelectedObject(){
+  if(!selectedObjectId) return;
+  currentSceneObjects=currentSceneObjects.filter(x=>x.id!==selectedObjectId);
+  selectedObjectId=null;
+  saveEngineLocal(); renderEngineScene(); renderHierarchy(); updateInspector();
+}
+
+function selectObject(id){
+  selectedObjectId=id;
+  renderEngineScene(); renderHierarchy(); updateInspector();
+}
+
 function getSelected(){return currentSceneObjects.find(o=>o.id===selectedObjectId)||null;}
-function updateObjFromInspector(field,val){const o=getSelected();if(!o)return;let v=(field==="name"||field==="color"||field==="shape")?val:Number(val);if(["x","y","w","h"].includes(field))v=Math.max(field==="w"||field==="h"?4:0,v||0);o[field]=v;saveEngineLocal();renderEngineScene();renderHierarchy();}
+
+function updateObjFromInspector(field,val){
+  const o=getSelected();if(!o)return;
+  if(["name","color","shape","text","textColor"].includes(field)) o[field]=val;
+  else o[field]=Number(val);
+  saveEngineLocal(); renderEngineScene(); renderHierarchy();
+}
+
 function shapeStyle(o){
-  const s={background:o.color,width:o.w+"px",height:o.h+"px",left:o.x+"px",top:o.y+"px",position:"absolute",boxSizing:"border-box",border:"2px solid rgba(255,255,255,.35)",zIndex:o.z||1};
-  if(o.shape==="circle")s.borderRadius="50%";
-  if(o.shape==="triangle"){s.background="transparent";s.width="0px";s.height="0px";s.left=o.x+"px";s.top=o.y+"px";s.border="0 solid transparent";s.borderLeft=o.w/2+"px solid transparent";s.borderRight=o.w/2+"px solid transparent";s.borderBottom=o.h+"px solid "+o.color;}
+  const s={
+    position:"absolute", boxSizing:"border-box", zIndex:o.z||1,
+    left:(o.x + enginePan.x)+"px", top:(o.y + enginePan.y)+"px",
+    width:o.w+"px", height:o.h+"px"
+  };
+  if(o.shape==="circle"){ s.background=o.color; s.borderRadius="50%"; }
+  else if(o.shape==="triangle"){
+    s.background="transparent"; s.width="0px"; s.height="0px";
+    s.border="0 solid transparent"; s.borderLeft=o.w/2+"px solid transparent"; s.borderRight=o.w/2+"px solid transparent"; s.borderBottom=o.h+"px solid "+o.color;
+  }
+  else if(o.shape==="ui_text"){
+    s.background="transparent"; s.color=o.color||"#fff"; s.fontSize=(o.fontSize||18)+"px"; s.fontWeight="bold"; s.userSelect="none";
+  }
+  else if(o.shape==="ui_button"){
+    s.background=o.color; s.color=o.textColor||"#fff"; s.borderRadius="6px"; s.display="flex"; s.alignItems="center"; s.justifyContent="center"; s.fontSize=(o.fontSize||14)+"px"; s.fontWeight="bold"; s.userSelect="none";
+  }
+  else if(o.shape==="ui_panel"){
+    s.background=o.color; s.border="1px solid rgba(255,255,255,0.2)"; s.borderRadius="8px";
+  }
+  else { s.background=o.color; s.border="1px solid rgba(255,255,255,0.2)"; }
   return s;
 }
+
 function applyStyles(el,styles){Object.entries(styles).forEach(([k,v])=>el.style[k]=v);}
+
+/* --- PAN & SCENE RENDERER --- */
 function renderEngineScene(){
   const c=document.getElementById("canvas-2d");if(!c)return;
   c.innerHTML="";
+
   currentSceneObjects.forEach(o=>{
-    const el=document.createElement("div");el.className="engine-object";el.dataset.id=o.id;applyStyles(el,shapeStyle(o));
-    el.title=o.name;el.addEventListener("mousedown",e=>{e.stopPropagation();handleObjectPointer(e,o.id);});
-    if(o.id===selectedObjectId&&o.shape!=="triangle")el.classList.add("selected");
+    const el=document.createElement("div");
+    el.className="engine-object";
+    el.dataset.id=o.id;
+    applyStyles(el,shapeStyle(o));
+
+    if(o.shape==="ui_text") el.innerText=o.text||"Texto";
+    if(o.shape==="ui_button") el.innerText=o.text||"Botão";
+
+    if(o.id===selectedObjectId){
+      el.classList.add("selected-unity");
+      attachUnityScaleHandles(el, o);
+    }
+
+    el.onmousedown=e=>{
+      e.stopPropagation();
+      if(e.button===0) handleObjectPointer(e,o.id);
+    };
+
     c.appendChild(el);
   });
+
+  // Pan e inserção no Canvas Vazio
   c.onmousedown=e=>{
-    if(e.target!==c)return;
-    if(["square","circle","triangle","player","coin"].includes(engineTool)){
-      const p=pointerToScene(e),o=defaultObject(engineTool);
-      o.x=Math.round(p.x/8)*8;o.y=Math.round(p.y/8)*8;
-      currentSceneObjects.push(o);selectedObjectId=o.id;saveEngineLocal();renderEngineScene();renderHierarchy();updateInspector();
-    }else{
-      selectedObjectId=null;renderEngineScene();renderHierarchy();updateInspector();
+    if(e.target!==c) return;
+    if(e.button===0){
+      if(["square","circle","triangle","player","coin","ui_text","ui_button","ui_panel"].includes(engineTool)){
+        const p=pointerToScene(e);
+        const o=defaultObject(engineTool);
+        o.x=Math.round(p.x - enginePan.x);
+        o.y=Math.round(p.y - enginePan.y);
+        currentSceneObjects.push(o); selectedObjectId=o.id;
+        saveEngineLocal(); renderEngineScene(); renderHierarchy(); updateInspector();
+      } else {
+        // Iniciar Pan da Câmera (Clique arrastar na Unity)
+        isPanning=true;
+        panStart={ x: e.clientX - enginePan.x, y: e.clientY - enginePan.y };
+        selectedObjectId=null; renderEngineScene(); renderHierarchy(); updateInspector();
+      }
     }
   };
 }
+
+document.addEventListener("mousemove",e=>{
+  if(isPanning){
+    enginePan.x = e.clientX - panStart.x;
+    enginePan.y = e.clientY - panStart.y;
+    renderEngineScene();
+  }
+});
+document.addEventListener("mouseup",()=>{ isPanning=false; });
+
 function pointerToScene(e){const c=document.getElementById("canvas-2d"),r=c.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};}
+
+/* --- HANDLE UNITY-STYLE SCALING & MOVING --- */
+function attachUnityScaleHandles(el, o){
+  const handles = ["nw","n","ne","e","se","s","sw","w"];
+  handles.forEach(h=>{
+    const hd = document.createElement("div");
+    hd.className = `resize-handle handle-${h}`;
+    hd.onmousedown = (e) => {
+      e.stopPropagation();
+      activeResizeHandle = h;
+      resizeStart = { x: e.clientX, y: e.clientY, ox: o.x, oy: o.y, ow: o.w, oh: o.h };
+      
+      const onMove = (ev) => {
+        const dx = ev.clientX - resizeStart.x;
+        const dy = ev.clientY - resizeStart.y;
+        
+        if(h.includes("e")) o.w = Math.max(10, resizeStart.ow + dx);
+        if(h.includes("s")) o.h = Math.max(10, resizeStart.oh + dy);
+        if(h.includes("w")){
+          const nw = Math.max(10, resizeStart.ow - dx);
+          o.x = resizeStart.ox + (resizeStart.ow - nw);
+          o.w = nw;
+        }
+        if(h.includes("n")){
+          const nh = Math.max(10, resizeStart.oh - dy);
+          o.y = resizeStart.oy + (resizeStart.oh - nh);
+          o.h = nh;
+        }
+        renderEngineScene(); updateInspector();
+      };
+
+      const onUp = () => {
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+        saveEngineLocal();
+      };
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    };
+    el.appendChild(hd);
+  });
+}
+
 function handleObjectPointer(e,id){
   const o=currentSceneObjects.find(x=>x.id===id);if(!o)return;
-  if(engineTool==="erase"){currentSceneObjects=currentSceneObjects.filter(x=>x.id!==id);selectedObjectId=null;saveEngineLocal();renderEngineScene();renderHierarchy();updateInspector();return;}
-  selectedObjectId=id;const start=pointerToScene(e), ox=o.x,oy=o.y,ow=o.w,oh=o.h;
-  const move=ev=>{const p=pointerToScene(ev);if(engineTool==="scale"){o.w=Math.max(4,Math.round(ow+(p.x-start.x)));o.h=Math.max(4,Math.round(oh+(p.y-start.y)));}else{o.x=Math.max(0,Math.round(ox+p.x-start.x));o.y=Math.max(0,Math.round(oy+p.y-start.y));}renderEngineScene();updateInspector();};
-  const up=()=>{document.removeEventListener("mousemove",move);document.removeEventListener("mouseup",up);saveEngineLocal();renderHierarchy();};
-  document.addEventListener("mousemove",move);document.addEventListener("mouseup",up);
-  renderEngineScene();renderHierarchy();updateInspector();
+  if(engineTool==="erase"){
+    currentSceneObjects=currentSceneObjects.filter(x=>x.id!==id);
+    selectedObjectId=null; saveEngineLocal(); renderEngineScene(); renderHierarchy(); updateInspector(); return;
+  }
+  selectedObjectId=id;
+  const start=pointerToScene(e), ox=o.x, oy=o.y;
+  const move=ev=>{
+    const p=pointerToScene(ev);
+    o.x=Math.round(ox + p.x - start.x);
+    o.y=Math.round(oy + p.y - start.y);
+    renderEngineScene(); updateInspector();
+  };
+  const up=()=>{
+    document.removeEventListener("mousemove",move);
+    document.removeEventListener("mouseup",up);
+    saveEngineLocal(); renderHierarchy();
+  };
+  document.addEventListener("mousemove",move); document.addEventListener("mouseup",up);
+  renderEngineScene(); renderHierarchy(); updateInspector();
 }
-function renderHierarchy(){const t=document.getElementById("hierarchy-tree");if(!t)return;t.innerHTML="";currentSceneObjects.forEach(o=>{const li=document.createElement("li");li.className=o.id===selectedObjectId?"selected":"";li.innerHTML=`<span class="mini-shape" style="background:${escapeHtml(o.color)}"></span>${escapeHtml(o.name)}`;li.onclick=()=>selectObject(o.id);t.appendChild(li);});vortexScripts.forEach(s=>{const li=document.createElement("li");li.className="script-item";li.innerText="▣ "+s.name+".vortex";li.onclick=()=>openVortexScriptEditor(s.id);t.appendChild(li);});}
+
+function renderHierarchy(){
+  const t=document.getElementById("hierarchy-tree");if(!t)return;
+  t.innerHTML="";
+
+  // Botões de Adicionar UI na Hierarchy Panel (se não existirem no HTML, adicionamos dinamicamente)
+  if(!document.getElementById("ui-hierarchy-tools")){
+    const div = document.createElement("div");
+    div.id = "ui-hierarchy-tools";
+    div.style.cssText = "display:flex; gap:4px; margin:6px 0; flex-wrap:wrap;";
+    div.innerHTML = `
+      <button class="add-object" style="padding:4px; font-size:11px;" onclick="addEngineObject('ui_text')">+ Texto UI</button>
+      <button class="add-object" style="padding:4px; font-size:11px;" onclick="addEngineObject('ui_button')">+ Botão UI</button>
+      <button class="add-object" style="padding:4px; font-size:11px;" onclick="addEngineObject('ui_panel')">+ Painel UI</button>
+    `;
+    t.parentNode.insertBefore(div, t);
+  }
+
+  currentSceneObjects.forEach(o=>{
+    const li=document.createElement("li");
+    li.className=o.id===selectedObjectId?"selected":"";
+    li.innerHTML=`<span class="mini-shape" style="background:${escapeHtml(o.color)}"></span>${escapeHtml(o.name)}`;
+    li.onclick=()=>selectObject(o.id);
+    t.appendChild(li);
+  });
+
+  vortexScripts.forEach(s=>{
+    const li=document.createElement("li");
+    li.className="script-item";
+    li.style.cssText = "display:flex; justify-content:space-between; align-items:center;";
+    li.innerHTML=`<span>▣ ${escapeHtml(s.name)}.vortex</span>
+      <div style="display:flex; gap:4px;">
+        <button style="background:none;border:none;color:#38bdf8;cursor:pointer;" onclick="event.stopPropagation(); duplicateVortexScript('${s.id}')" title="Duplicar">📋</button>
+        <button style="background:none;border:none;color:#f38ba8;cursor:pointer;" onclick="event.stopPropagation(); deleteVortexScript('${s.id}')" title="Remover">🗑</button>
+      </div>`;
+    li.onclick=()=>openVortexScriptEditor(s.id);
+    t.appendChild(li);
+  });
+}
+
 function updateInspector(){
-  const box=document.getElementById("inspector-content");if(!box)return;const o=getSelected();
-  if(!o){box.innerHTML="<div class='inspector-empty'>Selecione um objeto na cena ou na hierarquia.</div>";return;}
+  const box=document.getElementById("inspector-content");if(!box)return;
+  const o=getSelected();
+  if(!o){
+    box.innerHTML="<div class='inspector-empty'>Selecione um objeto na cena ou na hierarquia.</div>";
+    return;
+  }
+
+  let extraUiFields = "";
+  if(o.shape.startsWith("ui_")){
+    if(o.shape==="ui_text" || o.shape==="ui_button"){
+      extraUiFields += `<label>Texto<input id="ins-text" value="${escapeHtml(o.text||"")}"></label>
+                        <label>Tamanho da Fonte<input id="ins-fontSize" type="number" value="${o.fontSize||16}"></label>`;
+    }
+    if(o.shape==="ui_button"){
+      extraUiFields += `<label>Cor do Texto<input id="ins-textColor" type="color" value="${o.textColor||"#ffffff"}"></label>`;
+    }
+  }
+
   box.innerHTML=`<label>Nome<input id="ins-name" value="${escapeHtml(o.name)}"></label>
-  <label>Forma<select id="ins-shape"><option value="square">Quadrado</option><option value="circle">Círculo</option><option value="triangle">Triângulo</option></select></label>
-  <label>Cor<input id="ins-color" type="color" value="${o.color}"></label>
+  <label>Forma / Tipo<select id="ins-shape"><option value="square">Quadrado</option><option value="circle">Círculo</option><option value="triangle">Triângulo</option><option value="ui_text">Texto UI</option><option value="ui_button">Botão UI</option><option value="ui_panel">Painel UI</option></select></label>
+  <label>Cor<input id="ins-color" value="${o.color}"></label>
+  ${extraUiFields}
   <div class="ins-grid"><label>X<input id="ins-x" type="number" value="${o.x}"></label><label>Y<input id="ins-y" type="number" value="${o.y}"></label><label>Largura<input id="ins-w" type="number" min="4" value="${o.w}"></label><label>Altura<input id="ins-h" type="number" min="4" value="${o.h}"></label></div>
-  <button class="btn danger" id="ins-delete">Excluir objeto</button>`;
+  <div style="display:flex; gap:6px; margin-top:10px;">
+    <button class="btn" style="flex:1;" onclick="duplicateSelectedObject()">Duplicar</button>
+    <button class="btn danger" style="flex:1;" onclick="deleteSelectedObject()">Excluir</button>
+  </div>`;
+
   document.getElementById("ins-shape").value=o.shape;
-  ["name","shape","color","x","y","w","h"].forEach(f=>document.getElementById("ins-"+f).addEventListener("input",e=>updateObjFromInspector(f,e.target.value)));
-  document.getElementById("ins-delete").onclick=()=>{currentSceneObjects=currentSceneObjects.filter(x=>x.id!==o.id);selectedObjectId=null;saveEngineLocal();renderEngineScene();renderHierarchy();updateInspector();};
+  ["name","shape","color","text","fontSize","textColor","x","y","w","h"].forEach(f=>{
+    const el = document.getElementById("ins-"+f);
+    if(el) el.addEventListener("input",e=>updateObjFromInspector(f,e.target.value));
+  });
 }
+
 function saveEngineLocal(){if(!currentUser)return;localStorage.setItem("vortex_scene_"+currentUser.key,JSON.stringify({objects:currentSceneObjects,scripts:vortexScripts,active:activeScriptId}));}
-function loadEngineLocal(){if(!currentUser)return;try{const d=JSON.parse(localStorage.getItem("vortex_scene_"+currentUser.key)||"{}");currentSceneObjects=Array.isArray(d.objects)?d.objects:[];vortexScripts=Array.isArray(d.scripts)?d.scripts:[];activeScriptId=d.active||vortexScripts[0]?.id||null;
+function loadEngineLocal(){
+  if(!currentUser)return;
+  try{
+    const d=JSON.parse(localStorage.getItem("vortex_scene_"+currentUser.key)||"{}");
+    currentSceneObjects=Array.isArray(d.objects)?d.objects:[];
+    vortexScripts=Array.isArray(d.scripts)?d.scripts:[];
+    activeScriptId=d.active||vortexScripts[0]?.id||null;
   }catch{currentSceneObjects=[];vortexScripts=[];activeScriptId=null;}
-  if(!currentSceneObjects.length){currentSceneObjects=[Object.assign(defaultObject("player"),{x:80,y:80,name:"Player"}),Object.assign(defaultObject("square"),{x:40,y:220,w:220,h:40,name:"Chão"}),Object.assign(defaultObject("square"),{x:320,y:150,w:120,h:40,name:"Plataforma"}),Object.assign(defaultObject("coin"),{x:350,y:105,name:"Moeda"})];}
-  if(!vortexScripts.length){const id="script_"+Date.now();vortexScripts=[{id,name:"main",code:DEFAULT_VORTEX_CODE.replace("function_marker_placeholder","")}];activeScriptId=id;}
-  initEngineEditor();}
+  if(!currentSceneObjects.length){
+    currentSceneObjects=[
+      Object.assign(defaultObject("player"),{x:80,y:80,name:"Player"}),
+      Object.assign(defaultObject("square"),{x:40,y:220,w:220,h:40,name:"Chão"}),
+      Object.assign(defaultObject("coin"),{x:120,y:170,name:"Moeda"})
+    ];
+  }
+  if(!vortexScripts.length){
+    const id="script_"+Date.now();
+    vortexScripts=[{id,name:"main",code:DEFAULT_VORTEX_CODE.replace("function_marker_placeholder","")}];
+    activeScriptId=id;
+  }
+  initEngineEditor();
+}
 function clearScene(){if(!confirm("Apagar toda a cena?"))return;currentSceneObjects=[];selectedObjectId=null;saveEngineLocal();initEngineEditor();}
 
-/* ================= VORTEX SCRIPTING ================= */
+/* ================= VORTEX SCRIPTING ENGINE ================= */
 const DEFAULT_VORTEX_CODE=`# Vortex 10 — movimento pronto
 def _ready():
     print("Jogo iniciado!")
@@ -298,13 +767,11 @@ def _update():
     if player == None:
         return
 
-    # Movimento simples: não precisa programar colisão do zero
     if vortex.is_key_down("a") or vortex.is_key_down("arrowleft"):
         vortex.move_player(-4, 0)
     if vortex.is_key_down("d") or vortex.is_key_down("arrowright"):
         vortex.move_player(4, 0)
 
-    # Gravidade e pulo
     vortex.apply_gravity(player, 0.6)
     if (vortex.is_key_down(" ") or vortex.is_key_down("w")) and vortex.is_on_floor(player):
         player.vy = -12
@@ -320,30 +787,52 @@ def _update():
     vortex.follow_camera(player, 300, 200)
 
 function_marker_placeholder`;
+
 function createVortexScript(){
-  const name=prompt("Nome do script (sem extensão):","main")||"main", id="script_"+Date.now();
+  const name=prompt("Nome do script (sem extensão):","script")||"script", id="script_"+Date.now();
   const code=DEFAULT_VORTEX_CODE.replace("function_marker_placeholder","");
   vortexScripts.push({id,name,code});activeScriptId=id;saveEngineLocal();openVortexScriptEditor(id);
 }
+function duplicateVortexScript(id){
+  const s=vortexScripts.find(x=>x.id===id); if(!s) return;
+  const copy={ id:"script_"+Date.now(), name:s.name+"_copia", code:s.code };
+  vortexScripts.push(copy); activeScriptId=copy.id; saveEngineLocal(); renderHierarchy(); renderScriptsSidebarList();
+}
+function deleteVortexScript(id){
+  if(!confirm("Deseja remover este script?")) return;
+  vortexScripts=vortexScripts.filter(x=>x.id!==id);
+  if(activeScriptId===id) activeScriptId=vortexScripts[0]?.id||null;
+  saveEngineLocal(); renderHierarchy(); renderScriptsSidebarList();
+}
+
 function openVortexScriptEditor(id){activeScriptId=id;const s=vortexScripts.find(x=>x.id===id);if(!s)return;openWindow("win-vscode");document.getElementById("vortex-filename").value=s.name;document.getElementById("vortex-code-editor").value=s.code;renderScriptsSidebarList();}
-function renderScriptsSidebarList(){const l=document.getElementById("vscode-scripts-list");if(!l)return;l.innerHTML="";if(!vortexScripts.length){l.innerHTML="<li>Nenhum script</li>";return;}vortexScripts.forEach(s=>{const li=document.createElement("li");li.innerText=(s.id===activeScriptId?"➤ ":"")+"▣ "+s.name+".vortex";li.onclick=()=>openVortexScriptEditor(s.id);l.appendChild(li);});}
-function saveVortexScript(){const name=document.getElementById("vortex-filename").value.trim()||"main",code=document.getElementById("vortex-code-editor").value;let s=vortexScripts.find(x=>x.id===activeScriptId);if(!s){s={id:"script_"+Date.now(),name,code};vortexScripts.push(s);activeScriptId=s.id;}else{s.name=name;s.code=code;}saveEngineLocal();renderScriptsSidebarList();renderHierarchy();}
+function renderScriptsSidebarList(){
+  const l=document.getElementById("vscode-scripts-list");if(!l)return;l.innerHTML="";
+  vortexScripts.forEach(s=>{
+    const li=document.createElement("li");
+    li.innerText=(s.id===activeScriptId?"➤ ":"")+"▣ "+s.name+".vortex";
+    li.onclick=()=>openVortexScriptEditor(s.id);
+    l.appendChild(li);
+  });
+}
+function saveVortexScript(){
+  const name=document.getElementById("vortex-filename").value.trim()||"main",code=document.getElementById("vortex-code-editor").value;
+  let s=vortexScripts.find(x=>x.id===activeScriptId);
+  if(!s){s={id:"script_"+Date.now(),name,code};vortexScripts.push(s);activeScriptId=s.id;}
+  else{s.name=name;s.code=code;}
+  saveEngineLocal();renderScriptsSidebarList();renderHierarchy();
+}
 function runScriptFromStudio(){saveVortexScript();openWindow("win-engine");setTimeout(()=>{if(document.getElementById("engine-test-screen").style.display==="none")toggleEngineTestMode();},50);}
 
 function transpileVortexToJS(code){
-  let safeCode = String(code || "")
-    .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"')
-    .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'");
-
+  let safeCode = String(code || "").replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"').replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'");
   function removeComments(line) {
     let inSingle = false, inDouble = false;
     for (let i = 0; i < line.length; i++) {
       const c = line[i];
       if (c === '"' && !inSingle) inDouble = !inDouble;
       else if (c === "'" && !inDouble) inSingle = !inSingle;
-      else if (c === '#' && !inSingle && !inDouble) {
-        return line.slice(0, i);
-      }
+      else if (c === '#' && !inSingle && !inDouble) return line.slice(0, i);
     }
     return line;
   }
@@ -357,46 +846,26 @@ function transpileVortexToJS(code){
     const indent = raw.match(/^\s*/)[0].replace(/\t/g, "    ").length;
     while (indent < stack.at(-1)) { out.push("}"); stack.pop(); }
 
-    let x = trim
-      .replace(/\bTrue\b/g, "true")
-      .replace(/\bFalse\b/g, "false")
-      .replace(/\bNone\b/g, "null")
-      .replace(/\band\b/g, "&&")
-      .replace(/\bor\b/g, "||")
-      .replace(/\bnot\s+/g, "!")
-      .replace(/\.append\(/g, ".push(");
+    let x = trim.replace(/\bTrue\b/g, "true").replace(/\bFalse\b/g, "false").replace(/\bNone\b/g, "null").replace(/\band\b/g, "&&").replace(/\bor\b/g, "||").replace(/\bnot\s+/g, "!").replace(/\.append\(/g, ".push(");
 
     if (/^def\s+\w+\s*\(.*\)\s*:$/.test(x)) {
       out.push(x.replace(/^def\s+(\w+)\s*\((.*)\)\s*:$/, "function $1($2) {"));
       stack.push(indent + 4);
-    } else if (/^for\s+\w+\s+in\s+range\(.+\)\s*:$/.test(x)) {
-      const m = x.match(/^for\s+(\w+)\s+in\s+range\((.+)\)\s*:$/), p = m[2].split(",").map(a => a.trim());
-      out.push(p.length === 1 ? `for(let ${m[1]}=0;${m[1]}<${p[0]};${m[1]}++){` : `for(let ${m[1]}=${p[0]};${m[1]}<${p[1]};${m[1]}+=${p[2]||1}){`);
-      stack.push(indent + 4);
-    } else if (/^for\s+\w+\s+in\s+.+:$/.test(x)) {
-      out.push(x.replace(/^for\s+(\w+)\s+in\s+(.+):$/, "for(let $1 of $2){"));
-      stack.push(indent + 4);
     } else if (/^if\s+.+:$/.test(x)) {
       out.push(x.replace(/^if\s+(.+):$/, "if($1){"));
-      stack.push(indent + 4);
-    } else if (/^elif\s+.+:$/.test(x)) {
-      out.push(x.replace(/^elif\s+(.+):$/, "}else if($1){"));
       stack.push(indent + 4);
     } else if (/^else\s*:$/.test(x)) {
       out.push("}else{");
       stack.push(indent + 4);
-    } else if (/^while\s+.+:$/.test(x)) {
-      out.push(x.replace(/^while\s+(.+):$/, "while($1){"));
+    } else if (/^for\s+\w+\s+in\s+.+:$/.test(x)) {
+      out.push(x.replace(/^for\s+(\w+)\s+in\s+(.+):$/, "for(let $1 of $2){"));
       stack.push(indent + 4);
     } else {
       x = x.replace(/\bprint\s*\(/g, "vortex.print(");
-      if (/^[a-zA-Z_$][a-zA-Z0-9_$]*\s*=\s*/.test(x) && !/^(let|var|const)\s/.test(x)) {
-        x = "var " + x;
-      }
+      if (/^[a-zA-Z_$][a-zA-Z0-9_$]*\s*=\s*/.test(x) && !/^(let|var|const)\s/.test(x)) x = "var " + x;
       out.push(/[;{}]$/.test(x) ? x : x + ";");
     }
   }
-
   while (stack.length > 1) { out.push("}"); stack.pop(); }
   return out.join("\n");
 }
@@ -411,12 +880,17 @@ function compileVortexScript(code){
 
 /* ================= ENGINE RUNTIME ================= */
 function checkCollision(a,b){return !!a&&!!b&&a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;}
-function makeVortexEntity(inst,type,x,y,w,h,color,shape){
+function makeVortexEntity(inst,type,x,y,w,h,color,shape,extra={}){
   const defaults={block:{w:64,h:64,color:"#8b5cf6",shape:"square"},coin:{w:32,h:32,color:"#facc15",shape:"circle"},player:{w:48,h:56,color:"#38bdf8",shape:"square"}};
-  const d=defaults[type]||defaults.block;const o={x:Number(x)||0,y:Number(y)||0,w:Number(w)||d.w,h:Number(h)||d.h,vx:0,vy:0,type,color:color||d.color,shape:shape||d.shape,collected:false,el:null};
-  const el=document.createElement("div");el.className="runtime-object";applyStyles(el,shapeStyle(o));if(type==="player")el.style.zIndex=10;o.el=el;inst.worldEl.appendChild(el);
+  const d=defaults[type]||defaults.block;
+  const o=Object.assign({x:Number(x)||0,y:Number(y)||0,w:Number(w)||d.w,h:Number(h)||d.h,vx:0,vy:0,type,color:color||d.color,shape:shape||d.shape,collected:false,el:null},extra);
+  const el=document.createElement("div");el.className="runtime-object";applyStyles(el,shapeStyle(o));if(type==="player")el.style.zIndex=10;
+  if(o.shape==="ui_text") el.innerText=o.text||"";
+  if(o.shape==="ui_button") el.innerText=o.text||"";
+  o.el=el;inst.worldEl.appendChild(el);
   if(type==="block")inst.physicsData.blocks.push(o);else if(type==="coin")inst.physicsData.coins.push(o);else if(type==="player")inst.physicsData.player=o;return o;
 }
+
 function buildVortexAPI(inst){
   const api={
     print:(...a)=>inst.log(a.map(String).join(" ")),
@@ -436,176 +910,137 @@ function buildVortexAPI(inst){
     check_collision:checkCollision,
     move_player:(dx,dy)=>{
       const p=inst.physicsData.player;
-      if(p){
-        p.vx=Number(dx)||0;
-        if(dy) p.vy=Number(dy);
-      }
+      if(p){ p.vx=Number(dx)||0; if(dy) p.vy=Number(dy); }
     },
     apply_gravity:(e,g=.6)=>{if(e)e.vy+=(Number(g)||0.6)*60*api.delta();},
     is_on_floor:e=>{if(!e)return false;return inst.physicsData.blocks.some(b=>Math.abs((e.y+e.h)-b.y)<=3&&e.x+e.w>b.x&&e.x<b.x+b.w);},
     move_and_collide:e=>{if(!e)return;e.x+=e.vx||0;for(const b of inst.physicsData.blocks){if(checkCollision(e,b)){if(e.vx>0)e.x=b.x-e.w;else if(e.vx<0)e.x=b.x+b.w;e.vx=0;}}e.y+=e.vy||0;for(const b of inst.physicsData.blocks){if(checkCollision(e,b)){if(e.vy>0){e.y=b.y-e.h;e.vy=0;}else if(e.vy<0){e.y=b.y+b.h;e.vy=0;}}}},
     follow_camera:(e,ox=300,oy=200)=>{if(e)api.set_camera(e.x-ox,e.y-oy);},
-    spawn:(type,gx,gy)=>makeVortexEntity(inst,type,Number(gx)*TILE_W,Number(gy)*TILE_H),
     spawn_at:(type,x,y)=>makeVortexEntity(inst,type,x,y),
     destroy:e=>{if(!e)return;e.el?.remove();inst.physicsData.blocks=inst.physicsData.blocks.filter(x=>x!==e);inst.physicsData.coins=inst.physicsData.coins.filter(x=>x!==e);if(inst.physicsData.player===e)inst.physicsData.player=null;},
     collect_coin:c=>{if(c&&!c.collected){c.collected=true;c.el.style.display="none";}},
-    add_coins:n=>inst.coinCount+=Number(n)||0,set_coins:n=>inst.coinCount=Number(n)||0,get_coins_count:()=>inst.coinCount,
+    add_coins:n=>inst.coinCount+=Number(n)||0,get_coins_count:()=>inst.coinCount,
     set_camera:(x,y)=>{inst.camera.x=Number(x)||0;inst.camera.y=Number(y)||0;},
-    create_text:(id,text,x,y,color)=>{const e=document.createElement("div");e.className="runtime-ui-text";e.style.left=(Number(x)||0)+"px";e.style.top=(Number(y)||0)+"px";e.style.color=color||"#fff";e.innerText=text;inst.uiLayerEl.appendChild(e);inst.uiElements[id]={el:e};return e;},
-    create_button:(id,text,x,y,fn)=>{const b=document.createElement("button");b.className="btn btn-primary";b.innerText=text;b.style.position="absolute";b.style.left=(Number(x)||0)+"px";b.style.top=(Number(y)||0)+"px";b.style.pointerEvents="auto";b.onclick=()=>{if(typeof fn==="function")fn();};inst.uiLayerEl.appendChild(b);inst.uiElements[id]={el:b};return b;},
-    set_text:(id,text)=>{if(inst.uiElements[id])inst.uiElements[id].el.innerText=text;},
-    remove_ui:id=>{inst.uiElements[id]?.el.remove();delete inst.uiElements[id];},
-    set_color:(e,c)=>{if(e){e.color=c;if(e.el)e.el.style.background=c;}},
-    set_size:(e,w,h)=>{if(e){e.w=Number(w)||e.w;e.h=Number(h)||e.h;}},
-    set_position:(e,x,y)=>{if(e){e.x=Number(x)||0;e.y=Number(y)||0;}},
-    get_position:e=>e?{x:e.x,y:e.y}:null,
-    get_delta:()=>1/60
+    create_text:(id,text,x,y,color)=>{const e=document.createElement("div");e.style.cssText=`position:absolute;left:${x}px;top:${y}px;color:${color||"#fff"};font-weight:bold;font-family:sans-serif;`;e.innerText=text;inst.uiLayerEl.appendChild(e);inst.uiElements[id]={el:e};return e;},
+    create_button:(id,text,x,y,fn)=>{const b=document.createElement("button");b.className="btn btn-primary";b.innerText=text;b.style.cssText=`position:absolute;left:${x}px;top:${y}px;pointer-events:auto;`;b.onclick=()=>{if(typeof fn==="function")fn();};inst.uiLayerEl.appendChild(b);inst.uiElements[id]={el:b};return b;},
+    set_text:(id,text)=>{if(inst.uiElements[id])inst.uiElements[id].el.innerText=text;}
   };return api;
 }
-function syncVortexRender(pd){if(pd.player)applyStyles(pd.player.el,shapeStyle(pd.player));pd.blocks.forEach(b=>applyStyles(b.el,shapeStyle(b)));pd.coins.forEach(c=>{if(!c.collected)applyStyles(c.el,shapeStyle(c));});}
-function createVortexGameInstance(container,mapData,scriptCode,opts={}){
-  container.innerHTML="";
-  container.style.position="relative";
-  container.style.overflow="hidden";
-  container.style.background="#090512";
-  container.style.minHeight="220px";
-  container.style.width="100%";
-  container.style.height="100%";
 
+function syncVortexRender(pd){
+  if(pd.player)applyStyles(pd.player.el,shapeStyle(pd.player));
+  pd.blocks.forEach(b=>applyStyles(b.el,shapeStyle(b)));
+  pd.coins.forEach(c=>{if(!c.collected)applyStyles(c.el,shapeStyle(c));});
+}
+
+function createVortexGameInstance(container,mapData,scriptCode,opts={}){
+  container.innerHTML=""; container.style.cssText="position:relative;overflow:hidden;background:#090512;width:100%;height:100%;";
   const world=document.createElement("div");
-  world.className="runtime-world";
-  Object.assign(world.style,{position:"absolute",left:"0",top:"0",width:"3000px",height:"2000px",transformOrigin:"0 0",pointerEvents:"none"});
+  world.style.cssText="position:absolute;left:0;top:0;width:3000px;height:2000px;transform-origin:0 0;pointer-events:none;";
   container.appendChild(world);
 
   const ui=document.createElement("div");
-  ui.className="runtime-ui";
-  Object.assign(ui.style,{position:"absolute",inset:"0",zIndex:"100",pointerEvents:"none"});
+  ui.style.cssText="position:absolute;inset:0;z-index:100;pointer-events:none;";
   container.appendChild(ui);
 
   const inst={containerEl:container,worldEl:world,uiLayerEl:ui,physicsData:{player:null,blocks:[],coins:[]},uiElements:{},camera:{x:0,y:0},coinCount:0,running:false,loopHandle:null,consoleEl:opts.consoleEl};
   inst.log=(m,err)=>{
     if(inst.consoleEl){
       inst.consoleEl.style.display="block";
-      const l=document.createElement("div");
-      l.className=err?"log-error":"";
-      l.innerText=(err?"✖ ":"› ")+m;
-      inst.consoleEl.appendChild(l);
-      inst.consoleEl.scrollTop=inst.consoleEl.scrollHeight;
-    }else console[err?"error":"log"]("[Vortex]",m);
+      const l=document.createElement("div"); l.innerText=(err?"✖ ":"› ")+m; inst.consoleEl.appendChild(l);
+    }
   };
 
   const data=Array.isArray(mapData)?mapData:[];
-  if(data.length && typeof data[0]==="object" && !Array.isArray(data[0])){
-    data.forEach(o=>{
-      const runtimeType = o.type==="player" ? "player" : o.type==="coin" ? "coin" : "block";
-      makeVortexEntity(inst,runtimeType,o.x,o.y,o.w,o.h,o.color,o.shape);
-    });
-  }else{
-    data.forEach((type,i)=>{
-      if(type) makeVortexEntity(inst,type,(i%20)*TILE_W,Math.floor(i/20)*TILE_H);
-    });
-  }
-
-  if(inst.physicsData.blocks.length===0){
-    makeVortexEntity(inst,"block",0,360,900,40,"#6d28d9","square");
-  }
+  data.forEach(o=>{
+    const runtimeType = o.type==="player" ? "player" : o.type==="coin" ? "coin" : "block";
+    makeVortexEntity(inst,runtimeType,o.x,o.y,o.w,o.h,o.color,o.shape,o);
+  });
 
   try{
     inst.handlers=compileVortexScript(scriptCode||"")(buildVortexAPI(inst));
     inst.handlers?._ready?.();
-  }catch(e){
-    inst.handlers=null;
-    inst.log("Erro no script: "+e.message,true);
-  }
+  }catch(e){ inst.log("Erro no script: "+e.message,true); }
 
   const tick=()=>{
     if(!inst.running)return;
-    if(inst.physicsData.player){
-      inst.physicsData.player.vx=0;
-    }
-    try{
-      inst.handlers?._update?.();
-    }catch(e){
-      inst.log("Erro em _update(): "+e.message,true);
-      if(inst.handlers)inst.handlers._update=null;
-    }
+    if(inst.physicsData.player) inst.physicsData.player.vx=0;
+    try{ inst.handlers?._update?.(); }catch(e){ if(inst.handlers)inst.handlers._update=null; }
     syncVortexRender(inst.physicsData);
     world.style.transform=`translate(${-inst.camera.x}px,${-inst.camera.y}px)`;
   };
 
-  inst.start=()=>{
-    if(!inst.running){
-      inst.running=true;
-      tick();
-      inst.loopHandle=setInterval(tick,1000/60);
-    }
-  };
-  inst.stop=()=>{
-    inst.running=false;
-    if(inst.loopHandle)clearInterval(inst.loopHandle);
-    inst.loopHandle=null;
-  };
+  inst.start=()=>{ if(!inst.running){ inst.running=true; inst.loopHandle=setInterval(tick,1000/60); } };
+  inst.stop=()=>{ inst.running=false; if(inst.loopHandle)clearInterval(inst.loopHandle); };
   return inst;
 }
+
 function toggleEngineTestMode(){
-  const screen=document.getElementById("engine-test-screen"),
-        editor=document.getElementById("canvas-2d"),
-        btn=document.getElementById("btn-engine-test"),
-        consoleEl=document.getElementById("engine-console");
-
+  const screen=document.getElementById("engine-test-screen"), editor=document.getElementById("canvas-2d"), btn=document.getElementById("btn-engine-test"), consoleEl=document.getElementById("engine-console");
   if(screen.style.display==="none" || !screen.style.display){
-    if(!currentSceneObjects.some(o=>o.type==="player"))
-      return alert("Adicione um Player à cena.");
-
+    if(!currentSceneObjects.some(o=>o.type==="player")) return alert("Adicione um Player à cena.");
     saveVortexScript();
     const s=vortexScripts.find(x=>x.id===activeScriptId);
-
-    if(consoleEl){
-      consoleEl.innerHTML="";
-      consoleEl.style.display="none";
-    }
-
-    editor.style.display="none";
-    screen.style.display="block";
-    screen.style.position="relative";
-    screen.style.overflow="hidden";
-    screen.style.background="#090512";
-    screen.style.border="1px solid rgba(168,85,247,.35)";
-    screen.style.minHeight="300px";
-    screen.style.height="calc(100% - 42px)";
-
-    btn.innerText="■ PARAR";
-    btn.classList.add("stop");
-
-    currentGameInstance=createVortexGameInstance(
-      screen,
-      currentSceneObjects,
-      s?.code||"",
-      {consoleEl}
-    );
+    if(consoleEl){ consoleEl.innerHTML=""; consoleEl.style.display="none"; }
+    editor.style.display="none"; screen.style.cssText="display:block;position:relative;overflow:hidden;background:#090512;height:calc(100% - 42px);";
+    btn.innerText="■ PARAR"; btn.classList.add("stop");
+    currentGameInstance=createVortexGameInstance(screen, currentSceneObjects, s?.code||"", {consoleEl});
     currentGameInstance.start();
-  }else{
-    stopEngineTestLoop();
-  }
+  }else{ stopEngineTestLoop(); }
 }
+
 function stopEngineTestLoop(){
-  currentGameInstance?.stop();
-  currentGameInstance=null;
-  const s=document.getElementById("engine-test-screen"),
-        c=document.getElementById("canvas-2d"),
-        b=document.getElementById("btn-engine-test");
-  if(s)s.style.display="none";
-  if(c)c.style.display="block";
+  currentGameInstance?.stop(); currentGameInstance=null;
+  const s=document.getElementById("engine-test-screen"), c=document.getElementById("canvas-2d"), b=document.getElementById("btn-engine-test");
+  if(s)s.style.display="none"; if(c)c.style.display="block";
   if(b){b.innerText="▶ TESTAR";b.classList.remove("stop");}
 }
+
 function openPublishModalFromEngine(){document.getElementById("publish-modal").style.display="flex";}
 function closePublishModal(){document.getElementById("publish-modal").style.display="none";}
+
+/* --- ATUALIZAR BUILD .VEXE OU PUBLICAR NOVO --- */
 function compileAndPublishEngineGame(){
-  if(!currentUser)return alert("Faça login primeiro.");const title=document.getElementById("app-title-input").value.trim();const price=Math.max(0,Number(document.getElementById("app-price-input").value)||0);if(!title)return alert("Dê um nome ao jogo.");if(!currentSceneObjects.some(o=>o.type==="player"))return alert("Adicione um Player.");
-  saveVortexScript();const s=vortexScripts.find(x=>x.id===activeScriptId);try{compileVortexScript(s?.code||"");}catch(e){return alert("Script inválido: "+e.message);}
-  const appId="app_"+Date.now(),app={title,price,author:currentUser.displayName||currentUser.key,authorKey:currentUser.key,sceneObjects:currentSceneObjects,scriptCode:s?.code||"",createdAt:Date.now()};
-  database.ref("publishedApps/"+appId).set(app).then(()=>database.ref("users/"+currentUser.key+"/files/"+appId).set(true)).then(()=>{alert("Publicado com sucesso!");closePublishModal();loadGlobalStore();loadUserFiles();}).catch(e=>alert("Erro: "+e.message));
+  if(!currentUser)return alert("Faça login primeiro.");
+  const title=document.getElementById("app-title-input").value.trim();
+  const price=Math.max(0,Number(document.getElementById("app-price-input").value)||0);
+  if(!title)return alert("Dê um nome ao jogo.");
+  if(!currentSceneObjects.some(o=>o.type==="player"))return alert("Adicione um Player.");
+  
+  saveVortexScript();
+  const s=vortexScripts.find(x=>x.id===activeScriptId);
+
+  // Verifica se o usuário já possui um jogo publicado com este nome para ATUALIZAR A BUILD .vexe
+  database.ref("publishedApps").once("value").then(sSnapshot=>{
+    let existingAppId = null;
+    if(sSnapshot.exists()){
+      sSnapshot.forEach(child=>{
+        const val = child.val();
+        if(val.authorKey===currentUser.key && val.title.toLowerCase()===title.toLowerCase()){
+          existingAppId = child.key;
+        }
+      });
+    }
+
+    if(existingAppId && !confirm(`Você já publicou "${title}". Deseja ATUALIZAR a build .vexe existente?`)){
+      return;
+    }
+
+    const appId = existingAppId || ("app_" + Date.now());
+    const app = {
+      title, price, author:currentUser.displayName||currentUser.key, authorKey:currentUser.key,
+      sceneObjects:currentSceneObjects, scriptCode:s?.code||"", updatedAt:Date.now()
+    };
+
+    return database.ref("publishedApps/"+appId).set(app)
+      .then(()=>database.ref("users/"+currentUser.key+"/files/"+appId).set(true))
+      .then(()=>{
+        alert(existingAppId ? "✅ Build .vexe atualizada na loja!" : "✅ Jogo publicado na loja!");
+        closePublishModal(); loadGlobalStore(); loadUserFiles();
+      });
+  }).catch(e=>alert("Erro: "+e.message));
 }
+
 function loadGlobalStore(){
   const l=document.getElementById("global-apps-list"); if(!l)return;
   database.ref("publishedApps").once("value").then(s=>{
@@ -615,72 +1050,71 @@ function loadGlobalStore(){
       const a=c.val()||{}, card=document.createElement("div"); card.className="app-card";
       card.innerHTML=`<h4>${escapeHtml(a.title||c.key)}</h4><p>Por ${escapeHtml(a.author||a.authorKey||"Usuário")}</p><p>R$ ${Number(a.price||0).toFixed(2)}</p><div class="store-actions"></div>`;
       const actions=card.querySelector(".store-actions"), buy=document.createElement("button");
-      buy.className="btn btn-primary"; buy.innerText=(currentUser&&a.authorKey===currentUser.key)?"Comprar / Adicionar":"Comprar"; buy.onclick=()=>buyApp(c.key,a); actions.appendChild(buy);
-      if((currentUser&&a.authorKey===currentUser.key)||isAdmin()){const del=document.createElement("button");del.className="btn danger";del.innerText="Excluir jogo";del.onclick=()=>deletePublishedGame(c.key,a);actions.appendChild(del);}
+      buy.className="btn btn-primary"; buy.innerText=(currentUser&&a.authorKey===currentUser.key)?"Adicionar à biblioteca":"Comprar"; buy.onclick=()=>buyApp(c.key,a); actions.appendChild(buy);
+      if((currentUser&&a.authorKey===currentUser.key)||isAdmin()){const del=document.createElement("button");del.className="btn danger";del.innerText="Excluir";del.onclick=()=>deletePublishedGame(c.key,a);actions.appendChild(del);}
       l.appendChild(card);
     });
   });
 }
+
 function buyApp(id,a){
   if(!currentUser)return alert("Faça login.");
   const price=Math.max(0,Number(a.price||0));
-  if(a.authorKey===currentUser.key)return alert("Você não pode comprar seu próprio jogo.");
+  if(a.authorKey===currentUser.key){
+    return database.ref("users/"+currentUser.key+"/files/"+id).set(true).then(()=>{ alert("Jogo adicionado aos seus arquivos."); loadUserFiles(); });
+  }
   if(Number(currentUser.balance||0)<price)return alert("Saldo insuficiente.");
   const buyerRef=database.ref("users/"+currentUser.key+"/balance"), sellerRef=database.ref("users/"+a.authorKey+"/balance");
   let oldBuyer;
   return buyerRef.transaction(v=>{oldBuyer=Number(v||0);if(oldBuyer<price)return;return oldBuyer-price;})
     .then(r=>{if(!r.committed)throw new Error("Saldo insuficiente.");return sellerRef.transaction(v=>Number(v||0)+price);})
     .then(()=>database.ref("users/"+currentUser.key+"/files/"+id).set(true))
-    .then(()=>{currentUser.balance=Number((oldBuyer-price).toFixed(2));updateBalanceUI();alert(`Compra concluída! R$ ${price.toFixed(2)} foram enviados ao criador.`);loadUserFiles();})
-    .catch(e=>{if(oldBuyer!==undefined && String(e.message||e)!=="Saldo insuficiente."){return buyerRef.set(oldBuyer).then(()=>{throw e;});}throw e;})
+    .then(()=>{currentUser.balance=Number((oldBuyer-price).toFixed(2));updateBalanceUI();alert(`Compra concluída!`);loadUserFiles();})
     .catch(e=>alert("Erro: "+e.message));
 }
-function loadUserFiles(){const l=document.getElementById("files-list");if(!l||!currentUser)return;database.ref("users/"+currentUser.key+"/files").once("value").then(async s=>{l.innerHTML="";if(!s.exists()){l.innerHTML="<p>Nenhum .vexe instalado.</p>";return;}for(const id of Object.keys(s.val())){const a=(await database.ref("publishedApps/"+id).once("value")).val();if(!a)continue;const card=document.createElement("div");card.className="app-card";card.innerHTML=`<h4>${escapeHtml(a.title)}.vexe</h4><p>Por ${escapeHtml(a.author)}</p>`;const b=document.createElement("button");b.className="btn btn-primary";b.innerText="Executar";b.onclick=()=>runVexeApp(a);card.appendChild(b);l.appendChild(card);}});}
+
+function deletePublishedGame(id,a,admin=false){
+  if(!currentUser)return; const owner=a?.authorKey===currentUser.key; if(!admin&&!owner&&!isAdmin())return alert("Acesso negado."); if(!confirm(`Excluir "${a?.title||id}"?`))return;
+  return database.ref("publishedApps/"+id).remove().then(()=>database.ref("users/"+(a.authorKey||currentUser.key)+"/files/"+id).remove()).then(()=>{alert("Jogo excluído.");loadGlobalStore();loadUserFiles();}).catch(e=>alert("Erro: "+e.message));
+}
+
+function loadUserFiles(){
+  const l=document.getElementById("files-list");if(!l||!currentUser)return;
+  database.ref("users/"+currentUser.key+"/files").once("value").then(async s=>{
+    l.innerHTML="";
+    if(!s.exists()){l.innerHTML="<p>Nenhum .vexe instalado.</p>";return;}
+    for(const id of Object.keys(s.val())){
+      const a=(await database.ref("publishedApps/"+id).once("value")).val();
+      if(!a)continue;
+      const card=document.createElement("div");card.className="app-card";
+      card.innerHTML=`<h4>${escapeHtml(a.title)}.vexe</h4><p>Por ${escapeHtml(a.author)}</p>`;
+      const b=document.createElement("button");b.className="btn btn-primary";b.innerText="Executar";b.onclick=()=>runVexeApp(a);card.appendChild(b);l.appendChild(card);
+    }
+  });
+}
 function runVexeApp(app){openWindow("win-runner");document.getElementById("runner-title").innerText="Executando: "+app.title+".vexe";stopRunnerInstance();currentRunnerInstance=createVortexGameInstance(document.getElementById("runner-canvas"),app.sceneObjects||app.mapData||[],app.scriptCode||"");currentRunnerInstance.start();}
 function stopRunnerInstance(){currentRunnerInstance?.stop();currentRunnerInstance=null;}
 
 /* ================= VORTEX MESSENGER ================= */
-function clearMessengerListeners(){
-  messengerListeners.forEach(u=>{try{u();}catch{}});
-  messengerListeners=[];
-  if(messengerMessageUnsub){
-    try{messengerMessageUnsub();}catch{}
-    messengerMessageUnsub=null;
-  }
-}
-function messengerRef(path){return database.ref(path);}
-function safeUserName(data,key){
-  return String(data?.displayName||data?.username||data?.nick||key||"Usuário");
-}
+function clearMessengerListeners(){messengerListeners.forEach(u=>{try{u();}catch{}});messengerListeners=[];if(messengerMessageUnsub){try{messengerMessageUnsub();}catch{}messengerMessageUnsub=null;}}
+function safeUserName(data,key){return String(data?.displayName||data?.username||data?.nick||key||"Usuário");}
 function loadFriends(){
-  const l=document.getElementById("friends-list");
-  if(!l||!currentUser)return;
+  const l=document.getElementById("friends-list"); if(!l||!currentUser)return;
   const ref=database.ref("users/"+currentUser.key+"/friends");
   const handler=s=>{
-    l.innerHTML="";
-    if(!s.exists()){
-      l.innerHTML="<div class='muted'>Nenhum amigo. Adicione pelo nick.</div>";
-      return;
-    }
+    l.innerHTML=""; if(!s.exists()){l.innerHTML="<div class='muted'>Nenhum amigo.</div>";return;}
     Object.keys(s.val()).forEach(k=>{
       const f=s.val()[k]||{}, name=safeUserName(f,k);
-      const b=document.createElement("button");
-      b.className="friend-row";
+      const b=document.createElement("button"); b.className="friend-row";
       b.innerHTML=`<span class='avatar'>${escapeHtml(name[0].toUpperCase())}</span><span>@${escapeHtml(name)}</span>`;
-      b.onclick=()=>openDM(k,name);
-      l.appendChild(b);
+      b.onclick=()=>openDM(k,name); l.appendChild(b);
     });
   };
-  ref.on("value",handler);
-  messengerListeners.push(()=>ref.off("value",handler));
+  ref.on("value",handler); messengerListeners.push(()=>ref.off("value",handler));
 }
 function addFriend(){
-  if(!currentUser)return;
-  const nick=document.getElementById("friend-nick").value.trim();
-  if(!nick)return;
-  const k=keyForNick(nick);
+  if(!currentUser)return; const nick=document.getElementById("friend-nick").value.trim(); if(!nick)return; const k=keyForNick(nick);
   if(k===currentUser.key)return alert("Você não pode adicionar a si mesmo.");
-
   database.ref("users/"+k).once("value").then(s=>{
     if(!s.exists())throw new Error("Nick não encontrado.");
     const d=s.val()||{}, targetName=safeUserName(d,k), myName=safeUserName(currentUser,currentUser.key);
@@ -688,78 +1122,25 @@ function addFriend(){
       database.ref("users/"+currentUser.key+"/friends/"+k).set({displayName:targetName,nick:k}),
       database.ref("users/"+k+"/friends/"+currentUser.key).set({displayName:myName,nick:currentUser.key})
     ]);
-  }).then(()=>{
-    document.getElementById("friend-nick").value="";
-    alert("Amizade adicionada.");
-  }).catch(e=>alert("Não foi possível adicionar: "+e.message));
+  }).then(()=>{document.getElementById("friend-nick").value="";alert("Amizade adicionada.");}).catch(e=>alert("Erro: "+e.message));
 }
 function dmId(a,b){return [a,b].sort().join("__");}
-function openDM(key,name){
-  currentChatType="dm";
-  currentChatId=dmId(currentUser.key,key);
-  currentGroupId=null;
-  document.getElementById("chat-title").innerText="@"+safeUserName({displayName:name},key);
-  document.getElementById("chat-subtitle").innerText="Conversa privada";
-  listenMessages(currentChatId,"dm");
-}
-function openGroup(id,name){
-  currentChatType="group";
-  currentChatId=id;
-  currentGroupId=id;
-  document.getElementById("chat-title").innerText=name;
-  document.getElementById("chat-subtitle").innerText="Grupo Vortex";
-  listenMessages(id,"group");
-}
-function prepareMessengerLayout(){
-  const messages=document.getElementById("messages");
-  const chat=document.querySelector("#win-messenger .chat");
-  const composer=document.querySelector("#win-messenger .composer");
-  const emoji=document.querySelector("#win-messenger .emoji-bar");
-  if(chat)Object.assign(chat.style,{display:"flex",flexDirection:"column",minHeight:"0",overflow:"hidden"});
-  if(messages)Object.assign(messages.style,{flex:"1 1 auto",minHeight:"0",overflowY:"auto",overflowX:"hidden",display:"flex",flexDirection:"column",gap:"8px",padding:"12px",scrollBehavior:"smooth"});
-  if(emoji)Object.assign(emoji.style,{flex:"0 0 auto"});
-  if(composer)Object.assign(composer.style,{flex:"0 0 auto"});
-}
+function openDM(key,name){currentChatType="dm";currentChatId=dmId(currentUser.key,key);currentGroupId=null;document.getElementById("chat-title").innerText="@"+safeUserName({displayName:name},key);document.getElementById("chat-subtitle").innerText="Conversa privada";listenMessages(currentChatId,"dm");}
 function listenMessages(id,type){
-  prepareMessengerLayout();
-  if(messengerMessageUnsub){
-    try{messengerMessageUnsub();}catch{}
-    messengerMessageUnsub=null;
-  }
-
-  const box=document.getElementById("messages");
-  if(!box)return;
-  box.innerHTML="<div class='muted'>Carregando mensagens...</div>";
-
+  if(messengerMessageUnsub){try{messengerMessageUnsub();}catch{}messengerMessageUnsub=null;}
+  const box=document.getElementById("messages"); if(!box)return; box.innerHTML="<div class='muted'>Carregando...</div>";
   const path=type==="dm"?"conversations/"+id+"/messages":"groups/"+id+"/messages";
   const ref=database.ref(path).limitToLast(100);
-
   const handler=s=>{
-    const nearBottom=(box.scrollHeight-box.scrollTop-box.clientHeight)<120;
-    box.innerHTML="";
-
-    if(!s.exists()){
-      box.innerHTML="<div class='muted'>Nenhuma mensagem ainda.</div>";
-      return;
-    }
-
-    s.forEach(c=>renderMessage(box,c.val()||{}));
-
-    if(nearBottom){
-      requestAnimationFrame(()=>{box.scrollTop=box.scrollHeight;});
-    }
+    box.innerHTML=""; if(!s.exists()){box.innerHTML="<div class='muted'>Nenhuma mensagem.</div>";return;}
+    s.forEach(c=>renderMessage(box,c.val()||{})); box.scrollTop=box.scrollHeight;
   };
-
-  ref.on("value",handler);
-  messengerMessageUnsub=()=>ref.off("value",handler);
+  ref.on("value",handler); messengerMessageUnsub=()=>ref.off("value",handler);
 }
 function renderMessage(box,m){
-  const wrap=document.createElement("div");
-  wrap.className="message "+(m.senderKey===currentUser.key?"mine":"theirs");
+  const wrap=document.createElement("div"); wrap.className="message "+(m.senderKey===currentUser.key?"mine":"theirs");
   let content=escapeHtml(m.text||"").replace(/\n/g,"<br>");
-  if(m.image){
-    content+=`<img class="chat-image" src="${escapeHtml(m.image)}" alt="imagem enviada">`;
-  }
+  if(m.image) content+=`<img class="chat-image" src="${escapeHtml(m.image)}">`;
   wrap.innerHTML=`<div class="message-name">${escapeHtml(safeUserName(m,m.senderKey))}</div><div>${content}</div><small>${new Date(m.createdAt||Date.now()).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</small>`;
   box.appendChild(wrap);
 }
@@ -770,15 +1151,14 @@ function sendMessage(){
 }
 function sendEmoji(e){const i=document.getElementById("message-input");i.value+=(e||"🙂");i.focus();}
 function sendImage(){
-  if(!currentUser||!currentChatId)return;const input=document.getElementById("image-input");input.click();input.onchange=()=>{const file=input.files[0];if(!file)return;if(file.size>700*1024)return alert("Imagem muito grande. Use até 700 KB.");const r=new FileReader();r.onload=()=>{const path=currentChatType==="dm"?"conversations/"+currentChatId+"/messages":"groups/"+currentChatId+"/messages";database.ref(path).push({senderKey:currentUser.key,senderName:safeUserName(currentUser,currentUser.key),image:r.result,createdAt:Date.now()});};r.readAsDataURL(file);input.value="";};
+  if(!currentUser||!currentChatId)return;const input=document.getElementById("image-input");input.click();input.onchange=()=>{const file=input.files[0];if(!file)return;if(file.size>700*1024)return alert("Imagem muito grande (máx 700KB).");const r=new FileReader();r.onload=()=>{const path=currentChatType==="dm"?"conversations/"+currentChatId+"/messages":"groups/"+currentChatId+"/messages";database.ref(path).push({senderKey:currentUser.key,senderName:safeUserName(currentUser,currentUser.key),image:r.result,createdAt:Date.now()});};r.readAsDataURL(file);input.value="";};
 }
-function loadMessengerHome(){prepareMessengerLayout();loadFriends();loadGroups();renderGroupMembers();if(!currentChatId){document.getElementById("chat-title").innerText="Vortex Messenger";document.getElementById("chat-subtitle").innerText="Escolha um amigo para conversar";}}
-function renderGroupMembers(){const l=document.getElementById("group-members");if(!l||!currentUser)return;database.ref("users/"+currentUser.key+"/friends").once("value").then(s=>{l.innerHTML="";if(s.exists())Object.entries(s.val()).forEach(([k,f])=>{l.innerHTML+=`<label><input class="group-member-check" type="checkbox" value="${k}"> @${escapeHtml(f.displayName||k)}</label>`;});});}
+function loadMessengerHome(){loadFriends();if(!currentChatId){document.getElementById("chat-title").innerText="Vortex Messenger";document.getElementById("chat-subtitle").innerText="Escolha um amigo para conversar";}}
 
-/* ================= STARTUP ================= */
+/* ================= INICIALIZAÇÃO DA APLICAÇÃO ================= */
 window.addEventListener("DOMContentLoaded",()=>{
   const saved=localStorage.getItem("vortex_theme");if(saved)setTheme(saved);
+  ensureDynamicAppWindows();
   tryAutoLogin();
   document.getElementById("message-input")?.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMessage();}});
-  document.getElementById("group-name")?.addEventListener("input",renderGroupMembers);
 });
