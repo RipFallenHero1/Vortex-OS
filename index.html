@@ -21,6 +21,7 @@
 <div id="shutdown-screen" class="full-overlay dark" style="display:none"><div class="power-card"><div class="brand-mark">V</div><h1>Vortex OS</h1><p>O sistema está desligado.</p><button class="btn primary" onclick="powerOn()">Ligar PC</button></div></div>
 
 <div id="desktop" class="desktop">
+  <div class="desktop-icon" onclick="openWindow('win-browser')"><div class="app-icon browser">🌐</div><span>Vortex Web</span></div>
   <div class="desktop-icon" onclick="openWindow('win-engine')"><div class="app-icon vortex">V</div><span>Vortex Engine</span></div>
   <div class="desktop-icon" onclick="openWindow('win-vscode')"><div class="app-icon code">&lt;/&gt;</div><span>Vortex Code</span></div>
   <div class="desktop-icon" onclick="openWindow('win-messenger')"><div class="app-icon msg">M</div><span>Vortex Messenger</span></div>
@@ -35,6 +36,7 @@
 <div id="start-menu" class="start-menu">
   <div class="start-user"><div class="avatar big">V</div><div><b id="start-username">Usuário</b><small id="start-email">online</small></div></div>
   <div class="start-grid">
+    <button onclick="openWindow('win-browser');toggleStartMenu()">Vortex Web</button>
     <button onclick="openWindow('win-engine');toggleStartMenu()">Vortex Engine</button>
     <button onclick="openWindow('win-vscode');toggleStartMenu()">Vortex Code</button>
     <button onclick="openWindow('win-messenger');toggleStartMenu()">Messenger</button>
@@ -45,6 +47,24 @@
     <button onclick="openWindow('win-terminal');toggleStartMenu()">Terminal</button>
   </div>
   <button class="shutdown-link" onclick="shutdownPC()">Desligar</button>
+</div>
+
+<!-- BROWSER -->
+<div id="win-browser" class="window" style="top:60px;left:200px;width:940px;height:620px;display:none;">
+  <div class="window-header" onmousedown="dragWindow(event,'win-browser')"><span>Vortex Web — Navegador</span><div class="window-controls"><button onclick="closeWindow('win-browser')">×</button></div></div>
+  <div class="browser-layout" style="display:flex;flex-direction:column;height:calc(100% - 35px);width:100%;background:#1e1e2e;">
+    <div class="browser-bar" style="display:flex;gap:8px;padding:8px;background:#11111b;align-items:center;border-bottom:1px solid rgba(255,255,255,0.1);">
+      <button class="btn" onclick="browserNav('back')" title="Voltar">←</button>
+      <button class="btn" onclick="browserNav('forward')" title="Avançar">→</button>
+      <button class="btn" onclick="browserNav('reload')" title="Recarregar">↻</button>
+      <button class="btn" onclick="browserNav('home')" title="Página Inicial">🏠</button>
+      <input id="browser-url" type="text" placeholder="Digite uma URL (ex: https://bing.com) ou pesquise..." style="flex:1;padding:6px 12px;border-radius:6px;border:1px solid #444;background:#181825;color:#fff;outline:none;" onkeydown="if(event.key==='Enter')navigateBrowser()">
+      <button class="btn primary" onclick="navigateBrowser()">Ir</button>
+    </div>
+    <div style="flex:1;position:relative;width:100%;height:100%;overflow:hidden;background:#fff;">
+      <iframe id="browser-iframe" src="https://www.bing.com" style="width:100%;height:100%;border:none;"></iframe>
+    </div>
+  </div>
 </div>
 
 <!-- ENGINE -->
