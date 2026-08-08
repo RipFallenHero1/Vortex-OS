@@ -46,14 +46,14 @@ function injectDynamicEngineStyles(){
   style.id = "vortex-dynamic-styles";
   style.innerHTML = `
     .engine-object.selected-unity {
-      outline: 2px solid #38bdf8 !important;
+      outline: 2px solid #8b5cf6 !important;
       outline-offset: 1px;
     }
     .resize-handle {
       position: absolute;
       width: 10px;
       height: 10px;
-      background: #38bdf8;
+      background: #8b5cf6;
       border: 1px solid #ffffff;
       border-radius: 2px;
       z-index: 99;
@@ -81,17 +81,15 @@ function injectDynamicEngineStyles(){
 function ensureDynamicAppWindows(){
   injectDynamicEngineStyles();
 
-  // Desktop Icon do Criador .vort
   if(!document.getElementById("icon-vort-studio") && document.getElementById("desktop")){
     const icon = document.createElement("div");
     icon.id = "icon-vort-studio";
     icon.className = "desktop-icon";
     icon.onclick = () => openWindow("win-vort-studio");
-    icon.innerHTML = `<div class="app-icon" style="background:linear-gradient(135deg,#06b6d4,#3b82f6)">🌐</div><span>Criador .vort</span>`;
+    icon.innerHTML = `<div class="app-icon" style="background:linear-gradient(135deg,#8b5cf6,#a855f7)">🌐</div><span>Criador .vort</span>`;
     document.getElementById("desktop").appendChild(icon);
   }
 
-  // Window do Criador .vort
   if(!document.getElementById("win-vort-studio")){
     const win = document.createElement("div");
     win.id = "win-vort-studio";
@@ -156,8 +154,8 @@ function tryAutoLogin(){
   const k=localStorage.getItem("vortex_current_user"); if(!k)return;
   database.ref("users/"+k).once("value").then(s=>{if(s.exists())startSession(k,s.val());else localStorage.removeItem("vortex_current_user");});
 }
-function logoutUser(){localStorage.removeItem("vortex_current_user");currentUser=null;clearMessengerListeners();stopSystemListeners();document.getElementById("login-screen").style.display="flex";}
-function shutdownPC(){closeStartMenuIfOpen();document.getElementById("shutdown-screen").style.display="flex";if(clockInterval)clearInterval(clockInterval);stopEngineTestLoop();stopRunnerInstance();clearMessengerListeners();}
+function logoutUser(){saveEngineLocal();localStorage.removeItem("vortex_current_user");currentUser=null;clearMessengerListeners();stopSystemListeners();document.getElementById("login-screen").style.display="flex";}
+function shutdownPC(){saveEngineLocal();closeStartMenuIfOpen();document.getElementById("shutdown-screen").style.display="flex";if(clockInterval)clearInterval(clockInterval);stopEngineTestLoop();stopRunnerInstance();clearMessengerListeners();}
 function powerOn(){document.getElementById("shutdown-screen").style.display="none";if(currentUser){document.getElementById("login-screen").style.display="none";startClock();}else document.getElementById("login-screen").style.display="flex";}
 function startClock(){if(clockInterval)clearInterval(clockInterval);const u=()=>{const e=document.getElementById("os-clock");if(e){const d=new Date();e.innerText=String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");}};u();clockInterval=setInterval(u,30000);}
 
@@ -202,7 +200,6 @@ function navigateBrowser(targetUrl){
   } else if(cleanUrl === "vortex.api.vort"){
     renderIframeContent(iframe, getVortexApiDocHTML());
   } else {
-    // Busca site .vort personalizado no Firebase
     const siteKey = cleanUrl.replace(".vort","").replace(/[.#$/\[\]]/g,"_");
     database.ref("vortSites/"+siteKey).once("value").then(s=>{
       if(s.exists()){
@@ -245,15 +242,15 @@ function browserNav(action){
 function getChromiumHomeHTML(){
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     body { margin:0; padding:0; background:#0f0f17; color:#fff; font-family:system-ui,sans-serif; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; }
-    .logo { font-size:42px; font-weight:800; background:linear-gradient(135deg,#a855f7,#38bdf8); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:8px; }
+    .logo { font-size:42px; font-weight:800; background:linear-gradient(135deg,#8b5cf6,#c084fc); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:8px; }
     .sub { color:#94a3b8; font-size:14px; margin-bottom:28px; }
     .search-box { width:80%; max-width:540px; display:flex; gap:8px; }
     input { flex:1; padding:12px 18px; border-radius:24px; border:1px solid #334155; background:#1e293b; color:#fff; font-size:15px; outline:none; box-shadow:0 4px 12px rgba(0,0,0,0.3); }
-    input:focus { border-color:#a855f7; }
-    button { padding:12px 24px; border-radius:24px; border:none; background:#a855f7; color:#fff; font-weight:bold; cursor:pointer; }
+    input:focus { border-color:#8b5cf6; }
+    button { padding:12px 24px; border-radius:24px; border:none; background:#8b5cf6; color:#fff; font-weight:bold; cursor:pointer; }
     .shortcuts { display:flex; gap:16px; margin-top:32px; }
     .card { background:#1e293b; border:1px solid #334155; padding:12px 20px; border-radius:12px; cursor:pointer; transition:0.2s; text-align:center; }
-    .card:hover { transform:translateY(-3px); border-color:#a855f7; }
+    .card:hover { transform:translateY(-3px); border-color:#8b5cf6; }
   </style></head><body>
     <div class="logo">Vortex Chromium</div>
     <div class="sub">Navegador Oficial da Rede .vort</div>
@@ -335,7 +332,7 @@ function getNotFoundVortHTML(url){
     body { margin:0; padding:0; background:#0f0f17; color:#fff; font-family:sans-serif; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; }
     h1 { font-size:36px; color:#f38ba8; }
     p { color:#94a3b8; }
-    button { padding:10px 20px; border-radius:8px; border:none; background:#a855f7; color:#fff; cursor:pointer; font-weight:bold; }
+    button { padding:10px 20px; border-radius:8px; border:none; background:#8b5cf6; color:#fff; cursor:pointer; font-weight:bold; }
   </style></head><body>
     <h1>404 — Site .vort não encontrado</h1>
     <p>O endereço <b>${escapeHtml(url)}</b> ainda não foi publicado na rede Vortex.</p>
@@ -400,7 +397,16 @@ function hideMaintenanceOverlay(){document.getElementById("maintenance-overlay")
 function requireAdmin(){if(!isAdmin()){alert("Acesso negado.");return false;}return true;}
 
 /* ================= THEME / WALLET / PIX ================= */
-function setTheme(name){const t={purple:"linear-gradient(135deg,#2e0854,#12002b,#4a154b)","dark-purple":"linear-gradient(135deg,#0f172a,#1e1b4b,#311042)","cyber-blue":"linear-gradient(135deg,#0284c7,#0f172a,#1e1b4b)",sunset:"linear-gradient(135deg,#831843,#312e81,#0f172a)"};document.body.style.background=t[name]||t.purple;localStorage.setItem("vortex_theme",name);}
+function setTheme(name){
+  const t={
+    purple:"linear-gradient(135deg,#2e0854,#12002b,#4a154b)",
+    "dark-purple":"linear-gradient(135deg,#0f172a,#1e1b4b,#311042)",
+    "cyber-blue":"linear-gradient(135deg,#0284c7,#0f172a,#1e1b4b)",
+    sunset:"linear-gradient(135deg,#831843,#312e81,#0f172a)"
+  };
+  document.body.style.background=t[name]||t.purple;
+  localStorage.setItem("vortex_theme",name);
+}
 function updateBalanceUI(){const value=Number(currentUser?.balance||0).toFixed(2);const e=document.getElementById("user-balance");if(e)e.innerText=value;const p=document.getElementById("pay-balance");if(p)p.innerText=value;}
 function addBalance(amount){if(!currentUser)return Promise.reject("Sem sessão");amount=Number(amount)||0;return database.ref("users/"+currentUser.key+"/balance").transaction(v=>Number(v||0)+amount).then(r=>{currentUser.balance=Number(r.snapshot.val()||0);updateBalanceUI();});}
 function claimDailyReward(){if(!currentUser)return alert("Faça login primeiro.");const now=Date.now(),last=Number(currentUser.lastDaily||0),day=86400000;if(now-last<day)return alert("Você já coletou a diária hoje.");return addBalance(10).then(()=>database.ref("users/"+currentUser.key+"/lastDaily").set(now)).then(()=>{currentUser.lastDaily=now;alert("Você recebeu R$ 10,00.");}).catch(e=>alert("Erro: "+e.message));}
@@ -441,7 +447,7 @@ function defaultObject(type="square"){
     player:{shape:"square",color:"#38bdf8",w:48,h:56},
     coin:{shape:"circle",color:"#facc15",w:32,h:32},
     ui_text:{shape:"ui_text",color:"#ffffff",w:120,h:32,text:"Novo Texto",fontSize:20},
-    ui_button:{shape:"ui_button",color:"#a855f7",w:100,h:36,text:"Botão",textColor:"#ffffff",fontSize:14},
+    ui_button:{shape:"ui_button",color:"#8b5cf6",w:100,h:36,text:"Botão",textColor:"#ffffff",fontSize:14},
     ui_panel:{shape:"ui_panel",color:"rgba(30, 30, 46, 0.8)",w:180,h:120}
   };
   const t=types[type]||types.square;
@@ -559,7 +565,6 @@ function renderEngineScene(){
     c.appendChild(el);
   });
 
-  // Pan e inserção no Canvas Vazio
   c.onmousedown=e=>{
     if(e.target!==c) return;
     if(e.button===0){
@@ -571,7 +576,6 @@ function renderEngineScene(){
         currentSceneObjects.push(o); selectedObjectId=o.id;
         saveEngineLocal(); renderEngineScene(); renderHierarchy(); updateInspector();
       } else {
-        // Iniciar Pan da Câmera (Clique arrastar na Unity)
         isPanning=true;
         panStart={ x: e.clientX - enginePan.x, y: e.clientY - enginePan.y };
         selectedObjectId=null; renderEngineScene(); renderHierarchy(); updateInspector();
@@ -660,7 +664,6 @@ function renderHierarchy(){
   const t=document.getElementById("hierarchy-tree");if(!t)return;
   t.innerHTML="";
 
-  // Botões de Adicionar UI na Hierarchy Panel (se não existirem no HTML, adicionamos dinamicamente)
   if(!document.getElementById("ui-hierarchy-tools")){
     const div = document.createElement("div");
     div.id = "ui-hierarchy-tools";
@@ -687,7 +690,7 @@ function renderHierarchy(){
     li.style.cssText = "display:flex; justify-content:space-between; align-items:center;";
     li.innerHTML=`<span>▣ ${escapeHtml(s.name)}.vortex</span>
       <div style="display:flex; gap:4px;">
-        <button style="background:none;border:none;color:#38bdf8;cursor:pointer;" onclick="event.stopPropagation(); duplicateVortexScript('${s.id}')" title="Duplicar">📋</button>
+        <button style="background:none;border:none;color:#8b5cf6;cursor:pointer;" onclick="event.stopPropagation(); duplicateVortexScript('${s.id}')" title="Duplicar">📋</button>
         <button style="background:none;border:none;color:#f38ba8;cursor:pointer;" onclick="event.stopPropagation(); deleteVortexScript('${s.id}')" title="Remover">🗑</button>
       </div>`;
     li.onclick=()=>openVortexScriptEditor(s.id);
@@ -731,29 +734,50 @@ function updateInspector(){
   });
 }
 
-function saveEngineLocal(){if(!currentUser)return;localStorage.setItem("vortex_scene_"+currentUser.key,JSON.stringify({objects:currentSceneObjects,scripts:vortexScripts,active:activeScriptId}));}
+/* ================= PERSISTÊNCIA DO PROJETO VORTEX ENGINE ================= */
+function saveEngineLocal(){
+  const userStorageKey = currentUser ? "vortex_scene_" + currentUser.key : "vortex_scene_guest";
+  const payload = {
+    objects: currentSceneObjects,
+    scripts: vortexScripts,
+    active: activeScriptId
+  };
+  try {
+    localStorage.setItem(userStorageKey, JSON.stringify(payload));
+  } catch(e) {
+    console.error("Erro ao salvar projeto Vortex:", e);
+  }
+}
+
 function loadEngineLocal(){
-  if(!currentUser)return;
-  try{
-    const d=JSON.parse(localStorage.getItem("vortex_scene_"+currentUser.key)||"{}");
-    currentSceneObjects=Array.isArray(d.objects)?d.objects:[];
-    vortexScripts=Array.isArray(d.scripts)?d.scripts:[];
-    activeScriptId=d.active||vortexScripts[0]?.id||null;
-  }catch{currentSceneObjects=[];vortexScripts=[];activeScriptId=null;}
+  const userStorageKey = currentUser ? "vortex_scene_" + currentUser.key : "vortex_scene_guest";
+  try {
+    const d = JSON.parse(localStorage.getItem(userStorageKey) || "{}");
+    currentSceneObjects = Array.isArray(d.objects) ? d.objects : [];
+    vortexScripts = Array.isArray(d.scripts) ? d.scripts : [];
+    activeScriptId = d.active || vortexScripts[0]?.id || null;
+  } catch(e) {
+    currentSceneObjects = [];
+    vortexScripts = [];
+    activeScriptId = null;
+  }
+
   if(!currentSceneObjects.length){
-    currentSceneObjects=[
-      Object.assign(defaultObject("player"),{x:80,y:80,name:"Player"}),
-      Object.assign(defaultObject("square"),{x:40,y:220,w:220,h:40,name:"Chão"}),
-      Object.assign(defaultObject("coin"),{x:120,y:170,name:"Moeda"})
+    currentSceneObjects = [
+      Object.assign(defaultObject("player"), {x:80, y:80, name:"Player"}),
+      Object.assign(defaultObject("square"), {x:40, y:220, w:220, h:40, name:"Chão"}),
+      Object.assign(defaultObject("coin"), {x:120, y:170, name:"Moeda"})
     ];
   }
+
   if(!vortexScripts.length){
-    const id="script_"+Date.now();
-    vortexScripts=[{id,name:"main",code:DEFAULT_VORTEX_CODE.replace("function_marker_placeholder","")}];
-    activeScriptId=id;
+    const id = "script_" + Date.now();
+    vortexScripts = [{id, name:"main", code: DEFAULT_VORTEX_CODE.replace("function_marker_placeholder","")}];
+    activeScriptId = id;
   }
   initEngineEditor();
 }
+
 function clearScene(){if(!confirm("Apagar toda a cena?"))return;currentSceneObjects=[];selectedObjectId=null;saveEngineLocal();initEngineEditor();}
 
 /* ================= VORTEX SCRIPTING ENGINE ================= */
@@ -910,7 +934,7 @@ function buildVortexAPI(inst){
     check_collision:checkCollision,
     move_player:(dx,dy)=>{
       const p=inst.physicsData.player;
-      if(p){ p.vx=Number(dx)||0; if(dy) p.vy=Number(dy); }
+      if(p){ p.vx=Number(dx)||0; if(dy!==undefined) p.vy=Number(dy); }
     },
     apply_gravity:(e,g=.6)=>{if(e)e.vy+=(Number(g)||0.6)*60*api.delta();},
     is_on_floor:e=>{if(!e)return false;return inst.physicsData.blocks.some(b=>Math.abs((e.y+e.h)-b.y)<=3&&e.x+e.w>b.x&&e.x<b.x+b.w);},
@@ -943,7 +967,13 @@ function createVortexGameInstance(container,mapData,scriptCode,opts={}){
   ui.style.cssText="position:absolute;inset:0;z-index:100;pointer-events:none;";
   container.appendChild(ui);
 
-  const inst={containerEl:container,worldEl:world,uiLayerEl:ui,physicsData:{player:null,blocks:[],coins:[]},uiElements:{},camera:{x:0,y:0},coinCount:0,running:false,loopHandle:null,consoleEl:opts.consoleEl};
+  const inst={
+    containerEl:container, worldEl:world, uiLayerEl:ui,
+    physicsData:{player:null,blocks:[],coins:[]}, uiElements:{},
+    camera:{x:0,y:0}, coinCount:0, running:false,
+    animFrameId:null, consoleEl:opts.consoleEl
+  };
+
   inst.log=(m,err)=>{
     if(inst.consoleEl){
       inst.consoleEl.style.display="block";
@@ -968,13 +998,28 @@ function createVortexGameInstance(container,mapData,scriptCode,opts={}){
     try{ inst.handlers?._update?.(); }catch(e){ if(inst.handlers)inst.handlers._update=null; }
     syncVortexRender(inst.physicsData);
     world.style.transform=`translate(${-inst.camera.x}px,${-inst.camera.y}px)`;
+    inst.animFrameId = requestAnimationFrame(tick);
   };
 
-  inst.start=()=>{ if(!inst.running){ inst.running=true; inst.loopHandle=setInterval(tick,1000/60); } };
-  inst.stop=()=>{ inst.running=false; if(inst.loopHandle)clearInterval(inst.loopHandle); };
+  inst.start=()=>{
+    if(!inst.running){
+      inst.running=true;
+      inst.animFrameId = requestAnimationFrame(tick);
+    }
+  };
+
+  inst.stop=()=>{
+    inst.running=false;
+    if(inst.animFrameId!==null){
+      cancelAnimationFrame(inst.animFrameId);
+      inst.animFrameId=null;
+    }
+  };
+
   return inst;
 }
 
+/* --- TOGGLE E PARAR DO TESTE DA ENGINE --- */
 function toggleEngineTestMode(){
   const screen=document.getElementById("engine-test-screen"), editor=document.getElementById("canvas-2d"), btn=document.getElementById("btn-engine-test"), consoleEl=document.getElementById("engine-console");
   if(screen.style.display==="none" || !screen.style.display){
@@ -984,13 +1029,20 @@ function toggleEngineTestMode(){
     if(consoleEl){ consoleEl.innerHTML=""; consoleEl.style.display="none"; }
     editor.style.display="none"; screen.style.cssText="display:block;position:relative;overflow:hidden;background:#090512;height:calc(100% - 42px);";
     btn.innerText="■ PARAR"; btn.classList.add("stop");
+    
+    // Parar qualquer instância residual antes de rodar
+    if(currentGameInstance) currentGameInstance.stop();
+
     currentGameInstance=createVortexGameInstance(screen, currentSceneObjects, s?.code||"", {consoleEl});
     currentGameInstance.start();
   }else{ stopEngineTestLoop(); }
 }
 
 function stopEngineTestLoop(){
-  currentGameInstance?.stop(); currentGameInstance=null;
+  if(currentGameInstance){
+    currentGameInstance.stop();
+    currentGameInstance=null;
+  }
   const s=document.getElementById("engine-test-screen"), c=document.getElementById("canvas-2d"), b=document.getElementById("btn-engine-test");
   if(s)s.style.display="none"; if(c)c.style.display="block";
   if(b){b.innerText="▶ TESTAR";b.classList.remove("stop");}
@@ -1010,7 +1062,6 @@ function compileAndPublishEngineGame(){
   saveVortexScript();
   const s=vortexScripts.find(x=>x.id===activeScriptId);
 
-  // Verifica se o usuário já possui um jogo publicado com este nome para ATUALIZAR A BUILD .vexe
   database.ref("publishedApps").once("value").then(sSnapshot=>{
     let existingAppId = null;
     if(sSnapshot.exists()){
@@ -1102,7 +1153,7 @@ function loadFriends(){
   const l=document.getElementById("friends-list"); if(!l||!currentUser)return;
   const ref=database.ref("users/"+currentUser.key+"/friends");
   const handler=s=>{
-    l.innerHTML=""; if(!s.exists()){l.innerHTML="<div class='muted'>Nenhum amigo.</div>";return;}
+    l.innerHTML=""; if(!s.exists()){l.innerHTML="<div class='muted'>Nenum amigo.</div>";return;}
     Object.keys(s.val()).forEach(k=>{
       const f=s.val()[k]||{}, name=safeUserName(f,k);
       const b=document.createElement("button"); b.className="friend-row";
@@ -1157,7 +1208,8 @@ function loadMessengerHome(){loadFriends();if(!currentChatId){document.getElemen
 
 /* ================= INICIALIZAÇÃO DA APLICAÇÃO ================= */
 window.addEventListener("DOMContentLoaded",()=>{
-  const saved=localStorage.getItem("vortex_theme");if(saved)setTheme(saved);
+  const saved=localStorage.getItem("vortex_theme")||"purple";
+  setTheme(saved);
   ensureDynamicAppWindows();
   tryAutoLogin();
   document.getElementById("message-input")?.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMessage();}});
