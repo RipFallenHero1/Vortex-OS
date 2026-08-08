@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vortex OS v9.5 - NextGen</title>
+    <title>Vortex OS v9.6 - NextGen</title>
     <link rel="stylesheet" href="style.css">
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
@@ -17,7 +17,7 @@
             <div class="auth-header">
                 <h2>🌀 Vortex OS</h2>
                 <p>Identifique-se para acessar o sistema</p>
-                <small style="opacity:0.5;">v9.5</small>
+                <small style="opacity:0.5;">v9.6</small>
             </div>
             <div class="auth-form">
                 <input type="text" id="auth-username" placeholder="Nome de Usuário *" required>
@@ -91,7 +91,7 @@
     <!-- JANELA: VORTEX ENGINE 2D -->
     <div id="win-engine" class="window" style="top: 20px; left: 30px; width: 900px; height: 600px;">
         <div class="window-header" onmousedown="dragWindow(event, 'win-engine')">
-            <span>⚡ Vortex Engine 2D - Criador de Jogos (v9.5)</span>
+            <span>⚡ Vortex Engine 2D - Criador de Jogos (v9.6)</span>
             <div class="window-controls">
                 <button onclick="closeWindow('win-engine')">❌</button>
             </div>
@@ -116,6 +116,8 @@
                             <button id="btn-t-block" onclick="setTileMode('block')">🧱 Bloco</button>
                             <button id="btn-t-coin" onclick="setTileMode('coin')">🪙 Moeda</button>
                             <button id="btn-t-player" onclick="setTileMode('player')">👾 Player</button>
+                            <button id="btn-t-text" onclick="setTileMode('text')">🔤 Texto</button>
+                            <button id="btn-t-button" onclick="setTileMode('button')">🔘 Botão</button>
                             <button id="btn-t-erase" onclick="setTileMode('erase')">❌ Apagar</button>
                             <button id="btn-engine-test" style="background:#22c55e; font-weight:bold;" onclick="toggleEngineTestMode()">▶️ TESTAR</button>
                         </div>
@@ -125,7 +127,7 @@
                 </section>
                 <aside class="panel inspector-panel">
                     <h3>⚙️ Inspetor</h3>
-                    <div id="inspector-content">Selecione uma ferramenta e pinte na cena acima.</div>
+                    <div id="inspector-content">Selecione uma ferramenta e pinte na cena acima. "🔤 Texto" e "🔘 Botão" abrem um prompt para você definir o conteúdo — o botão pode chamar qualquer função do seu script .vortex pelo nome.</div>
                     <div id="engine-console" style="margin-top:10px; font-family:monospace; font-size:0.75rem; background:#000; color:#0f0; padding:6px; border-radius:4px; max-height:150px; overflow-y:auto; display:none;"></div>
                 </aside>
             </div>
@@ -142,24 +144,57 @@
         </div>
         <div class="window-body" style="display:flex; background:#1e1e1e; color:#d4d4d4; padding:0;">
             <!-- SIDEBAR API DOCS -->
-            <div style="width:230px; background:#252526; border-right:1px solid #333; padding:10px; font-size:0.75rem; overflow-y:auto;">
-                <h4 style="color:#a78bfa; margin-bottom:8px;">🐍 API Vortex v1</h4>
-                <p style="color:#999; margin-bottom:10px;">Sintaxe inspirada em Python (beta).</p>
+            <div style="width:250px; background:#252526; border-right:1px solid #333; padding:10px; font-size:0.75rem; overflow-y:auto;">
+                <h4 style="color:#a78bfa; margin-bottom:8px;">🐍 API Vortex v2</h4>
+                <p style="color:#999; margin-bottom:10px;">Sintaxe inspirada em Python. Nada é automático: você programa tudo.</p>
+
                 <p><strong>Funções especiais:</strong></p>
                 <code style="color:#4ec9b0;">def _ready():</code><br>
                 <code style="color:#4ec9b0;">def _update():</code><br>
                 <code style="color:#4ec9b0;">print("texto")</code><br><br>
+
                 <p><strong>Controle:</strong></p>
                 <code style="color:#c586c0;">if x &gt; 5:</code><br>
                 <code style="color:#c586c0;">elif x == 0:</code><br>
                 <code style="color:#c586c0;">else:</code><br>
+                <code style="color:#c586c0;">while cond:</code><br>
+                <code style="color:#c586c0;">for i in range(10):</code><br>
+                <code style="color:#c586c0;">for x in lista:</code><br>
                 <code style="color:#c586c0;">and / or / not</code><br><br>
-                <p><strong>API da Engine:</strong></p>
-                <code style="color:#ce9178;">vortex.spawn('coin', x, y)</code><br>
-                <code style="color:#ce9178;">vortex.destroy(entidade)</code><br>
+
+                <p><strong>Nativas:</strong></p>
+                <code style="color:#dcdcaa;">str(x) int(x) float(x) len(x)</code><br>
+                <code style="color:#dcdcaa;">lista.append(x)</code><br><br>
+
+                <p><strong>Player / entidades:</strong></p>
                 <code style="color:#ce9178;">p = vortex.get_player()</code><br>
-                <code style="color:#ce9178;">p.jump(12)</code><br>
-                <code style="color:#ce9178;">p.x / p.y</code><br>
+                <code style="color:#ce9178;">p.x / p.y / p.vx / p.vy</code><br>
+                <code style="color:#ce9178;">vortex.get_blocks()</code><br>
+                <code style="color:#ce9178;">vortex.get_coins()</code><br>
+                <code style="color:#ce9178;">vortex.check_collision(a, b)</code><br>
+                <code style="color:#ce9178;">vortex.spawn('coin', gx, gy)</code><br>
+                <code style="color:#ce9178;">vortex.spawn_at('block', x, y)</code><br>
+                <code style="color:#ce9178;">vortex.destroy(entidade)</code><br><br>
+
+                <p><strong>Input:</strong></p>
+                <code style="color:#ce9178;">vortex.is_key_down("a")</code><br><br>
+
+                <p><strong>Moedas:</strong></p>
+                <code style="color:#ce9178;">vortex.collect_coin(moeda)</code><br>
+                <code style="color:#ce9178;">vortex.add_coins(1)</code><br>
+                <code style="color:#ce9178;">vortex.get_coins_count()</code><br><br>
+
+                <p><strong>Câmera:</strong></p>
+                <code style="color:#ce9178;">vortex.set_camera(x, y)</code><br><br>
+
+                <p><strong>UI (via script):</strong></p>
+                <code style="color:#ce9178;">vortex.create_text(id, txt, x, y)</code><br>
+                <code style="color:#ce9178;">vortex.create_button(id, txt, x, y, fn)</code><br>
+                <code style="color:#ce9178;">vortex.set_text(id, txt)</code><br>
+                <code style="color:#ce9178;">vortex.remove_ui(id)</code><br><br>
+
+                <p style="color:#999;">Dica: os botões "🔤 Texto"/"🔘 Botão" da Engine colocam objetos de UI direto no mapa — o botão do mapa chama uma função do seu script pelo nome.</p>
+
                 <hr style="border-color:#333; margin:10px 0;">
                 <p id="vscode-scripts-list-label"><strong>Meus Scripts:</strong></p>
                 <ul id="vscode-scripts-list" style="list-style:none; padding:0; color:#9cdcfe;"></ul>
@@ -173,7 +208,7 @@
                     <button class="btn" onclick="saveVortexScript()">💾 Salvar</button>
                     <button class="btn btn-primary" onclick="runScriptFromStudio()">▶️ Testar na Engine</button>
                 </div>
-                <textarea id="vortex-code-editor" style="flex:1; background:#181818; color:#9cdcfe; font-family:monospace; padding:10px; border:1px solid #333; outline:none; resize:none; font-size:0.9rem;" placeholder="# Crie sua lógica em Vortex (Python-like)&#10;&#10;def _ready():&#10;    print('Jogo Carregado com Sucesso')&#10;&#10;def _update():&#10;    p = vortex.get_player()&#10;    if p.y > 400:&#10;        p.jump(12)"></textarea>
+                <textarea id="vortex-code-editor" style="flex:1; background:#181818; color:#9cdcfe; font-family:monospace; padding:10px; border:1px solid #333; outline:none; resize:none; font-size:0.9rem;" placeholder="# Crie sua lógica em Vortex (Python-like)&#10;&#10;def _ready():&#10;    print('Jogo Carregado com Sucesso')&#10;&#10;def _update():&#10;    p = vortex.get_player()&#10;    if p == None:&#10;        return&#10;    if vortex.is_key_down('d'):&#10;        p.x = p.x + 4"></textarea>
             </div>
         </div>
     </div>
@@ -257,7 +292,7 @@
             <div class="window-controls"><button onclick="closeWindow('win-terminal')">❌</button></div>
         </div>
         <div class="window-body" style="background: #000; color: #0f0; font-family: monospace;">
-            <div id="terminal-output">Vortex OS Kernel v9.5 Online.<br>Digite 'help' para comandos.<br></div>
+            <div id="terminal-output">Vortex OS Kernel v9.6 Online.<br>Digite 'help' para comandos.<br></div>
             <div style="display: flex;"><input type="text" id="terminal-input" onkeypress="handleTerminal(event)" style="background: transparent; border: none; color: #0f0; outline: none; flex: 1; font-family: monospace;"></div>
         </div>
     </div>
