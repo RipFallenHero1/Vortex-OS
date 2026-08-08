@@ -1,9 +1,9 @@
 // ==========================================
-// 🌀 VORTEX OS - VERSÃO 9.0 (PYTHON-LIKE & PHYSICS ENGINE)
+// 🌀 VORTEX OS - SCRIPT PRINCIPAL (compatível com index.html)
 // ==========================================
-const OS_VERSION = "9.0";
+const OS_VERSION = "9.5";
 
-// FIREBASE CONFIG (Mantenha as suas credenciais se necessário)
+// ---- FIREBASE CONFIG ----
 const firebaseConfig = {
     apiKey: "AIzaSyCAC6tnKdPC6X2SwYWiMGZQI0GxwDq5SeA",
     authDomain: "vortex-os-971fc.firebaseapp.com",
@@ -13,72 +13,176 @@ const firebaseConfig = {
 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
-// INJEÇÃO AUTOMÁTICA DE ESTILOS DA V9.0
-(function initV90Styles() {
-    document.title = `Vortex ${OS_VERSION}`;
-    const style = document.createElement('style');
-    style.innerHTML = `
-        /* ESTILOS DE JANELAS E BARRA DE TAREFAS */
-        .window { position: absolute; background: #12002b; border: 1px solid #a78bfa; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); display: flex; flex-direction: column; overflow: hidden; }
-        .window.minimized { display: none !important; }
-        .window.maximized { top: 0 !important; left: 0 !important; width: 100vw !important; height: calc(100vh - 45px) !important; border-radius: 0 !important; z-index: 9999 !important; }
-        .window-header { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: rgba(30, 27, 75, 0.9); cursor: move; border-bottom: 1px solid rgba(255,255,255,0.1); user-select: none; }
-        .window-controls { display: flex; gap: 4px; }
-        .window-controls button { background: rgba(255,255,255,0.1); border: none; color: #fff; width: 24px; height: 24px; border-radius: 4px; cursor: pointer; }
-        .window-controls button:hover { background: rgba(255,255,255,0.25); }
-        .window-controls button.btn-close:hover { background: #ef4444; }
-
-        /* TOOLBAR E GRID DA ENGINE */
-        .engine-toolbar { display: flex; gap: 8px; padding: 10px; background: #1e1b4b; border-bottom: 1px solid #a78bfa; }
-        .engine-btn { background: #2d2d2d; color: white; border: 1px solid #555; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        .engine-btn.active { background: #8b5cf6; border-color: #c084fc; }
-        .engine-btn:hover { background: #444; }
-        
-        #canvas-2d { display: grid; grid-template-columns: repeat(20, 1fr); grid-template-rows: repeat(12, 1fr); gap: 1px; background: #000; padding: 2px; flex: 1; }
-        .tile { display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: crosshair; background: #111; user-select: none; }
-        .tile:hover { background: #333; }
-
-        /* RUNNER GAME CANVAS */
-        #game-screen { width: 100%; height: 100%; background: #87CEEB; position: relative; overflow: hidden; display: none; }
-        .game-entity { position: absolute; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; }
-    `;
-    document.head.appendChild(style);
-})();
-
 // ==========================================
-// 1. SISTEMA DE JANELAS (FIX DEFINITIVO)
+// ESTADO GLOBAL
 // ==========================================
+let currentUser = null;       // { username, pin, email, balance, createdAt, lastDaily }
 let highestZIndex = 100;
 let openApps = new Set();
+let clockInterval = null;
 
+let currentTileMode = 'block';
+let currentSceneGrid = new Array(240).fill(''); // grid 20x12
+
+// ==========================================
+// 1. AUTENTICAÇÃO (LOGIN / CADASTRO AUTOMÁTICO)
+// ==========================================
+function loginUser() {
+    const usernameInput = document.getElementById('auth-username');
+    const pinInput = document.getElementById('auth-pin');
+    const emailInput = document.getElementById('auth-email');
+
+    const username = usernameInput.value.trim();
+    const pin = pinInput.value.trim();
+    const email = emailInput.value.trim();
+
+    if (!username) {
+        alert('⚠️ Digite um nome de usuário.');
+        return;
+    }
+    if (!/^\d{4}$/.test(pin)) {
+        alert('⚠️ O PIN deve ter exatamente 4 dígitos numéricos.');
+        return;
+    }
+
+    // Sanitiza o nome de usuário para usar como chave no Firebase
+    const userKey = username.toLowerCase().replace(/[.#$/\[\]]/g, '_');
+    const userRef = database.ref('users/' + userKey);
+
+    const loginBtn = document.querySelector('#login-screen .btn-primary');
+    if (loginBtn) { loginBtn.disabled = true; loginBtn.innerText = 'Verificando...'; }
+
+    userRef.once('value')
+        .then(snapshot => {
+            if (snapshot.exists()) {
+                // USUÁRIO JÁ EXISTE -> tenta logar
+                const data = snapshot.val();
+                if (data.pin === pin) {
+                    startSession(userKey, data);
+                } else {
+                    alert('❌ PIN incorreto para o usuário "' + username + '".');
+                }
+            } else {
+                // USUÁRIO NÃO EXISTE -> cadastra automaticamente
+                const newUser = {
+                    displayName: username,
+                    pin: pin,
+                    email: email || '',
+                    balance: 0,
+                    createdAt: Date.now(),
+                    lastDaily: 0
+                };
+                return userRef.set(newUser).then(() => {
+                    startSession(userKey, newUser);
+                    alert('✅ Conta criada com sucesso! Bem-vindo(a), ' + username + '.');
+                });
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert('❌ Erro de conexão com o Firebase: ' + err.message);
+        })
+        .finally(() => {
+            if (loginBtn) { loginBtn.disabled = false; loginBtn.innerText = 'Entrar no Vortex OS'; }
+        });
+}
+
+function startSession(userKey, data) {
+    currentUser = Object.assign({ key: userKey }, data);
+    localStorage.setItem('vortex_current_user', userKey);
+
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('shutdown-screen').style.display = 'none';
+
+    const displayName = data.displayName || userKey;
+    document.getElementById('start-username').innerText = displayName;
+    document.getElementById('start-email').innerText = data.email || 'online';
+    document.getElementById('settings-user').innerText = displayName;
+    document.getElementById('settings-email').innerText = data.email || '-';
+    updateBalanceUI();
+
+    startClock();
+    loadGlobalStore();
+    loadUserFiles();
+}
+
+function tryAutoLogin() {
+    const savedKey = localStorage.getItem('vortex_current_user');
+    if (!savedKey) return;
+
+    database.ref('users/' + savedKey).once('value').then(snapshot => {
+        if (snapshot.exists()) {
+            startSession(savedKey, snapshot.val());
+        } else {
+            localStorage.removeItem('vortex_current_user');
+        }
+    }).catch(err => console.error('Erro no auto-login:', err));
+}
+
+function logoutUser() {
+    localStorage.removeItem('vortex_current_user');
+    currentUser = null;
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('auth-pin').value = '';
+    if (clockInterval) clearInterval(clockInterval);
+}
+
+// ==========================================
+// 2. LIGAR / DESLIGAR PC
+// ==========================================
+function shutdownPC() {
+    closeStartMenuIfOpen();
+    document.getElementById('shutdown-screen').style.display = 'flex';
+    if (clockInterval) clearInterval(clockInterval);
+}
+
+function powerOn() {
+    document.getElementById('shutdown-screen').style.display = 'none';
+    if (currentUser) {
+        // Já tem sessão válida, volta direto pro desktop
+        document.getElementById('login-screen').style.display = 'none';
+        startClock();
+    } else {
+        document.getElementById('login-screen').style.display = 'flex';
+    }
+}
+
+// ==========================================
+// 3. RELÓGIO DO SISTEMA
+// ==========================================
+function startClock() {
+    if (clockInterval) clearInterval(clockInterval);
+    const update = () => {
+        const now = new Date();
+        const h = String(now.getHours()).padStart(2, '0');
+        const m = String(now.getMinutes()).padStart(2, '0');
+        const clockEl = document.getElementById('os-clock');
+        if (clockEl) clockEl.innerText = `${h}:${m}`;
+    };
+    update();
+    clockInterval = setInterval(update, 1000 * 30);
+}
+
+// ==========================================
+// 4. SISTEMA DE JANELAS
+// ==========================================
 function openWindow(id) {
-    if (id === 'win-vscode') createVSCodeDOM();
-    if (id === 'win-engine') createEngineDOM();
-
     const win = document.getElementById(id);
     if (!win) return;
 
-    win.classList.remove('minimized');
     win.style.display = 'flex';
     bringToFront(win);
     openApps.add(id);
+    addTaskbarButton(id);
+
+    if (id === 'win-engine') initMapCanvasOnce();
 }
 
 function closeWindow(id) {
     const win = document.getElementById(id);
     if (win) win.style.display = 'none';
     openApps.delete(id);
-    if (id === 'win-engine') stopGame();
-}
-
-function minimizeWindow(id) {
-    const win = document.getElementById(id);
-    if (win) win.classList.add('minimized');
-}
-
-function toggleMaximizeWindow(id) {
-    const win = document.getElementById(id);
-    if (win) win.classList.toggle('maximized');
+    removeTaskbarButton(id);
 }
 
 function bringToFront(element) {
@@ -89,90 +193,245 @@ function bringToFront(element) {
 function dragWindow(e, winId) {
     const win = document.getElementById(winId);
     bringToFront(win);
-    if (win.classList.contains('maximized')) return;
-    
-    let pos1 = 0, pos2 = 0, pos3 = e.clientX, pos4 = e.clientY;
+
+    let pos3 = e.clientX, pos4 = e.clientY;
     document.onmouseup = () => { document.onmouseup = null; document.onmousemove = null; };
-    document.onmousemove = (e) => {
-        e.preventDefault();
-        pos1 = pos3 - e.clientX; pos2 = pos4 - e.clientY;
-        pos3 = e.clientX; pos4 = e.clientY;
+    document.onmousemove = (ev) => {
+        ev.preventDefault();
+        const pos1 = pos3 - ev.clientX;
+        const pos2 = pos4 - ev.clientY;
+        pos3 = ev.clientX; pos4 = ev.clientY;
         win.style.top = (win.offsetTop - pos2) + "px";
         win.style.left = (win.offsetLeft - pos1) + "px";
     };
 }
 
-// ==========================================
-// 2. ENGINE 2D (FÍSICA E COLISÃO JOGÁVEL)
-// ==========================================
-let currentTileMode = 'block';
-let currentSceneGrid = new Array(240).fill(''); 
-let gameLoopInterval;
-let keys = {};
+function addTaskbarButton(id) {
+    const bar = document.getElementById('taskbar-apps');
+    if (!bar || document.getElementById('task-' + id)) return;
+    const win = document.getElementById(id);
+    const title = win.querySelector('.window-header span')?.innerText || id;
 
-window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
-window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
-
-function createEngineDOM() {
-    if (document.getElementById('win-engine')) return;
-
-    const win = document.createElement('div');
-    win.id = 'win-engine';
-    win.className = 'window';
-    win.style.cssText = "top: 40px; left: 100px; width: 640px; height: 500px; display:none; flex-direction:column;";
-    win.innerHTML = `
-        <div class="window-header" onmousedown="dragWindow(event, 'win-engine')">
-            <span>⚡ Vortex Game Engine</span>
-            <div class="window-controls">
-                <button onclick="minimizeWindow('win-engine')">➖</button>
-                <button onclick="toggleMaximizeWindow('win-engine')">🔲</button>
-                <button class="btn-close" onclick="closeWindow('win-engine')">❌</button>
-            </div>
-        </div>
-        <div class="engine-toolbar">
-            <button class="engine-btn active" id="btn-t-block" onclick="setMode('block')">🧱 Bloco</button>
-            <button class="engine-btn" id="btn-t-coin" onclick="setMode('coin')">🪙 Moeda</button>
-            <button class="engine-btn" id="btn-t-player" onclick="setMode('player')">👾 Player</button>
-            <button class="engine-btn" id="btn-t-erase" onclick="setMode('erase')">🧹 Borracha</button>
-            <div style="flex:1;"></div>
-            <button class="engine-btn" style="background:#dc2626;" onclick="clearEngine()">🗑️ Limpar</button>
-            <button class="engine-btn" style="background:#22c55e;" id="btn-play" onclick="togglePlayMode()">▶️ TESTAR JOGO</button>
-        </div>
-        <div id="canvas-2d"></div>
-        <div id="game-screen"></div>
-    `;
-    document.body.appendChild(win);
-    initMapCanvas();
+    const btn = document.createElement('button');
+    btn.id = 'task-' + id;
+    btn.className = 'btn-sm taskbar-app-btn';
+    btn.innerText = title;
+    btn.onclick = () => {
+        const w = document.getElementById(id);
+        if (w.style.display === 'none') {
+            w.style.display = 'flex';
+        }
+        bringToFront(w);
+    };
+    bar.appendChild(btn);
 }
 
-function setMode(mode) {
-    currentTileMode = mode;
-    ['block', 'coin', 'player', 'erase'].forEach(m => {
-        const btn = document.getElementById(`btn-t-${m}`);
-        if (btn) btn.classList.toggle('active', m === mode);
+function removeTaskbarButton(id) {
+    const btn = document.getElementById('task-' + id);
+    if (btn) btn.remove();
+}
+
+// ==========================================
+// 5. MENU INICIAR
+// ==========================================
+function toggleStartMenu() {
+    const menu = document.getElementById('start-menu');
+    if (!menu) return;
+    menu.classList.toggle('open');
+    menu.style.display = menu.classList.contains('open') ? 'block' : 'none';
+}
+
+function closeStartMenuIfOpen() {
+    const menu = document.getElementById('start-menu');
+    if (menu) { menu.classList.remove('open'); menu.style.display = 'none'; }
+}
+
+// Fecha o menu iniciar se clicar fora dele
+document.addEventListener('click', (e) => {
+    const menu = document.getElementById('start-menu');
+    const startBtn = document.querySelector('.start-btn');
+    if (!menu || !startBtn) return;
+    if (menu.classList.contains('open') && !menu.contains(e.target) && e.target !== startBtn) {
+        closeStartMenuIfOpen();
+    }
+});
+
+// ==========================================
+// 6. TEMAS / WALLPAPER
+// ==========================================
+function setTheme(name) {
+    const themes = {
+        'purple': 'linear-gradient(135deg, #2e0854, #12002b, #4a154b)',
+        'dark-purple': 'linear-gradient(135deg, #0f172a, #1e1b4b, #311042)',
+        'cyber-blue': 'linear-gradient(135deg, #0284c7, #0f172a, #1e1b4b)',
+        'sunset': 'linear-gradient(135deg, #831843, #312e81, #0f172a)'
+    };
+    const bg = themes[name] || themes['purple'];
+    document.body.style.background = bg;
+    document.body.style.backgroundAttachment = 'fixed';
+    localStorage.setItem('vortex_theme', name);
+}
+
+// Aplica tema salvo ao carregar
+(function restoreTheme() {
+    const saved = localStorage.getItem('vortex_theme');
+    if (saved) {
+        window.addEventListener('DOMContentLoaded', () => setTheme(saved));
+    }
+})();
+
+// ==========================================
+// 7. CARTEIRA / ECONOMIA (Firebase)
+// ==========================================
+function updateBalanceUI() {
+    const el = document.getElementById('user-balance');
+    if (el && currentUser) el.innerText = Number(currentUser.balance || 0).toFixed(2);
+}
+
+function addBalance(amount) {
+    if (!currentUser) return Promise.reject('Sem sessão ativa');
+    const newBalance = Number(currentUser.balance || 0) + amount;
+    return database.ref('users/' + currentUser.key + '/balance').set(newBalance).then(() => {
+        currentUser.balance = newBalance;
+        updateBalanceUI();
     });
 }
 
-function initMapCanvas() {
+function claimDailyReward() {
+    if (!currentUser) return alert('Faça login primeiro.');
+    const now = Date.now();
+    const last = currentUser.lastDaily || 0;
+    const oneDay = 1000 * 60 * 60 * 24;
+
+    if (now - last < oneDay) {
+        const horasRestantes = Math.ceil((oneDay - (now - last)) / (1000 * 60 * 60));
+        alert(`⏳ Você já coletou sua recompensa diária. Volte em ~${horasRestantes}h.`);
+        return;
+    }
+
+    addBalance(10).then(() => {
+        currentUser.lastDaily = now;
+        database.ref('users/' + currentUser.key + '/lastDaily').set(now);
+        alert('🎁 Você recebeu R$ 10,00 de recompensa diária!');
+    }).catch(err => alert('Erro: ' + err));
+}
+
+function simulateIncomingPix() {
+    if (!currentUser) return alert('Faça login primeiro.');
+    const valor = Math.floor(Math.random() * 41) + 10; // R$10 a R$50
+    addBalance(valor).then(() => {
+        alert(`💸 Você recebeu um Pix simulado de R$ ${valor.toFixed(2)}!`);
+    }).catch(err => alert('Erro: ' + err));
+}
+
+// ==========================================
+// 8. TERMINAL
+// ==========================================
+function handleTerminal(event) {
+    if (event.key !== 'Enter') return;
+
+    const input = document.getElementById('terminal-input');
+    const output = document.getElementById('terminal-output');
+    const cmd = input.value.trim();
+    input.value = '';
+
+    output.innerHTML += `<br>&gt; ${cmd}<br>`;
+
+    switch (cmd.toLowerCase()) {
+        case 'help':
+            output.innerHTML += 'Comandos: help, clear, whoami, balance, date, apps, shutdown';
+            break;
+        case 'clear':
+            output.innerHTML = '';
+            break;
+        case 'whoami':
+            output.innerHTML += currentUser ? currentUser.displayName || currentUser.key : 'Nenhum usuário logado';
+            break;
+        case 'balance':
+            output.innerHTML += 'R$ ' + Number(currentUser?.balance || 0).toFixed(2);
+            break;
+        case 'date':
+            output.innerHTML += new Date().toLocaleString('pt-BR');
+            break;
+        case 'apps':
+            output.innerHTML += Array.from(openApps).join(', ') || 'Nenhum app aberto';
+            break;
+        case 'shutdown':
+            shutdownPC();
+            break;
+        default:
+            output.innerHTML += `Comando não reconhecido: "${cmd}". Digite 'help'.`;
+    }
+
+    output.scrollTop = output.scrollHeight;
+}
+
+// ==========================================
+// 9. CALCULADORA
+// ==========================================
+function calcInput(val) {
+    const display = document.getElementById('calc-display');
+    display.value += val;
+}
+
+function calcEval() {
+    const display = document.getElementById('calc-display');
+    try {
+        // Apenas dígitos e operadores básicos são permitidos
+        if (!/^[0-9+\-*/.\s]+$/.test(display.value)) throw new Error('Entrada inválida');
+        display.value = String(Function('"use strict";return (' + display.value + ')')());
+    } catch (e) {
+        display.value = 'Erro';
+    }
+}
+
+// ==========================================
+// 10. VORTEX ENGINE 2D
+// ==========================================
+let mapCanvasInitialized = false;
+
+function initMapCanvasOnce() {
+    if (mapCanvasInitialized) return;
     const canvas = document.getElementById('canvas-2d');
+    if (!canvas) return;
+
+    canvas.style.display = 'grid';
+    canvas.style.gridTemplateColumns = 'repeat(20, 1fr)';
+    canvas.style.gridTemplateRows = 'repeat(12, 1fr)';
+    canvas.style.gap = '1px';
+    canvas.style.background = '#000';
+
     canvas.innerHTML = '';
     for (let i = 0; i < 240; i++) {
         const tile = document.createElement('div');
-        tile.className = 'tile';
         tile.dataset.index = i;
+        tile.style.display = 'flex';
+        tile.style.alignItems = 'center';
+        tile.style.justifyContent = 'center';
+        tile.style.background = '#111';
+        tile.style.cursor = 'crosshair';
+        tile.style.fontSize = '1.1rem';
+        tile.style.userSelect = 'none';
         tile.onmousedown = () => applyTool(i, tile);
         tile.onmouseenter = (e) => { if (e.buttons === 1) applyTool(i, tile); };
         canvas.appendChild(tile);
     }
+    mapCanvasInitialized = true;
+}
+
+function setTileMode(mode) {
+    currentTileMode = mode;
+    const inspector = document.getElementById('inspector-content');
+    if (inspector) inspector.innerText = `Ferramenta ativa: ${mode}. Clique e arraste na cena para pintar.`;
 }
 
 function applyTool(index, tileElement) {
     if (currentTileMode === 'player') {
-        // Só pode existir um player
-        const oldPlayerIdx = currentSceneGrid.indexOf('player');
-        if (oldPlayerIdx !== -1) {
-            currentSceneGrid[oldPlayerIdx] = '';
-            document.querySelector(`.tile[data-index='${oldPlayerIdx}']`).innerText = '';
+        const oldIdx = currentSceneGrid.indexOf('player');
+        if (oldIdx !== -1) {
+            currentSceneGrid[oldIdx] = '';
+            const oldTile = document.querySelector(`#canvas-2d [data-index='${oldIdx}']`);
+            if (oldTile) oldTile.innerText = '';
         }
     }
     currentSceneGrid[index] = currentTileMode === 'erase' ? '' : currentTileMode;
@@ -181,235 +440,180 @@ function applyTool(index, tileElement) {
 
 function renderTile(tile, mode) {
     tile.innerText = '';
-    tile.style.backgroundColor = '#111';
-    if (mode === 'block') { tile.innerText = '🧱'; }
-    if (mode === 'coin') { tile.innerText = '🪙'; }
-    if (mode === 'player') { tile.innerText = '👾'; }
+    if (mode === 'block') tile.innerText = '🧱';
+    if (mode === 'coin') tile.innerText = '🪙';
+    if (mode === 'player') tile.innerText = '👾';
 }
 
-function clearEngine() {
-    if(confirm("Apagar o mapa inteiro?")) {
-        currentSceneGrid.fill('');
-        document.querySelectorAll('.tile').forEach(t => renderTile(t, ''));
-    }
-}
+function addHierarchyItem(type) {
+    const tree = document.getElementById('hierarchy-tree');
+    if (!tree) return;
 
-// === MOTOR DE FÍSICA E LÓGICA DO JOGO ===
-let physicsData = { player: null, blocks: [], coins: [] };
+    const icons = { square: '🧱', coin: '🪙', script: '📜' };
+    const labels = { square: 'Bloco Solido', coin: 'Item Moeda', script: 'Script.js' };
 
-function togglePlayMode() {
-    const btn = document.getElementById('btn-play');
-    const editor = document.getElementById('canvas-2d');
-    const screen = document.getElementById('game-screen');
-
-    if (btn.innerText.includes("TESTAR")) {
-        // Iniciar Jogo
-        if (!currentSceneGrid.includes('player')) return alert("⚠️ Coloque um Player (👾) no mapa primeiro!");
-        
-        btn.innerText = "🛑 PARAR JOGO";
-        btn.style.background = "#ef4444";
-        editor.style.display = "none";
-        screen.style.display = "block";
-        
-        buildGameScene(screen);
-        startGameLoop();
-    } else {
-        // Parar Jogo
-        stopGame();
-        btn.innerText = "▶️ TESTAR JOGO";
-        btn.style.background = "#22c55e";
-        editor.style.display = "grid";
-        screen.style.display = "none";
-    }
-}
-
-function buildGameScene(screen) {
-    screen.innerHTML = '';
-    physicsData = { player: null, blocks: [], coins: [] };
-
-    // O Canvas tem 640px de largura e aprox 430px de altura.
-    // Grid 20x12 -> Cada bloco tem 32x35 px (aprox)
-    const TILE_W = 32; 
-    const TILE_H = 35;
-
-    currentSceneGrid.forEach((type, i) => {
-        if (!type) return;
-        const x = (i % 20) * TILE_W;
-        const y = Math.floor(i / 20) * TILE_H;
-
-        const el = document.createElement('div');
-        el.className = 'game-entity';
-        el.style.width = TILE_W + 'px';
-        el.style.height = TILE_H + 'px';
-        el.style.left = x + 'px';
-        el.style.top = y + 'px';
-
-        if (type === 'block') {
-            el.innerText = '🧱';
-            physicsData.blocks.push({ x, y, w: TILE_W, h: TILE_H, el });
-        } else if (type === 'coin') {
-            el.innerText = '🪙';
-            physicsData.coins.push({ x, y, w: TILE_W, h: TILE_H, el, collected: false });
-        } else if (type === 'player') {
-            el.innerText = '👾';
-            el.style.zIndex = "10";
-            physicsData.player = { x, y, vx: 0, vy: 0, w: 28, h: 32, el, speed: 4, jumpPower: -12, grounded: false };
-        }
-        screen.appendChild(el);
-    });
-}
-
-function startGameLoop() {
-    gameLoopInterval = setInterval(updatePhysics, 1000 / 60); // 60 FPS
-}
-
-function stopGame() {
-    clearInterval(gameLoopInterval);
-}
-
-function checkCollision(rect1, rect2) {
-    return (rect1.x < rect2.x + rect2.w &&
-            rect1.x + rect1.w > rect2.x &&
-            rect1.y < rect2.y + rect2.h &&
-            rect1.y + rect1.h > rect2.y);
-}
-
-function updatePhysics() {
-    let p = physicsData.player;
-    if (!p) return;
-
-    // Movimentação Horizontal (A/D ou Setas)
-    if (keys['a'] || keys['arrowleft']) p.vx = -p.speed;
-    else if (keys['d'] || keys['arrowright']) p.vx = p.speed;
-    else p.vx = 0;
-
-    // Gravidade
-    p.vy += 0.6; // Força da gravidade
-
-    // Pulo (W, Espaço ou Seta Cima)
-    if ((keys['w'] || keys[' '] || keys['arrowup']) && p.grounded) {
-        p.vy = p.jumpPower;
-        p.grounded = false;
-    }
-
-    // Aplicar Movimento X
-    p.x += p.vx;
-    
-    // Limites da tela X
-    if (p.x < 0) p.x = 0;
-    if (p.x > 640 - p.w) p.x = 640 - p.w;
-
-    // Colisão Horizontal com Blocos
-    for (let b of physicsData.blocks) {
-        if (checkCollision(p, b)) {
-            if (p.vx > 0) p.x = b.x - p.w; // Batendo na direita
-            else if (p.vx < 0) p.x = b.x + b.w; // Batendo na esquerda
-            p.vx = 0;
-        }
-    }
-
-    // Aplicar Movimento Y
-    p.y += p.vy;
-    p.grounded = false;
-
-    // Colisão Vertical com Blocos
-    for (let b of physicsData.blocks) {
-        if (checkCollision(p, b)) {
-            if (p.vy > 0) { // Caindo em cima do bloco
-                p.y = b.y - p.h;
-                p.vy = 0;
-                p.grounded = true;
-            } else if (p.vy < 0) { // Batendo a cabeça
-                p.y = b.y + b.h;
-                p.vy = 0;
-            }
-        }
-    }
-
-    // Limite da tela Y (Morrer ao cair)
-    if (p.y > 450) {
-        alert("💀 Você caiu no vazio! Reiniciando...");
-        togglePlayMode(); // Para
-        setTimeout(togglePlayMode, 500); // Recomeça
-        return;
-    }
-
-    // Coleta de Moedas
-    physicsData.coins.forEach(c => {
-        if (!c.collected && checkCollision(p, c)) {
-            c.collected = true;
-            c.el.style.display = 'none';
-            // vortex.giveMoney(1); // Integração futura com o banco de dados
-        }
-    });
-
-    // Atualiza a posição na tela
-    p.el.style.left = p.x + 'px';
-    p.el.style.top = p.y + 'px';
-    
-    // Vira o rostinho (👾) para o lado certo usando scaleX
-    if (p.vx < 0) p.el.style.transform = 'scaleX(-1)';
-    if (p.vx > 0) p.el.style.transform = 'scaleX(1)';
+    const li = document.createElement('li');
+    li.innerText = `${icons[type] || '❔'} ${labels[type] || type} #${tree.children.length + 1}`;
+    li.style.cursor = 'pointer';
+    li.onclick = () => {
+        const inspector = document.getElementById('inspector-content');
+        if (inspector) inspector.innerText = `Item selecionado: ${li.innerText}`;
+    };
+    tree.appendChild(li);
 }
 
 // ==========================================
-// 3. VORTEX CODE STUDIO (LINGUAGEM ESTILO PYTHON)
+// 11. PUBLICAÇÃO (.vexe) E LOJA GLOBAL
 // ==========================================
-function createVSCodeDOM() {
-    if (document.getElementById('win-vscode')) return;
-
-    const win = document.createElement('div');
-    win.id = 'win-vscode';
-    win.className = 'window';
-    win.style.cssText = "top: 60px; left: 160px; width: 680px; height: 460px; display:none; flex-direction:column;";
-    win.innerHTML = `
-        <div class="window-header" onmousedown="dragWindow(event, 'win-vscode')">
-            <span>📝 Vortex Code Studio (Python-Like API)</span>
-            <div class="window-controls">
-                <button onclick="minimizeWindow('win-vscode')">➖</button>
-                <button onclick="toggleMaximizeWindow('win-vscode')">🔲</button>
-                <button class="btn-close" onclick="closeWindow('win-vscode')">❌</button>
-            </div>
-        </div>
-        <div class="window-body" style="display:flex; flex:1; background:#1e1e1e; color:#d4d4d4;">
-            <!-- SIDEBAR API DOCS -->
-            <div style="width:230px; background:#252526; border-right:1px solid #333; padding:10px; font-size:0.75rem; overflow-y:auto;">
-                <h4 style="color:#a78bfa; margin-bottom:8px;">🐍 API Vortex v2</h4>
-                <p style="color:#999; margin-bottom:10px;">Sintaxe inspirada em Python. Sem problemas de IndentationError!</p>
-                <p><strong>Básicos:</strong></p>
-                <code style="color:#4ec9b0;">def _ready():</code><br>
-                <code style="color:#4ec9b0;">def _update():</code><br>
-                <code style="color:#4ec9b0;">print("Olá!")</code><br><br>
-                <p><strong>Entidades Engine:</strong></p>
-                <code style="color:#ce9178;">vortex.spawn('block', x, y)</code><br>
-                <code style="color:#ce9178;">vortex.destroy(id)</code><br>
-                <code style="color:#ce9178;">player = vortex.get_player()</code><br>
-                <code style="color:#ce9178;">player.jump(15)</code><br>
-            </div>
-
-            <!-- EDITOR AREA -->
-            <div style="flex:1; display:flex; flex-direction:column; padding:10px; gap:8px;">
-                <div style="display:flex; gap:10px; align-items:center;">
-                    <input type="text" id="vortex-filename" placeholder="meu_jogo" style="padding:4px 8px; background:#2d2d2d; border:1px solid #444; color:#fff; border-radius:4px;">
-                    <span style="color:#a78bfa; font-weight:bold;">.vortex</span>
-                </div>
-                <textarea id="vortex-code-editor" style="flex:1; background:#181818; color:#9cdcfe; font-family:monospace; padding:10px; border:1px solid #333; outline:none; resize:none; font-size:0.9rem;" placeholder="# Crie sua lógica em Python aqui!&#10;&#10;def _ready():&#10;    print('Jogo Carregado com Sucesso')&#10;    vortex.spawn('coin', 5, 5)&#10;&#10;def _update():&#10;    player = vortex.get_player()&#10;    if player.y > 100:&#10;        player.jump(10)"></textarea>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(win);
+function openPublishModalFromEngine() {
+    const modal = document.getElementById('publish-modal');
+    if (modal) modal.style.display = 'flex';
 }
 
-// INICIALIZAÇÃO ATUALIZADA
-window.onload = () => {
-    // Cria um ícone na área de trabalho para a Engine!
-    const desktop = document.getElementById('desktop');
-    if (desktop && !document.getElementById('icon-engine')) {
-        const icon = document.createElement('div');
-        icon.id = 'icon-engine';
-        icon.className = 'desktop-icon';
-        icon.onclick = () => openWindow('win-engine');
-        icon.innerHTML = `<div class="icon-img">⚡</div><span>Engine</span>`;
-        desktop.appendChild(icon);
+function closePublishModal() {
+    const modal = document.getElementById('publish-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function compileAndPublishEngineGame() {
+    if (!currentUser) return alert('Faça login primeiro.');
+
+    const title = document.getElementById('app-title-input').value.trim();
+    const price = Number(document.getElementById('app-price-input').value) || 0;
+
+    if (!title) return alert('⚠️ Dê um nome ao seu jogo antes de publicar.');
+    if (!currentSceneGrid.includes('player')) return alert('⚠️ Coloque um Player (👾) na cena antes de publicar.');
+
+    const appId = 'app_' + Date.now();
+    const appData = {
+        title,
+        price,
+        author: currentUser.displayName || currentUser.key,
+        authorKey: currentUser.key,
+        mapData: currentSceneGrid,
+        createdAt: Date.now()
+    };
+
+    database.ref('publishedApps/' + appId).set(appData)
+        .then(() => database.ref('users/' + currentUser.key + '/files/' + appId).set(true))
+        .then(() => {
+            alert(`🚀 "${title}" foi compilado e publicado com sucesso!`);
+            closePublishModal();
+            loadGlobalStore();
+            loadUserFiles();
+        })
+        .catch(err => alert('Erro ao publicar: ' + err.message));
+}
+
+function loadGlobalStore() {
+    const list = document.getElementById('global-apps-list');
+    if (!list) return;
+    list.innerHTML = '<p>Carregando nuvem Firebase...</p>';
+
+    database.ref('publishedApps').once('value').then(snapshot => {
+        list.innerHTML = '';
+        if (!snapshot.exists()) {
+            list.innerHTML = '<p>Nenhum jogo publicado ainda. Seja o primeiro na Vortex Engine!</p>';
+            return;
+        }
+        snapshot.forEach(child => {
+            const app = child.val();
+            const card = document.createElement('div');
+            card.className = 'app-card';
+            card.innerHTML = `
+                <h4>🎮 ${app.title}</h4>
+                <p>Por: ${app.author}</p>
+                <p>R$ ${Number(app.price).toFixed(2)}</p>
+                <button class="btn btn-primary">Comprar / Baixar</button>
+            `;
+            card.querySelector('button').onclick = () => buyApp(child.key, app);
+            list.appendChild(card);
+        });
+    }).catch(err => {
+        list.innerHTML = '<p>Erro ao carregar loja: ' + err.message + '</p>';
+    });
+}
+
+function buyApp(appId, app) {
+    if (!currentUser) return alert('Faça login primeiro.');
+    if (Number(currentUser.balance || 0) < Number(app.price || 0)) {
+        return alert('❌ Saldo insuficiente para comprar este jogo.');
     }
-};
+
+    addBalance(-Number(app.price || 0)).then(() => {
+        return database.ref('users/' + currentUser.key + '/files/' + appId).set(true);
+    }).then(() => {
+        alert(`✅ "${app.title}" adicionado aos seus arquivos!`);
+        loadUserFiles();
+    }).catch(err => alert('Erro na compra: ' + err.message));
+}
+
+function loadUserFiles() {
+    const list = document.getElementById('files-list');
+    if (!list || !currentUser) return;
+    list.innerHTML = '<p>Carregando seus arquivos...</p>';
+
+    database.ref('users/' + currentUser.key + '/files').once('value').then(async filesSnap => {
+        list.innerHTML = '';
+        if (!filesSnap.exists()) {
+            list.innerHTML = '<p>Nenhum executável (.vexe) instalado ainda.</p>';
+            return;
+        }
+        const fileIds = Object.keys(filesSnap.val());
+        for (const appId of fileIds) {
+            const appSnap = await database.ref('publishedApps/' + appId).once('value');
+            if (!appSnap.exists()) continue;
+            const app = appSnap.val();
+            const card = document.createElement('div');
+            card.className = 'app-card';
+            card.innerHTML = `<h4>🎮 ${app.title}.vexe</h4><p>Por: ${app.author}</p>`;
+            const btn = document.createElement('button');
+            btn.className = 'btn btn-primary';
+            btn.innerText = 'Executar';
+            btn.onclick = () => runVexeApp(app);
+            card.appendChild(btn);
+            list.appendChild(card);
+        }
+    }).catch(err => {
+        list.innerHTML = '<p>Erro ao carregar arquivos: ' + err.message + '</p>';
+    });
+}
+
+function runVexeApp(app) {
+    openWindow('win-runner');
+    document.getElementById('runner-title').innerText = `🎮 Executando: ${app.title}.vexe`;
+    const canvas = document.getElementById('runner-canvas');
+    canvas.innerHTML = '';
+    canvas.style.display = 'grid';
+    canvas.style.gridTemplateColumns = 'repeat(20, 1fr)';
+    canvas.style.gridTemplateRows = 'repeat(12, 1fr)';
+    canvas.style.gap = '1px';
+    canvas.style.background = '#000';
+
+    (app.mapData || []).forEach(type => {
+        const tile = document.createElement('div');
+        tile.style.display = 'flex';
+        tile.style.alignItems = 'center';
+        tile.style.justifyContent = 'center';
+        tile.style.background = '#111';
+        if (type === 'block') tile.innerText = '🧱';
+        if (type === 'coin') tile.innerText = '🪙';
+        if (type === 'player') tile.innerText = '👾';
+        canvas.appendChild(tile);
+    });
+}
+
+// ==========================================
+// INICIALIZAÇÃO
+// ==========================================
+window.addEventListener('DOMContentLoaded', () => {
+    tryAutoLogin();
+
+    // Permite logar pressionando Enter no campo de PIN
+    const pinInput = document.getElementById('auth-pin');
+    if (pinInput) {
+        pinInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') loginUser();
+        });
+    }
+});
