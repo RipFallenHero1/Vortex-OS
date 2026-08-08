@@ -1,10 +1,9 @@
 :root {
-    --os-bg: #0f172a;
-    --panel-bg: #1e293b;
+    --os-bg: url('https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=2070&auto=format&fit=crop') center/cover;
+    --panel-bg: rgba(30, 41, 59, 0.95);
     --panel-border: #334155;
-    --accent: #0284c7;
+    --accent: #0ea5e9;
     --text-main: #f8fafc;
-    --text-muted: #94a3b8;
 }
 
 * {
@@ -33,6 +32,7 @@ body {
     flex-wrap: wrap;
     gap: 20px;
     align-content: flex-start;
+    position: relative;
 }
 
 .desktop-icon {
@@ -40,193 +40,96 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     cursor: pointer;
-    padding: 8px;
+    padding: 10px;
     border-radius: 8px;
+    transition: background 0.2s;
 }
 
-.desktop-icon:hover {
-    background: rgba(255, 255, 255, 0.1);
-}
+.desktop-icon:hover { background: rgba(255, 255, 255, 0.2); }
+.icon-img { font-size: 2.5rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+.desktop-icon span { font-size: 0.8rem; text-align: center; text-shadow: 1px 1px 3px #000; font-weight: 500; }
 
-.icon-img {
-    font-size: 2.2rem;
-}
-
-.desktop-icon span {
-    font-size: 0.75rem;
-    text-align: center;
-    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
-}
-
-/* JANELAS DO SO */
-.window {
+/* MENU INICIAR */
+.start-menu {
     position: absolute;
-    top: 50px;
-    left: 100px;
-    width: 800px;
-    height: 520px;
+    bottom: 50px;
+    left: 10px;
+    width: 280px;
     background: var(--panel-bg);
     border: 1px solid var(--panel-border);
     border-radius: 8px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
     display: none;
     flex-direction: column;
-    z-index: 10;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.7);
+    z-index: 1000;
+    backdrop-filter: blur(10px);
 }
 
-.window.active {
-    display: flex;
+.start-menu.active { display: flex; }
+.start-header { padding: 15px; border-bottom: 1px solid var(--panel-border); background: rgba(0,0,0,0.3); border-radius: 8px 8px 0 0; }
+.start-body { padding: 10px; display: flex; flex-direction: column; gap: 5px; }
+.start-body button {
+    background: transparent; border: none; color: #fff; padding: 10px; text-align: left; cursor: pointer; border-radius: 4px; font-size: 0.95rem;
 }
+.start-body button:hover { background: rgba(255,255,255,0.1); }
 
-.window-header {
-    background: #0f172a;
-    padding: 8px 14px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid var(--panel-border);
-    border-radius: 8px 8px 0 0;
-}
-
-.window-controls button {
-    background: transparent;
-    border: none;
-    color: #fff;
-    cursor: pointer;
-    font-size: 0.9rem;
-}
-
-.window-body {
-    flex: 1;
-    overflow: auto;
-    padding: 12px;
-}
-
-/* BARRA DE TAREFAS */
-.taskbar {
-    height: 44px;
-    background: #090d16;
-    border-top: 1px solid var(--panel-border);
-    display: flex;
-    align-items: center;
-    padding: 0 12px;
-    gap: 12px;
-    z-index: 100;
-}
-
-.start-btn {
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    padding: 6px 12px;
-    font-weight: bold;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.taskbar-apps {
-    flex: 1;
-    display: flex;
-    gap: 6px;
-}
-
-.task-app {
-    background: #1e293b;
-    color: #fff;
+/* JANELAS (ARRASTÁVEIS) */
+.window {
+    position: absolute;
+    background: var(--panel-bg);
     border: 1px solid var(--panel-border);
-    padding: 4px 10px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.8rem;
-}
-
-.system-tray {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 0.85rem;
-}
-
-.wallet {
-    background: #020617;
-    padding: 4px 8px;
-    border-radius: 4px;
-    border: 1px solid var(--panel-border);
-}
-
-.btn-sm {
-    background: #334155;
-    border: none;
-    color: #fff;
-    padding: 4px 8px;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-/* VORTEX ENGINE ESTILOS */
-.engine-layout {
-    display: grid;
-    grid-template-columns: 200px 1fr 220px;
-    height: 100%;
-    gap: 8px;
-}
-
-.panel {
-    background: #0f172a;
-    border: 1px solid var(--panel-border);
-    border-radius: 6px;
-    padding: 8px;
-    display: flex;
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    display: none;
     flex-direction: column;
-    gap: 8px;
+    backdrop-filter: blur(8px);
 }
-
-.panel h3 { font-size: 0.8rem; color: var(--text-muted); }
-
-.panel-actions button, .map-controls button, .btn {
-    background: #334155;
-    color: #fff;
-    border: none;
-    padding: 5px;
-    font-size: 0.75rem;
-    border-radius: 4px;
-    cursor: pointer;
+.window.active { display: flex; }
+.window-header {
+    background: #0f172a; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--panel-border); border-radius: 8px 8px 0 0; cursor: grab; font-weight: 500;
 }
+.window-header:active { cursor: grabbing; }
+.window-controls button { background: transparent; border: none; color: #ff4757; cursor: pointer; font-size: 1rem; }
+.window-body { flex: 1; overflow: auto; padding: 15px; }
 
-.tree-list { list-style: none; overflow-y: auto; }
-.tree-item {
-    padding: 4px 8px;
-    margin-bottom: 2px;
-    background: #1e293b;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.8rem;
+/* TASKBAR */
+.taskbar {
+    height: 45px; background: rgba(15, 23, 42, 0.95); border-top: 1px solid var(--panel-border);
+    display: flex; align-items: center; padding: 0 10px; gap: 15px; z-index: 9999; backdrop-filter: blur(10px);
 }
+.start-btn { background: var(--accent); color: #fff; border: none; padding: 6px 15px; font-weight: bold; border-radius: 4px; cursor: pointer; font-size: 0.95rem; }
+.taskbar-apps { flex: 1; display: flex; gap: 5px; }
+.task-app { background: #1e293b; color: #fff; border: 1px solid var(--panel-border); padding: 5px 12px; border-radius: 4px; cursor: pointer; }
+.task-app.active { background: #334155; border-bottom: 2px solid var(--accent); }
+
+.system-tray { display: flex; align-items: center; gap: 10px; font-size: 0.85rem; }
+.wallet { background: #000; padding: 5px 10px; border-radius: 4px; border: 1px solid #333; color: #22c55e; }
+.btn-sm { background: #334155; border: none; color: #fff; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+.btn-sm:hover { background: #475569; }
+
+/* VORTEX ENGINE & LOJA */
+.engine-layout { display: grid; grid-template-columns: 220px 1fr 220px; height: 100%; gap: 10px; }
+.panel { background: rgba(0,0,0,0.3); border: 1px solid var(--panel-border); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+.panel h3 { font-size: 0.85rem; color: #94a3b8; text-transform: uppercase; }
+.panel-actions button, .map-controls button, .btn { background: #334155; color: #fff; border: none; padding: 6px; font-size: 0.8rem; border-radius: 4px; cursor: pointer; }
+.panel-actions button:hover, .btn:hover { background: var(--accent); }
+.tree-list { list-style: none; overflow-y: auto; flex: 1; }
+.tree-item { padding: 6px 8px; margin-bottom: 3px; background: rgba(255,255,255,0.05); border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
 .tree-item.selected { background: var(--accent); }
 
-.viewport-panel { background: #020617; }
-.viewport-header { display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; margin-bottom: 8px; }
-
-.grid-canvas {
-    flex: 1;
-    display: grid;
-    grid-template-columns: repeat(15, 1fr);
-    grid-template-rows: repeat(10, 1fr);
-    gap: 1px;
-    background: #1e293b;
-}
-
-.tile { background: #0f172a; cursor: pointer; }
+.viewport-header { display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; margin-bottom: 10px; }
+.grid-canvas { flex: 1; display: grid; grid-template-columns: repeat(20, 1fr); grid-template-rows: repeat(12, 1fr); gap: 1px; background: #000; border: 1px solid #333; }
+.tile { background: #1e293b; cursor: pointer; }
 .tile.block { background: #64748b; }
-.tile.coin { background: #eab308; }
+.tile.coin { background: #eab308; border-radius: 50%; }
 
-/* LOJA & MODAL */
-.apps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-top: 15px; }
-.app-card { background: #0f172a; border: 1px solid var(--panel-border); padding: 12px; border-radius: 6px; }
-
+.apps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
+.app-card { background: rgba(0,0,0,0.4); border: 1px solid var(--panel-border); padding: 15px; border-radius: 6px; display: flex; flex-direction: column; gap: 8px; }
 .btn-primary { background: var(--accent); }
-.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 1000; }
-.modal-content { background: var(--panel-bg); padding: 20px; border-radius: 8px; width: 300px; display: flex; flex-direction: column; gap: 10px; }
-.modal-content input { padding: 6px; background: #0f172a; border: 1px solid var(--panel-border); color: #fff; border-radius: 4px; }
+
+.modal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); justify-content:center; align-items:center; z-index: 10000; }
+.modal-content { background: var(--panel-bg); padding: 25px; border-radius: 8px; width: 320px; display: flex; flex-direction: column; gap: 15px; border: 1px solid var(--panel-border); }
+.modal-content input { padding: 8px; background: #000; border: 1px solid #444; color: #fff; border-radius: 4px; }
