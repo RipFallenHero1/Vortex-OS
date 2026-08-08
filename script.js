@@ -45,12 +45,7 @@ function loginUser(){
   }).catch(e=>alert("Erro: "+e.message)).finally(()=>{if(btn){btn.disabled=false;btn.innerText="Entrar no Vortex OS";}});
 }
 function startSession(userKey,data){
-  data = data && typeof data === "object" ? data : {};
-  const safeName = String(data.displayName || data.username || userKey || "Usuário").trim() || userKey || "Usuário";
-  if (!data.displayName) {
-    database.ref("users/"+userKey+"/displayName").set(safeName).catch(()=>{});
-  }
-  currentUser=Object.assign({key:userKey,displayName:safeName},data,{key:userKey,displayName:safeName});
+  currentUser=Object.assign({key:userKey},data);
   localStorage.setItem("vortex_current_user",userKey);
   document.getElementById("login-screen").style.display="none";
   document.getElementById("shutdown-screen").style.display="none";
@@ -331,59 +326,13 @@ function runVexeApp(app){openWindow("win-runner");document.getElementById("runne
 function stopRunnerInstance(){currentRunnerInstance?.stop();currentRunnerInstance=null;}
 
 /* ================= VORTEX MESSENGER ================= */
+function clearMessengerListeners(){messengerListeners.forEach(u=>{try{u();}catch{}});messengerListeners=[];}
 function messengerRef(path){return database.ref(path);}
-let friendsListenerCleanup=null;
-let groupsListenerCleanup=null;
-let chatListenerCleanup=null;
-function clearMessengerListeners(){
-  [friendsListenerCleanup,groupsListenerCleanup,chatListenerCleanup].forEach(fn=>{try{if(fn)fn();}catch{}});
-  friendsListenerCleanup=groupsListenerCleanup=chatListenerCleanup=null;
-  messengerListeners=[];
-}
-function loadFriends(){
-  const l=document.getElementById("friends-list");
-  if(!l||!currentUser)return;
-  if(friendsListenerCleanup){try{friendsListenerCleanup();}catch{}}
-  const ref=database.ref("users/"+currentUser.key+"/friends");
-  const handler=s=>{
-    l.innerHTML="";
-    if(!s.exists()){l.innerHTML="<div class='muted'>Nenhum amigo. Adicione pelo nick.</div>";return;}
-    const friends=s.val()||{};
-    Object.entries(friends).forEach(([k,raw])=>{
-      const f=raw&&typeof raw==="object"?raw:{};
-      const name=String(f.displayName||f.username||k||"Usuário").trim()||k;
-      const b=document.createElement("button");
-      b.className="friend-row";
-      b.innerHTML=`<span class='avatar'>${escapeHtml(name.charAt(0).toUpperCase())}</span><span>@${escapeHtml(name)}</span>`;
-      b.onclick=()=>openDM(k,name);
-      l.appendChild(b);
-    });
-  };
-  ref.on("value",handler);
-  friendsListenerCleanup=()=>ref.off("value",handler);
-}
+function loadFriends(){const l=document.getElementById("friends-list");if(!l||!currentUser)return;const ref=database.ref("users/"+currentUser.key+"/friends");const handler=s=>{l.innerHTML="";if(!s.exists()){l.innerHTML="<div class='muted'>Nenhum amigo. Adicione pelo nick.</div>";return;}Object.keys(s.val()).forEach(k=>{const f=s.val()[k];const b=document.createElement("button");b.className="friend-row";b.innerHTML=`<span class='avatar'>${escapeHtml((f.displayName||k)[0].toUpperCase())}</span><span>@${escapeHtml(f.displayName||k)}</span>`;b.onclick=()=>openDM(k,f.displayName||k);l.appendChild(b);});};ref.on("value",handler);messengerListeners.push(()=>ref.off("value",handler));}
 function addFriend(){
-  if(!currentUser)return;
-  const input=document.getElementById("friend-nick");
-  const nick=String(input?.value||"").trim().replace(/^@/,"");
-  if(!nick)return alert("Digite o nick do amigo.");
-  const k=keyForNick(nick);
-  if(!k)return alert("Nick inválido.");
-  if(k===currentUser.key)return alert("Você não pode adicionar a si mesmo.");
-  database.ref("users/"+k).once("value").then(s=>{
-    if(!s.exists())throw new Error("Nick não encontrado.");
-    const d=s.val()||{};
-    const targetName=String(d.displayName||d.username||nick||k).trim()||k;
-    const myName=String(currentUser.displayName||currentUser.username||currentUser.key||"Usuário").trim()||currentUser.key;
-    const updates={};
-    updates["users/"+currentUser.key+"/friends/"+k]={displayName:targetName,username:k,addedAt:Date.now()};
-    updates["users/"+k+"/friends/"+currentUser.key]={displayName:myName,username:currentUser.key,addedAt:Date.now()};
-    return database.ref().update(updates);
-  }).then(()=>{
-    if(input)input.value="";
-    loadFriends();
-    alert("✅ Amizade adicionada.");
-  }).catch(e=>alert("Não foi possível adicionar: "+(e?.message||e)));
+  if(!currentUser)return;const nick=document.getElementById("friend-nick").value.trim();if(!nick)return;
+  const k=keyForNick(nick);if(k===currentUser.key)return alert("Você não pode adicionar a si mesmo.");
+  database.ref("users/"+k).once("value").then(s=>{if(!s.exists())throw new Error("Nick não encontrado.");const d=s.val();return Promise.all([database.ref("users/"+currentUser.key+"/friends/"+k).set({displayName:d.displayName}),database.ref("users/"+k+"/friends/"+currentUser.key).set({displayName:currentUser.displayName})]);}).then(()=>{document.getElementById("friend-nick").value="";alert("Amizade adicionada.");}).catch(e=>alert(e.message));
 }
 function dmId(a,b){return [a,b].sort().join("__");}
 function openDM(k,name){currentChatType="dm";currentChatId=dmId(currentUser.key,k);currentGroupId=null;document.getElementById("chat-title").innerText="@"+name;document.getElementById("chat-subtitle").innerText="Conversa privada";listenMessages(currentChatId,"dm");}
@@ -395,37 +344,19 @@ function createGroup(){
   Object.keys(members).forEach(k=>updates["users/"+k+"/groups/"+id]={name});
   return database.ref().update(updates).then(()=>{document.getElementById("group-name").value="";closeWindow("win-group-create");loadGroups();});
 }
-function loadGroups(){
-  const l=document.getElementById("groups-list");
-  if(!l||!currentUser)return;
-  if(groupsListenerCleanup){try{groupsListenerCleanup();}catch{}}
-  const ref=database.ref("users/"+currentUser.key+"/groups");
-  const handler=s=>{
-    l.innerHTML="";
-    if(!s.exists()){l.innerHTML="<div class='muted'>Nenhum grupo.</div>";return;}
-    Object.entries(s.val()||{}).forEach(([id,raw])=>{
-      const g=raw&&typeof raw==="object"?raw:{};
-      const name=String(g.name||id||"Grupo");
-      const b=document.createElement("button");
-      b.className="friend-row";
-      b.innerHTML=`<span class='avatar group-avatar'>G</span><span>${escapeHtml(name)}</span>`;
-      b.onclick=()=>openGroup(id,name);
-      l.appendChild(b);
-    });
-  };
-  ref.on("value",handler);
-  groupsListenerCleanup=()=>ref.off("value",handler);
-}
+function loadGroups(){const l=document.getElementById("groups-list");if(!l||!currentUser)return;database.ref("users/"+currentUser.key+"/groups").once("value").then(s=>{l.innerHTML="";if(!s.exists()){l.innerHTML="<div class='muted'>Nenhum grupo.</div>";return;}Object.entries(s.val()).forEach(([id,g])=>{const b=document.createElement("button");b.className="friend-row";b.innerHTML=`<span class='avatar'>G</span><span>${escapeHtml(g.name)}</span>`;b.onclick=()=>openGroup(id,g.name);l.appendChild(b);});});}
 function openGroup(id,name){currentChatType="group";currentChatId=id;currentGroupId=id;document.getElementById("chat-title").innerText=name;document.getElementById("chat-subtitle").innerText="Grupo Vortex";listenMessages(id,"group");}
 function listenMessages(id,type){
-  if(chatListenerCleanup){try{chatListenerCleanup();}catch{}}
-  const box=document.getElementById("messages");
-  box.innerHTML="<div class='muted'>Carregando mensagens...</div>";
+  clearMessengerListeners();const box=document.getElementById("messages");box.innerHTML="<div class='muted'>Carregando mensagens...</div>";
   const path=type==="dm"?"conversations/"+id+"/messages":"groups/"+id+"/messages";
-  const ref=database.ref(path).limitToLast(100);
-  const handler=s=>{box.innerHTML="";if(!s.exists()){box.innerHTML="<div class='muted'>Nenhuma mensagem ainda.</div>";return;}s.forEach(c=>{const m=c.val();if(m&&typeof m==="object")renderMessage(box,m);});box.scrollTop=box.scrollHeight;};
-  ref.on("value",handler);
-  chatListenerCleanup=()=>ref.off("value",handler);
+  const ref=database.ref(path).limitToLast(100),handler=s=>{
+    const wasNearBottom=box.scrollHeight-box.scrollTop-box.clientHeight<80;
+    box.innerHTML="";
+    if(!s.exists()){box.innerHTML="<div class='muted'>Nenhuma mensagem ainda.</div>";return;}
+    s.forEach(c=>{renderMessage(box,c.val());});
+    if(wasNearBottom) box.scrollTop=box.scrollHeight;
+  };
+  ref.on("value",handler);messengerListeners.push(()=>ref.off("value",handler));
 }
 function renderMessage(box,m){
   const wrap=document.createElement("div");wrap.className="message "+(m.senderKey===currentUser.key?"mine":"theirs");
@@ -437,11 +368,11 @@ function renderMessage(box,m){
 function sendMessage(){
   if(!currentUser||!currentChatId)return;const input=document.getElementById("message-input"),text=input.value.trim();if(!text)return;
   const path=currentChatType==="dm"?"conversations/"+currentChatId+"/messages":"groups/"+currentChatId+"/messages";
-  database.ref(path).push({senderKey:currentUser.key,senderName:String(currentUser.displayName||currentUser.key||"Usuário"),text,createdAt:Date.now()}).catch(e=>alert("Mensagem não enviada: "+e.message));input.value="";
+  database.ref(path).push({senderKey:currentUser.key,senderName:currentUser.displayName,text,createdAt:Date.now()});input.value="";
 }
 function sendEmoji(e){const i=document.getElementById("message-input");i.value+=(e||"🙂");i.focus();}
 function sendImage(){
-  if(!currentUser||!currentChatId)return;const input=document.getElementById("image-input");input.click();input.onchange=()=>{const file=input.files[0];if(!file)return;if(file.size>700*1024)return alert("Imagem muito grande. Use até 700 KB.");const r=new FileReader();r.onload=()=>{const path=currentChatType==="dm"?"conversations/"+currentChatId+"/messages":"groups/"+currentChatId+"/messages";database.ref(path).push({senderKey:currentUser.key,senderName:String(currentUser.displayName||currentUser.key||"Usuário"),image:r.result,createdAt:Date.now()}).catch(e=>alert("Imagem não enviada: "+e.message));};r.readAsDataURL(file);input.value="";};
+  if(!currentUser||!currentChatId)return;const input=document.getElementById("image-input");input.click();input.onchange=()=>{const file=input.files[0];if(!file)return;if(file.size>700*1024)return alert("Imagem muito grande. Use até 700 KB.");const r=new FileReader();r.onload=()=>{const path=currentChatType==="dm"?"conversations/"+currentChatId+"/messages":"groups/"+currentChatId+"/messages";database.ref(path).push({senderKey:currentUser.key,senderName:currentUser.displayName,image:r.result,createdAt:Date.now()});};r.readAsDataURL(file);input.value="";};
 }
 function loadMessengerHome(){loadFriends();loadGroups();renderGroupMembers();if(!currentChatId){document.getElementById("chat-title").innerText="Vortex Messenger";document.getElementById("chat-subtitle").innerText="Escolha um amigo para conversar";}}
 function renderGroupMembers(){const l=document.getElementById("group-members");if(!l||!currentUser)return;database.ref("users/"+currentUser.key+"/friends").once("value").then(s=>{l.innerHTML="";if(s.exists())Object.entries(s.val()).forEach(([k,f])=>{l.innerHTML+=`<label><input class="group-member-check" type="checkbox" value="${k}"> @${escapeHtml(f.displayName||k)}</label>`;});});}
