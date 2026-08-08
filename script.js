@@ -1,7 +1,7 @@
 /* =========================================================
    VORTEX OS v10.0 — OS + Vortex Engine + Vortex Messenger
    ========================================================= */
-const OS_VERSION = "10.0";
+const OS_VERSION = "10.1";
 const firebaseConfig = {
   apiKey: "AIzaSyCAC6tnKdPC6X2SwYWiMGZQI0GxwDq5SeA",
   authDomain: "vortex-os-971fc.firebaseapp.com",
@@ -290,7 +290,13 @@ function transpileVortexToJS(code){
     else if(/^elif\s+.+:$/.test(x)){out.push(x.replace(/^elif\s+(.+):$/,"}else if($1){"));stack.push(indent+4);}
     else if(/^else\s*:$/.test(x)){out.push("}else{");stack.push(indent+4);}
     else if(/^while\s+.+:$/.test(x)){out.push(x.replace(/^while\s+(.+):$/,"while($1){"));stack.push(indent+4);}
-    else {x=x.replace(/\bprint\s*\(/g,"vortex.print(");out.push(/[;{}]$/.test(x)?x:x+";");}
+    else {
+      x=x.replace(/\bprint\s*\(/g,"vortex.print(");
+      if(/^[a-zA-Z_$][a-zA-Z0-9_$]*\s*=\s*/.test(x) && !/^(let|var|const)\s/.test(x)){
+        x="var "+x;
+      }
+      out.push(/[;{}]$/.test(x)?x:x+";");
+    }
   }
   while(stack.length>1){out.push("}");stack.pop();}return out.join("\n");
 }
@@ -298,7 +304,7 @@ function extractVortexTopLevelFunctions(code){return String(code||"").split("\n"
 function compileVortexScript(code){
   const js=transpileVortexToJS(code), names=extractVortexTopLevelFunctions(code);
   const exports=names.map(n=>`${JSON.stringify(n)}:typeof ${n}==="function"?${n}:null`).join(",");
-  const factory=new Function("vortex","str","int","float","len",`"use strict";${js};return{_ready:typeof _ready==="function"?_ready:null,_update:typeof _update==="function"?_update:null,functions:{${exports}}};`);
+  const factory=new Function("vortex","str","int","float","len",`${js};return{_ready:typeof _ready==="function"?_ready:null,_update:typeof _update==="function"?_update:null,functions:{${exports}}};`);
   return api=>factory(api,String, v=>parseInt(v,10),v=>parseFloat(v),v=>v==null?0:(v.length??Object.keys(v).length));
 }
 
@@ -317,11 +323,25 @@ function buildVortexAPI(inst){
     get_player:()=>inst.physicsData.player,
     get_blocks:()=>inst.physicsData.blocks,
     get_coins:()=>inst.physicsData.coins,
-    is_key_down:k=>!!globalKeys[String(k).toLowerCase()],
+    is_key_down:k=>{
+      const key=String(k).toLowerCase();
+      if(key==="space"||key===" ") return !!(globalKeys[" "]||globalKeys["space"]);
+      if(key==="arrowleft"||key==="left") return !!(globalKeys["arrowleft"]||globalKeys["left"]);
+      if(key==="arrowright"||key==="right") return !!(globalKeys["arrowright"]||globalKeys["right"]);
+      if(key==="arrowup"||key==="up") return !!(globalKeys["arrowup"]||globalKeys["up"]);
+      if(key==="arrowdown"||key==="down") return !!(globalKeys["arrowdown"]||globalKeys["down"]);
+      return !!globalKeys[key];
+    },
     check_collision:checkCollision,
-    move_player:(dx,dy)=>{const p=inst.physicsData.player;if(p){p.x+=Number(dx)||0;p.y+=Number(dy)||0;}},
+    move_player:(dx,dy)=>{
+      const p=inst.physicsData.player;
+      if(p){
+        p.vx=Number(dx)||0;
+        if(dy) p.vy=Number(dy);
+      }
+    },
     apply_gravity:(e,g=.6)=>{if(e)e.vy+=(Number(g)||0.6)*60*api.delta();},
-    is_on_floor:e=>{if(!e)return false;return inst.physicsData.blocks.some(b=>Math.abs((e.y+e.h)-b.y)<=2&&e.x+e.w>b.x&&e.x<b.x+b.w);},
+    is_on_floor:e=>{if(!e)return false;return inst.physicsData.blocks.some(b=>Math.abs((e.y+e.h)-b.y)<=3&&e.x+e.w>b.x&&e.x<b.x+b.w);},
     move_and_collide:e=>{if(!e)return;e.x+=e.vx||0;for(const b of inst.physicsData.blocks){if(checkCollision(e,b)){if(e.vx>0)e.x=b.x-e.w;else if(e.vx<0)e.x=b.x+b.w;e.vx=0;}}e.y+=e.vy||0;for(const b of inst.physicsData.blocks){if(checkCollision(e,b)){if(e.vy>0){e.y=b.y-e.h;e.vy=0;}else if(e.vy<0){e.y=b.y+b.h;e.vy=0;}}}},
     follow_camera:(e,ox=300,oy=200)=>{if(e)api.set_camera(e.x-ox,e.y-oy);},
     spawn:(type,gx,gy)=>makeVortexEntity(inst,type,Number(gx)*TILE_W,Number(gy)*TILE_H),
@@ -376,8 +396,6 @@ function createVortexGameInstance(container,mapData,scriptCode,opts={}){
   const data=Array.isArray(mapData)?mapData:[];
   if(data.length && typeof data[0]==="object" && !Array.isArray(data[0])){
     data.forEach(o=>{
-      // Editor -> runtime mapping. The editor uses square/circle/triangle/player/coin.
-      // Runtime uses block/coin/player for gameplay while preserving the shape/color.
       const runtimeType = o.type==="player" ? "player" : o.type==="coin" ? "coin" : "block";
       makeVortexEntity(inst,runtimeType,o.x,o.y,o.w,o.h,o.color,o.shape);
     });
@@ -387,7 +405,6 @@ function createVortexGameInstance(container,mapData,scriptCode,opts={}){
     });
   }
 
-  // Keep a visible fallback floor if an old scene has only a player.
   if(inst.physicsData.blocks.length===0){
     makeVortexEntity(inst,"block",0,360,900,40,"#6d28d9","square");
   }
@@ -402,6 +419,9 @@ function createVortexGameInstance(container,mapData,scriptCode,opts={}){
 
   const tick=()=>{
     if(!inst.running)return;
+    if(inst.physicsData.player){
+      inst.physicsData.player.vx=0;
+    }
     try{
       inst.handlers?._update?.();
     }catch(e){
