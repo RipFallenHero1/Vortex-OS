@@ -277,12 +277,29 @@ function saveVortexScript(){const name=document.getElementById("vortex-filename"
 function runScriptFromStudio(){saveVortexScript();openWindow("win-engine");setTimeout(()=>{if(document.getElementById("engine-test-screen").style.display==="none")toggleEngineTestMode();},50);}
 
 function transpileVortexToJS(code){
-  // Normaliza aspas inteligentes se foram copiadas do chat
-  const safeCode = String(code||"").replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
+  // 1. Remove caracteres invisíveis e sanitiza aspas inteligentes/curvadas
+  let safeCode = String(code || "")
+    .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"')
+    .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'");
+
+  // 2. Função interna para ignorar o '#' quando estiver dentro de textos (ex: "#ffffff")
+  function removeComments(line) {
+    let inSingle = false, inDouble = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"' && !inSingle) inDouble = !inDouble;
+      else if (c === "'" && !inDouble) inSingle = !inSingle;
+      else if (c === '#' && !inSingle && !inDouble) {
+        return line.slice(0, i);
+      }
+    }
+    return line;
+  }
+
   const lines = safeCode.split("\n"), out = [], stack = [0];
 
   for (const raw of lines) {
-    const clean = stripPythonComments(raw), trim = clean.trim();
+    const clean = removeComments(raw), trim = clean.trim();
     if (!trim) continue;
 
     const indent = raw.match(/^\s*/)[0].replace(/\t/g, "    ").length;
