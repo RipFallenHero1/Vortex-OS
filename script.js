@@ -1,7 +1,7 @@
 /* =========================================================
-   VORTEX OS v10.1 — Complete OS & Engine & Vortex Chromium
+   VORTEX OS v11.0 — Complete OS & Engine & Vortex Chromium
    ========================================================= */
-const OS_VERSION = "10.1";
+const OS_VERSION = "11.0";
 const firebaseConfig = {
   apiKey: "AIzaSyCAC6tnKdPC6X2SwYWiMGZQI0GxwDq5SeA",
   authDomain: "vortex-os-971fc.firebaseapp.com",
@@ -20,7 +20,6 @@ let systemListeners=[];
 function isAdmin(){return !!currentUser && ADMIN_KEYS.has(currentUser.key);}
 function isMessengerBanned(){return !!currentUser?.messengerBanned;}
 const globalKeys={};
-const TILE_W=32,TILE_H=35;
 
 /* ================= ENGINE PAN & RESIZE STATE ================= */
 let enginePan = { x: 0, y: 0 };
@@ -110,7 +109,7 @@ function ensureDynamicAppWindows(){
             <input id="vort-site-title" placeholder="Meu Site Incrível" style="width:100%; margin-top:4px;">
           </label>
           <label>Conteúdo HTML / CSS do Site
-            <textarea id="vort-site-html" rows="10" style="width:100%; margin-top:4px; height:180px;" placeholder="<h1>Bem-vindo ao meu site .vort!</h1>\n<p>Criado no Vortex OS.</p>"></textarea>
+            <textarea id="vort-site-html" rows="10" style="width:100%; margin-top:4px; height:180px;" placeholder="<h1>Bem-vindo ao meu site .vort!</h1>\n<p>Criado no Vortex OS v11.0.</p>"></textarea>
           </label>
           <button class="btn primary" onclick="publishVortSite()">Publicar Site na Rede .vort</button>
         </div>
@@ -179,7 +178,7 @@ function toggleStartMenu(){const m=document.getElementById("start-menu");m.class
 function closeStartMenuIfOpen(){const m=document.getElementById("start-menu");if(m){m.classList.remove("open");m.style.display="none";}}
 document.addEventListener("click",e=>{const m=document.getElementById("start-menu"),b=document.querySelector(".start-btn");if(m?.classList.contains("open")&&!m.contains(e.target)&&e.target!==b)closeStartMenuIfOpen();});
 
-/* ================= VORTEX CHROMIUM (NAVEGADOR PRÓPRIO .VORT) ================= */
+/* ================= VORTEX CHROMIUM ================= */
 function navigateBrowser(targetUrl){
   const input = document.getElementById("browser-url");
   const iframe = document.getElementById("browser-iframe");
@@ -220,9 +219,7 @@ function navigateBrowser(targetUrl){
   }
 }
 
-function renderIframeContent(iframe, html){
-  iframe.srcdoc = html;
-}
+function renderIframeContent(iframe, html){ iframe.srcdoc = html; }
 
 function browserNav(action){
   if(action === "back" && browserHistoryIndex > 0){
@@ -238,7 +235,6 @@ function browserNav(action){
   }
 }
 
-/* --- HTML TEMPLATES DO VORTEX CHROMIUM --- */
 function getChromiumHomeHTML(){
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     body { margin:0; padding:0; background:#0f0f17; color:#fff; font-family:system-ui,sans-serif; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; }
@@ -274,16 +270,14 @@ function getVortexApiDocHTML(){
     pre { background:#181825; padding:14px; border-radius:8px; border:1px solid #313244; overflow-x:auto; color:#a6e3a1; font-family:monospace; }
     .box { background:#1e1e2e; padding:16px; border-radius:8px; border-left:4px solid #cba6f7; margin-bottom:16px; }
   </style></head><body>
-    <h1>📖 Vortex Engine — Documentação da API</h1>
-    <p>Bem-vindo à documentação oficial dos scripts <code>.vortex</code>. Aqui você encontra todas as funções prontas para usar nos seus jogos!</p>
-    
+    <h1>📖 Vortex Engine — Documentação da API (v11.0)</h1>
+    <p>Bem-vindo à documentação oficial dos scripts <code>.vortex</code>.</p>
     <div class="box">
       <b>🚀 Ciclo Principal do Jogo:</b>
       <p>Todo script pode declarar duas funções principais:</p>
       <code>def _ready():</code> — Executada 1 vez quando o jogo inicia.<br>
       <code>def _update():</code> — Executada a cada quadro (60 FPS).
     </div>
-
     <h2>1. Controle do Jogador e Física</h2>
     <pre>
 player = vortex.get_player()               # Retorna o objeto do Jogador
@@ -291,38 +285,6 @@ vortex.move_player(dx, dy)                 # Move o jogador (ex: vortex.move_pla
 vortex.apply_gravity(player, 0.6)          # Aplica gravidade contínua
 vortex.is_on_floor(player)                 # Retorna True se o jogador toca no chão
 vortex.move_and_collide(player)            # Trata colisões automáticas com blocos
-    </pre>
-
-    <h2>2. Teclado e Entradas (Input)</h2>
-    <pre>
-if vortex.is_key_down("a") or vortex.is_key_down("arrowleft"):
-    vortex.move_player(-4, 0)
-
-if vortex.is_key_down("space") and vortex.is_on_floor(player):
-    player.vy = -12
-    </pre>
-
-    <h2>3. Blocos, Moedas e Spawning</h2>
-    <pre>
-blocks = vortex.get_blocks()                # Lista de todos os blocos sólidos
-coins = vortex.get_coins()                  # Lista de todas as moedas
-vortex.spawn_at("coin", 150, 200)           # Criar objeto dinamicamente
-vortex.destroy(obj)                        # Destruir um objeto
-vortex.collect_coin(moeda)                  # Coletar moeda
-    </pre>
-
-    <h2>4. Interface de Usuário (UI) & HUD</h2>
-    <pre>
-vortex.create_text("hud", "Moedas: 0", 12, 12, "#ffffff")
-vortex.set_text("hud", "Moedas: " + str(vortex.get_coins_count()))
-vortex.create_button("btn1", "Iniciar", 100, 100, minha_funcao)
-    </pre>
-
-    <h2>5. Câmera e Utilitários</h2>
-    <pre>
-vortex.follow_camera(player, 300, 200)      # Faz a câmera seguir o jogador
-vortex.set_color(obj, "#ff0000")            # Altera a cor do objeto
-vortex.set_size(obj, 64, 64)                # Altera o tamanho (largura, altura)
     </pre>
   </body></html>`;
 }
@@ -350,7 +312,6 @@ function getCustomVortSiteHTML(title, contentHtml, author){
   </body></html>`;
 }
 
-/* --- CRIADOR DE SITES .VORT --- */
 function publishVortSite(){
   if(!currentUser) return alert("Faça login para publicar.");
   let domain = document.getElementById("vort-site-domain").value.trim().toLowerCase();
@@ -384,8 +345,8 @@ function startSystemListeners(){
   const resetRef=database.ref("system/globalResetAt");
   const banRef=currentUser?database.ref("users/"+currentUser.key+"/messengerBanned"):null;
   const maintenanceHandler=s=>{const on=!!s.val(); document.body.dataset.maintenance=on?"1":"0"; if(on&&!isAdmin()) showMaintenanceOverlay(); else hideMaintenanceOverlay();};
-  const resetHandler=s=>{const ts=Number(s.val()||0); if(ts && ts!==Number(localStorage.getItem("vortex_last_global_reset")||0)){localStorage.setItem("vortex_last_global_reset",String(ts)); shutdownPC(); alert("O Vortex OS foi reiniciado globalmente por um administrador.");}};
-  const banHandler=s=>{if(!currentUser)return;currentUser.messengerBanned=!!s.val(); if(currentUser.messengerBanned){clearMessengerListeners(); if(document.getElementById("win-messenger")?.style.display!=="none") closeWindow("win-messenger"); alert("Seu acesso ao Vortex Messenger foi bloqueado.");}};
+  const resetHandler=s=>{const ts=Number(s.val()||0); if(ts && ts!==Number(localStorage.getItem("vortex_last_global_reset")||0)){localStorage.setItem("vortex_last_global_reset",String(ts)); shutdownPC(); alert("O Vortex OS v11.0 foi reiniciado globalmente.");}};
+  const banHandler=s=>{if(!currentUser)return;currentUser.messengerBanned=!!s.val(); if(currentUser.messengerBanned){clearMessengerListeners(); if(document.getElementById("win-messenger")?.style.display!=="none") closeWindow("win-messenger"); alert("Seu acesso ao Messenger foi bloqueado.");}};
   maintenanceRef.on("value",maintenanceHandler); resetRef.on("value",resetHandler); if(banRef)banRef.on("value",banHandler);
   systemListeners.push(()=>maintenanceRef.off("value",maintenanceHandler),()=>resetRef.off("value",resetHandler)); if(banRef)systemListeners.push(()=>banRef.off("value",banHandler));
 }
@@ -394,7 +355,6 @@ function showMaintenanceOverlay(){
   let e=document.getElementById("maintenance-overlay"); if(!e){e=document.createElement("div");e.id="maintenance-overlay";e.className="full-overlay dark";e.innerHTML='<div class="power-card"><div class="brand-mark">V</div><h1>Vortex OS</h1><p>O sistema está em manutenção.</p><small>Volte em alguns minutos.</small></div>';document.body.appendChild(e);} e.style.display="flex";
 }
 function hideMaintenanceOverlay(){document.getElementById("maintenance-overlay")?.remove();}
-function requireAdmin(){if(!isAdmin()){alert("Acesso negado.");return false;}return true;}
 
 /* ================= THEME / WALLET / PIX ================= */
 function setTheme(name){
@@ -538,7 +498,6 @@ function shapeStyle(o){
 
 function applyStyles(el,styles){Object.entries(styles).forEach(([k,v])=>el.style[k]=v);}
 
-/* --- PAN & SCENE RENDERER --- */
 function renderEngineScene(){
   const c=document.getElementById("canvas-2d");if(!c)return;
   c.innerHTML="";
@@ -595,7 +554,6 @@ document.addEventListener("mouseup",()=>{ isPanning=false; });
 
 function pointerToScene(e){const c=document.getElementById("canvas-2d"),r=c.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};}
 
-/* --- HANDLE UNITY-STYLE SCALING & MOVING --- */
 function attachUnityScaleHandles(el, o){
   const handles = ["nw","n","ne","e","se","s","sw","w"];
   handles.forEach(h=>{
@@ -772,7 +730,7 @@ function loadEngineLocal(){
 
   if(!vortexScripts.length){
     const id = "script_" + Date.now();
-    vortexScripts = [{id, name:"main", code: DEFAULT_VORTEX_CODE.replace("function_marker_placeholder","")}];
+    vortexScripts = [{id, name:"main", code: DEFAULT_VORTEX_CODE}];
     activeScriptId = id;
   }
   initEngineEditor();
@@ -781,10 +739,10 @@ function loadEngineLocal(){
 function clearScene(){if(!confirm("Apagar toda a cena?"))return;currentSceneObjects=[];selectedObjectId=null;saveEngineLocal();initEngineEditor();}
 
 /* ================= VORTEX SCRIPTING ENGINE ================= */
-const DEFAULT_VORTEX_CODE=`# Vortex 10 — movimento pronto
+const DEFAULT_VORTEX_CODE=`# Vortex OS v11.0 — Script de Exemplo
 def _ready():
     print("Jogo iniciado!")
-    vortex.create_text("hud", "Vortex Engine", 12, 12, "#ffffff")
+    vortex.create_text("hud", "Vortex Engine v11.0", 12, 12, "#ffffff")
 
 def _update():
     player = vortex.get_player()
@@ -808,13 +766,11 @@ def _update():
             vortex.add_coins(1)
             vortex.set_text("hud", "Moedas: " + str(vortex.get_coins_count()))
 
-    vortex.follow_camera(player, 300, 200)
-
-function_marker_placeholder`;
+    vortex.follow_camera(player, 300, 200)`;
 
 function createVortexScript(){
   const name=prompt("Nome do script (sem extensão):","script")||"script", id="script_"+Date.now();
-  const code=DEFAULT_VORTEX_CODE.replace("function_marker_placeholder","");
+  const code=DEFAULT_VORTEX_CODE;
   vortexScripts.push({id,name,code});activeScriptId=id;saveEngineLocal();openVortexScriptEditor(id);
 }
 function duplicateVortexScript(id){
@@ -937,8 +893,28 @@ function buildVortexAPI(inst){
       if(p){ p.vx=Number(dx)||0; if(dy!==undefined) p.vy=Number(dy); }
     },
     apply_gravity:(e,g=.6)=>{if(e)e.vy+=(Number(g)||0.6)*60*api.delta();},
-    is_on_floor:e=>{if(!e)return false;return inst.physicsData.blocks.some(b=>Math.abs((e.y+e.h)-b.y)<=3&&e.x+e.w>b.x&&e.x<b.x+b.w);},
-    move_and_collide:e=>{if(!e)return;e.x+=e.vx||0;for(const b of inst.physicsData.blocks){if(checkCollision(e,b)){if(e.vx>0)e.x=b.x-e.w;else if(e.vx<0)e.x=b.x+b.w;e.vx=0;}}e.y+=e.vy||0;for(const b of inst.physicsData.blocks){if(checkCollision(e,b)){if(e.vy>0){e.y=b.y-e.h;e.vy=0;}else if(e.vy<0){e.y=b.y+b.h;e.vy=0;}}}},
+    is_on_floor:e=>{
+      if(!e)return false;
+      return inst.physicsData.blocks.some(b=>Math.abs((e.y+e.h)-b.y)<=4 && e.x+e.w>b.x && e.x<b.x+b.w);
+    },
+    move_and_collide:e=>{
+      if(!e)return;
+      e.x+=e.vx||0;
+      for(const b of inst.physicsData.blocks){
+        if(checkCollision(e,b)){
+          if(e.vx>0) e.x=b.x-e.w;
+          else if(e.vx<0) e.x=b.x+b.w;
+          e.vx=0;
+        }
+      }
+      e.y+=e.vy||0;
+      for(const b of inst.physicsData.blocks){
+        if(checkCollision(e,b)){
+          if(e.vy>0){ e.y=b.y-e.h; e.vy=0; }
+          else if(e.vy<0){ e.y=b.y+b.h; e.vy=0; }
+        }
+      }
+    },
     follow_camera:(e,ox=300,oy=200)=>{if(e)api.set_camera(e.x-ox,e.y-oy);},
     spawn_at:(type,x,y)=>makeVortexEntity(inst,type,x,y),
     destroy:e=>{if(!e)return;e.el?.remove();inst.physicsData.blocks=inst.physicsData.blocks.filter(x=>x!==e);inst.physicsData.coins=inst.physicsData.coins.filter(x=>x!==e);if(inst.physicsData.player===e)inst.physicsData.player=null;},
@@ -1019,7 +995,6 @@ function createVortexGameInstance(container,mapData,scriptCode,opts={}){
   return inst;
 }
 
-/* --- TOGGLE E PARAR DO TESTE DA ENGINE --- */
 function toggleEngineTestMode(){
   const screen=document.getElementById("engine-test-screen"), editor=document.getElementById("canvas-2d"), btn=document.getElementById("btn-engine-test"), consoleEl=document.getElementById("engine-console");
   if(screen.style.display==="none" || !screen.style.display){
@@ -1030,7 +1005,6 @@ function toggleEngineTestMode(){
     editor.style.display="none"; screen.style.cssText="display:block;position:relative;overflow:hidden;background:#090512;height:calc(100% - 42px);";
     btn.innerText="■ PARAR"; btn.classList.add("stop");
     
-    // Parar qualquer instância residual antes de rodar
     if(currentGameInstance) currentGameInstance.stop();
 
     currentGameInstance=createVortexGameInstance(screen, currentSceneObjects, s?.code||"", {consoleEl});
@@ -1051,7 +1025,6 @@ function stopEngineTestLoop(){
 function openPublishModalFromEngine(){document.getElementById("publish-modal").style.display="flex";}
 function closePublishModal(){document.getElementById("publish-modal").style.display="none";}
 
-/* --- ATUALIZAR BUILD .VEXE OU PUBLICAR NOVO --- */
 function compileAndPublishEngineGame(){
   if(!currentUser)return alert("Faça login primeiro.");
   const title=document.getElementById("app-title-input").value.trim();
