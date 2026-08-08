@@ -1,7 +1,40 @@
 // ==========================================
-// 1. CONFIGURAÇÃO DO FIREBASE (NUVEM GLOBAL)
+// 1. GERENCIAMENTO DE JANELAS DO SO
 // ==========================================
-// Substitua pelas credenciais do seu projeto Firebase Console
+function openWindow(id) {
+    const win = document.getElementById(id);
+    if (win) {
+        win.classList.add('active');
+        // Trás a janela para frente
+        document.querySelectorAll('.window').forEach(w => w.style.zIndex = 10);
+        win.style.zIndex = 20;
+    }
+}
+
+function closeWindow(id) {
+    const win = document.getElementById(id);
+    if (win) win.classList.remove('active');
+}
+
+function toggleWindow(id) {
+    const win = document.getElementById(id);
+    if (win.classList.contains('active')) {
+        closeWindow(id);
+    } else {
+        openWindow(id);
+    }
+}
+
+// Relógio do SO
+function updateClock() {
+    const now = new Date();
+    document.getElementById('os-clock').innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+setInterval(updateClock, 1000);
+
+// ==========================================
+// 2. FIREBASE & ECONOMIA GLOBAL
+// ==========================================
 const firebaseConfig = {
   apiKey: "AIzaSyCAC6tnKdPC6X2SwYWiMGZQI0GxwDq5SeA",
   authDomain: "vortex-os-971fc.firebaseapp.com",
@@ -13,23 +46,20 @@ const firebaseConfig = {
   measurementId: "G-387R68F77S"
 };
 
-// Inicializa Firebase se configurado, senão usa modo fallback local
+
 let database = null;
 try {
     if (firebaseConfig.apiKey !== "SUA_API_KEY_AQUI") {
         firebase.initializeApp(firebaseConfig);
         database = firebase.database();
-        console.log("⚡ Firebase Global Conectado com sucesso!");
+        document.getElementById('firebase-status').innerText = "🟢 Conectado Globalmente";
     } else {
-        console.warn("⚠️ Firebase não configurado. Usando armazenamento em memória local.");
+        document.getElementById('firebase-status').innerText = "🟡 Modo Off-line (Local)";
     }
 } catch (e) {
-    console.error("Erro Firebase:", e);
+    document.getElementById('firebase-status').innerText = "🔴 Erro de Conexão";
 }
 
-// ==========================================
-// 2. SISTEMA DE ECONOMIA
-// ==========================================
 let userBalance = parseFloat(localStorage.getItem('vortex_balance')) || 50.00;
 
 function updateBalanceUI() {
@@ -42,50 +72,36 @@ function claimDailyReward() {
     const today = new Date().toDateString();
 
     if (lastClaim === today) {
-        alert("⏳ Você já resgatou sua recompensa diária hoje! Volte amanhã.");
+        alert("⏳ Você já resgatou sua recompensa diária hoje!");
         return;
     }
 
-    const reward = 25.00;
-    userBalance += reward;
+    userBalance += 25.00;
     localStorage.setItem('vortex_last_daily', today);
     updateBalanceUI();
-    alert(`🎁 Recompensa Diária Resgatada! Você ganhou R$ ${reward.toFixed(2)}`);
+    alert("🎁 Você recebeu R$ 25.00 de recompensa diária!");
 }
 
 function simulateIncomingPix() {
-    const senders = ["Carlos Silva", "Lucas Dev", "Ana Souza", "Mano King"];
-    const randomSender = senders[Math.floor(Math.random() * senders.length)];
-    const amount = (Math.random() * 50 + 5).toFixed(2);
+    const senders = ["Carlos Silva", "Mano King", "Lucas Dev"];
+    const sender = senders[Math.floor(Math.random() * senders.length)];
+    const amount = (Math.random() * 40 + 10).toFixed(2);
 
     userBalance += parseFloat(amount);
     updateBalanceUI();
-    alert(`💸 Pix Recebido!\nRemetente: ${randomSender}\nValor: R$ ${amount}`);
+    alert(`💸 Pix Recebido de ${sender}!\nValor: R$ ${amount}`);
 }
 
 // ==========================================
-// 3. VORTEX ENGINE 2D (HIERARQUIA & MAPA)
+// 3. VORTEX ENGINE 2D (DENTRO DO SO)
 // ==========================================
 let hierarchyData = [];
 let selectedItem = null;
 let currentTileMode = 'block';
 
 function addHierarchyItem(type) {
-    const nameMap = {
-        folder: "📁 Nova_Pasta",
-        square: "🟦 Quadrado_2D",
-        circle: "🔴 Círculo_2D",
-        button: "🔘 Botão_UI",
-        script: "📜 Script_Behavior.js"
-    };
-
-    const newItem = {
-        id: Date.now(),
-        type: type,
-        name: `${nameMap[type]}_${hierarchyData.length + 1}`,
-        code: type === 'script' ? '// Escreva o código aqui\nfunction update() {\n  // loop\n}' : ''
-    };
-
+    const nameMap = { folder: "📁 Pasta", square: "🟦 Quadrado", circle: "🔴 Círculo", button: "🔘 Botão", script: "📜 Script.js" };
+    const newItem = { id: Date.now(), type: type, name: `${nameMap[type]}_${hierarchyData.length + 1}` };
     hierarchyData.push(newItem);
     renderHierarchy();
 }
@@ -93,7 +109,6 @@ function addHierarchyItem(type) {
 function renderHierarchy() {
     const tree = document.getElementById('hierarchy-tree');
     tree.innerHTML = '';
-
     hierarchyData.forEach(item => {
         const li = document.createElement('li');
         li.className = `tree-item ${selectedItem && selectedItem.id === item.id ? 'selected' : ''}`;
@@ -106,78 +121,35 @@ function renderHierarchy() {
 function selectHierarchyItem(item) {
     selectedItem = item;
     renderHierarchy();
-
-    const inspector = document.getElementById('inspector-content');
-    inspector.innerHTML = `
+    document.getElementById('inspector-content').innerHTML = `
         <label>Nome:</label>
-        <input type="text" value="${item.name}" onchange="updateItemName(this.value)" style="width:100%; padding:4px; margin-bottom:8px;">
-        <p><strong>Tipo:</strong> ${item.type.toUpperCase()}</p>
-        ${item.type === 'script' ? `
-            <label>Código JS:</label>
-            <textarea style="width:100%; height:120px; background:#111; color:#0f0; padding:4px;" onchange="updateScriptCode(this.value)">${item.code}</textarea>
-        ` : ''}
-        <button onclick="deleteSelectedItem()" style="margin-top:10px; background:#c0392b; color:#fff; border:none; padding:6px; width:100%; cursor:pointer;">Deletar Objeto</button>
+        <input type="text" value="${item.name}" onchange="updateItemName(this.value)" style="width:100%; padding:4px; margin-top:4px; background:#0f172a; color:#fff; border:1px solid #334155;">
     `;
 }
 
 function updateItemName(val) {
-    if (selectedItem) {
-        selectedItem.name = val;
-        renderHierarchy();
-    }
+    if (selectedItem) { selectedItem.name = val; renderHierarchy(); }
 }
 
-function updateScriptCode(val) {
-    if (selectedItem && selectedItem.type === 'script') {
-        selectedItem.code = val;
-    }
-}
-
-function deleteSelectedItem() {
-    if (!selectedItem) return;
-    hierarchyData = hierarchyData.filter(i => i.id !== selectedItem.id);
-    selectedItem = null;
-    document.getElementById('inspector-content').innerHTML = '<p class="placeholder-text">Selecione um elemento.</p>';
-    renderHierarchy();
-}
-
-// ---------------- MAP BUILDER 2D ----------------
 function initMapCanvas() {
     const canvas = document.getElementById('canvas-2d');
     canvas.innerHTML = '';
-
-    for (let i = 0; i < 300; i++) {
+    for (let i = 0; i < 150; i++) {
         const tile = document.createElement('div');
         tile.className = 'tile';
         tile.onclick = () => {
             tile.className = 'tile';
-            if (currentTileMode !== 'erase') {
-                tile.classList.add(currentTileMode);
-            }
+            if (currentTileMode !== 'erase') tile.classList.add(currentTileMode);
         };
         canvas.appendChild(tile);
     }
 }
 
-function setTileMode(mode) {
-    currentTileMode = mode;
-}
+function setTileMode(mode) { currentTileMode = mode; }
 
 // ==========================================
-// 4. LOJA GLOBAL (FIREBASE INTEGRATION)
+// 4. LOJA GLOBAL DE APPS DENTRO DO SO
 // ==========================================
-function switchTab(tabName) {
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-
-    document.getElementById(`tab-${tabName}`).classList.add('active');
-    event.target.classList.add('active');
-
-    if (tabName === 'store') {
-        loadGlobalStore();
-    }
-}
-
 function openPublishModal() { document.getElementById('publish-modal').style.display = 'flex'; }
 function closePublishModal() { document.getElementById('publish-modal').style.display = 'none'; }
 
@@ -185,28 +157,21 @@ function publishAppToGlobalStore() {
     const title = document.getElementById('app-title-input').value.trim();
     const price = parseFloat(document.getElementById('app-price-input').value) || 0;
 
-    if (!title) return alert("Digite um nome válido para o seu jogo!");
+    if (!title) return alert("Digite um nome!");
 
-    const newApp = {
-        title: title,
-        price: price,
-        author: "Dev_Vortex",
-        downloads: 0
-    };
+    const newApp = { title, price, author: "Dev_Vortex" };
 
     if (database) {
-        // Envia para o Firebase Realtime Database
         database.ref('global_apps').push(newApp).then(() => {
-            alert("🚀 Seu jogo foi publicado GLOBALMENTE no Firebase!");
+            alert("🚀 Publicado na Nuvem Firebase!");
             closePublishModal();
             loadGlobalStore();
         });
     } else {
-        // Fallback Local
         let localApps = JSON.parse(localStorage.getItem('vortex_apps')) || [];
         localApps.push(newApp);
         localStorage.setItem('vortex_apps', JSON.stringify(localApps));
-        alert("Seu jogo foi publicado localmente! (Configure o Firebase para publicar globalmente)");
+        alert("Publicado localmente!");
         closePublishModal();
         loadGlobalStore();
     }
@@ -220,30 +185,23 @@ function loadGlobalStore() {
         database.ref('global_apps').once('value', (snapshot) => {
             container.innerHTML = '';
             const data = snapshot.val();
-            if (!data) {
-                container.innerHTML = '<p>Nenhum jogo postado globalmente ainda. Seja o primeiro!</p>';
-                return;
-            }
-            Object.keys(data).forEach(key => {
-                renderAppCard(container, data[key], key);
-            });
+            if (!data) return container.innerHTML = '<p>Nenhum app global ainda.</p>';
+            Object.keys(data).forEach(key => renderAppCard(container, data[key]));
         });
     } else {
-        let localApps = JSON.parse(localStorage.getItem('vortex_apps')) || [
-            { title: "Vortex Platformer 2D", price: 15.00, author: "King", downloads: 42 }
-        ];
-        localApps.forEach((app, index) => renderAppCard(container, app, index));
+        let localApps = JSON.parse(localStorage.getItem('vortex_apps')) || [{ title: "Vortex Platformer", price: 15.00, author: "King" }];
+        localApps.forEach(app => renderAppCard(container, app));
     }
 }
 
-function renderAppCard(container, app, id) {
+function renderAppCard(container, app) {
     const card = document.createElement('div');
     card.className = 'app-card';
     card.innerHTML = `
         <h4>${app.title}</h4>
-        <p><small>Criador: ${app.author}</small></p>
-        <p><strong>Preço:</strong> R$ ${app.price.toFixed(2)}</p>
-        <button class="btn btn-primary" onclick="buyApp('${app.title}', ${app.price})">🛒 Comprar Jogo</button>
+        <p><small>Por: ${app.author}</small></p>
+        <p><strong>R$ ${app.price.toFixed(2)}</strong></p>
+        <button class="btn btn-primary" onclick="buyApp('${app.title}', ${app.price})">🛒 Comprar</button>
     `;
     container.appendChild(card);
 }
@@ -252,14 +210,21 @@ function buyApp(title, price) {
     if (userBalance >= price) {
         userBalance -= price;
         updateBalanceUI();
-        alert(`🎉 Você comprou o jogo "${title}" com sucesso!`);
+        alert(`🎉 Comprou "${title}" com sucesso!`);
     } else {
-        alert("❌ Saldo insuficiente! Resgate a recompensa diária ou receba um Pix para acumular dinheiro.");
+        alert("❌ Saldo insuficiente!");
     }
+}
+
+function resetOS() {
+    localStorage.clear();
+    location.reload();
 }
 
 // INICIALIZAÇÃO
 window.onload = () => {
     updateBalanceUI();
+    updateClock();
     initMapCanvas();
+    loadGlobalStore();
 };
