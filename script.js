@@ -1,109 +1,77 @@
 // ==========================================
-// 🌀 VORTEX OS - VERSÃO 9.5 (CORREÇÃO FINAL)
+// 🌀 VORTEX OS 9.5 - SISTEMA DE AUTENTICAÇÃO
 // ==========================================
-const OS_VERSION = "9.5";
 
-// 1. FIREBASE
+// COPIE AQUI O SEU CONFIG EXATO DO FIREBASE
 const firebaseConfig = {
-    apiKey: "AIzaSyCAC6tnKdPC6X2SwYWiMGZQI0GxwDq5SeA",
-    authDomain: "vortex-os-971fc.firebaseapp.com",
-    databaseURL: "https://vortex-os-971fc-default-rtdb.firebaseio.com",
-    projectId: "vortex-os-971fc"
+  apiKey: "AIzaSyCAC6tnKdPC6X2SwYWiMGZQI0GxwDq5SeA",
+  authDomain: "vortex-os-971fc.firebaseapp.com",
+  databaseURL: "https://vortex-os-971fc-default-rtdb.firebaseio.com",
+  projectId: "vortex-os-971fc",
+  storageBucket: "vortex-os-971fc.firebasestorage.app",
+  messagingSenderId: "128698321803",
+  appId: "1:128698321803:web:fa6ad595d268980019bd8e",
+  measurementId: "G-387R68F77S"
 };
 
-if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-}
+firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
+const db = firebase.database();
 
-// 2. ESTILOS V9.5
-(function initV95Styles() {
-    document.title = `Vortex OS ${OS_VERSION}`;
-    const style = document.createElement('style');
-    style.innerHTML = `
-        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
-        body, html { width: 100vw; height: 100vh; overflow: hidden; font-family: 'Segoe UI', sans-serif; background: #0b001a; color: #fff; }
-        #login-screen { position: absolute; top:0; left:0; width:100vw; height:100vh; background: linear-gradient(135deg, #0d001a 0%, #1f0038 100%); display: flex; align-items: center; justify-content: center; z-index: 99999; }
-        .login-card { background: rgba(255,255,255,0.05); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.15); padding: 30px; border-radius: 12px; width: 320px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.6); }
-        .login-card h2 { margin-bottom: 20px; color: #a78bfa; font-weight: 600; }
-        .login-card input { width: 100%; padding: 10px; margin-bottom: 12px; background: rgba(0,0,0,0.4); border: 1px solid #4c1d95; border-radius: 6px; color: #fff; outline: none; }
-        .login-card button { width: 100%; padding: 10px; background: #7c3aed; border: none; border-radius: 6px; color: #fff; font-weight: bold; cursor: pointer; }
-        .login-card button:hover { background: #6d28d9; }
-        #desktop { width: 100vw; height: calc(100vh - 45px); padding: 20px; display: flex; flex-direction: column; gap: 20px; align-content: flex-start; flex-wrap: wrap;}
-        .desktop-icon { width: 75px; text-align: center; cursor: pointer; font-size: 0.8rem; }
-        .desktop-icon .icon-img { width: 50px; height: 50px; background: rgba(255,255,255,0.1); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; margin: 0 auto 5px auto; }
-        #taskbar { position: absolute; bottom: 0; left: 0; width: 100vw; height: 45px; background: rgba(15, 10, 30, 0.85); display: flex; align-items: center; padding: 0 10px; border-top: 1px solid rgba(255,255,255,0.1); }
-        .start-btn { background: #7c3aed; border: none; padding: 6px 14px; border-radius: 6px; color: #fff; font-weight: bold; cursor: pointer; }
-    `;
-    document.head.appendChild(style);
-})();
+let isLoginMode = true; // Alterna entre Login e Cadastro
 
-// 3. GERAR INTERFACE DO ZERO
-document.addEventListener("DOMContentLoaded", () => {
-    // ISSO AQUI DESTRÓI A INTERFACE ANTIGA!
-    document.body.innerHTML = ''; 
+// UI GERADA VIA JS
+document.body.innerHTML = `
+    <div id="auth-box" style="width: 320px; background: #1a0b2e; padding: 30px; border-radius: 15px; color: #fff; text-align: center; border: 1px solid #7c3aed;">
+        <h2 id="auth-title">Vortex OS 9.5</h2>
+        <input type="email" id="email" placeholder="E-mail" style="width:100%; padding:10px; margin:5px 0; background:#000; color:#fff; border:1px solid #444;">
+        <input type="text" id="username" placeholder="Nome de Usuário" style="width:100%; padding:10px; margin:5px 0; background:#000; color:#fff; border:1px solid #444; display:none;">
+        <input type="password" id="pin" placeholder="PIN (Senha)" style="width:100%; padding:10px; margin:5px 0; background:#000; color:#fff; border:1px solid #444;">
+        
+        <button onclick="processAuth()" id="btn-main" style="width:100%; padding:10px; background:#7c3aed; color:#fff; border:none; cursor:pointer; margin-top:10px;">ENTRAR</button>
+        <p onclick="toggleMode()" id="btn-toggle" style="margin-top:15px; cursor:pointer; font-size:0.8rem; color:#a78bfa;">Não tem conta? Cadastrar-se</p>
+        <p onclick="recoverAccount()" style="margin-top:5px; cursor:pointer; font-size:0.7rem; color:#666;">Esqueci minha senha</p>
+        <p id="msg" style="margin-top:15px; font-size:0.8rem;"></p>
+    </div>
+`;
 
-    // Cria Login
-    const loginDiv = document.createElement("div");
-    loginDiv.id = "login-screen";
-    loginDiv.innerHTML = `
-        <div class="login-card">
-            <h2>🌀 Vortex OS ${OS_VERSION}</h2>
-            <input type="email" id="login-email" placeholder="Seu E-mail">
-            <input type="password" id="login-password" placeholder="Sua Senha">
-            <button onclick="handleLogin()">ENTRAR / CADASTRAR</button>
-            <p id="login-msg" style="color: #f87171; margin-top: 10px; font-size: 0.8rem; min-height: 1.2em;"></p>
-        </div>
-    `;
-    document.body.appendChild(loginDiv);
+function toggleMode() {
+    isLoginMode = !isLoginMode;
+    document.getElementById('auth-title').innerText = isLoginMode ? "Vortex OS 9.5" : "Novo Usuário";
+    document.getElementById('btn-main').innerText = isLoginMode ? "ENTRAR" : "CADASTRAR";
+    document.getElementById('btn-toggle').innerText = isLoginMode ? "Não tem conta? Cadastrar-se" : "Já tem conta? Entrar";
+    document.getElementById('username').style.display = isLoginMode ? "none" : "block";
+    document.getElementById('msg').innerText = "";
+}
 
-    // Cria Desktop
-    const desktopDiv = document.createElement("div");
-    desktopDiv.id = "desktop";
-    desktopDiv.innerHTML = `
-        <div class="desktop-icon" onclick="alert('Engine V9.5 em breve no próximo clique!')">
-            <div class="icon-img">⚡</div>
-            <span>Engine</span>
-        </div>
-    `;
-    document.body.appendChild(desktopDiv);
+function processAuth() {
+    const email = document.getElementById('email').value;
+    const pin = document.getElementById('pin').value;
+    const username = document.getElementById('username').value;
+    const msg = document.getElementById('msg');
 
-    // Cria Barra de Tarefas
-    const taskbarDiv = document.createElement("div");
-    taskbarDiv.id = "taskbar";
-    taskbarDiv.innerHTML = `<button class="start-btn">🌀 Vortex v${OS_VERSION}</button>`;
-    document.body.appendChild(taskbarDiv);
-});
-
-// 4. LÓGICA DO BOTÃO DE LOGIN
-window.handleLogin = function() {
-    const email = document.getElementById("login-email").value.trim();
-    const pass = document.getElementById("login-password").value.trim();
-    const msg = document.getElementById("login-msg");
-
-    if (!email || !pass) {
-        msg.innerText = "Preencha e-mail e senha!";
-        return;
+    if (isLoginMode) {
+        // LOGIN
+        auth.signInWithEmailAndPassword(email, pin)
+            .then(() => alert("Bem-vindo de volta!"))
+            .catch(e => msg.innerText = e.message);
+    } else {
+        // CADASTRO
+        if (!username) return msg.innerText = "Digite um Username!";
+        auth.createUserWithEmailAndPassword(email, pin)
+            .then(userCredential => {
+                // Salva o username no banco de dados
+                db.ref('users/' + userCredential.user.uid).set({ username: username });
+                alert("Cadastro feito com sucesso!");
+            })
+            .catch(e => msg.innerText = e.message);
     }
+}
 
-    msg.style.color = "#a78bfa";
-    msg.innerText = "Carregando...";
-
-    auth.signInWithEmailAndPassword(email, pass)
-        .then(() => unlockSystem())
-        .catch(error => {
-            if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-                msg.innerText = "Criando conta...";
-                auth.createUserWithEmailAndPassword(email, pass)
-                    .then(() => unlockSystem())
-                    .catch(err => { msg.style.color = "#f87171"; msg.innerText = "Erro ao criar: " + err.message; });
-            } else {
-                msg.style.color = "#f87171";
-                msg.innerText = error.message;
-            }
-        });
-};
-
-function unlockSystem() {
-    document.getElementById("login-screen").style.display = "none";
+function recoverAccount() {
+    const email = document.getElementById('email').value;
+    if(!email) return alert("Digite seu e-mail para recuperar");
+    auth.sendPasswordResetEmail(email)
+        .then(() => alert("E-mail de recuperação enviado!"))
+        .catch(e => alert(e.message));
 }
