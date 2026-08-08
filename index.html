@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vortex OS v7.5</title>
+    <title>Vortex OS v7.5 - Complete Edition</title>
     <link rel="stylesheet" href="style.css">
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
@@ -13,32 +13,49 @@
 
     <!-- ÁREA DE TRABALHO (DESKTOP) -->
     <div id="desktop" class="desktop">
-        <!-- ÍCONES DOS APLICATIVOS -->
+        <!-- ÍCONES -->
         <div class="desktop-icon" onclick="openWindow('win-engine')">
             <div class="icon-img">⚡</div>
             <span>Vortex Engine</span>
         </div>
-
         <div class="desktop-icon" onclick="openWindow('win-store')">
             <div class="icon-img">🛒</div>
             <span>Loja Global</span>
         </div>
-
         <div class="desktop-icon" onclick="openWindow('win-files')">
             <div class="icon-img">📁</div>
-            <span>Meus Arquivos</span>
+            <span>Arquivos</span>
         </div>
-
-        <div class="desktop-icon" onclick="openWindow('win-settings')">
-            <div class="icon-img">⚙️</div>
-            <span>Configurações</span>
+        <div class="desktop-icon" onclick="openWindow('win-terminal')">
+            <div class="icon-img">💻</div>
+            <span>Terminal</span>
+        </div>
+        <div class="desktop-icon" onclick="openWindow('win-calc')">
+            <div class="icon-img">🧮</div>
+            <span>Calculadora</span>
         </div>
     </div>
 
-    <!-- JANELA 1: VORTEX ENGINE 2D -->
-    <div id="win-engine" class="window">
-        <div class="window-header">
-            <span>⚡ Vortex Engine 2D - Desenvolvimento</span>
+    <!-- MENU INICIAR -->
+    <div id="start-menu" class="start-menu">
+        <div class="start-header">
+            <h3>Vortex OS</h3>
+            <small>Admin User</small>
+        </div>
+        <div class="start-body">
+            <button onclick="openWindow('win-engine'); toggleStartMenu()">⚡ Vortex Engine</button>
+            <button onclick="openWindow('win-store'); toggleStartMenu()">🛒 Loja Global</button>
+            <button onclick="openWindow('win-files'); toggleStartMenu()">📁 Gerenciador de Arquivos</button>
+            <button onclick="openWindow('win-terminal'); toggleStartMenu()">💻 Prompt de Comando</button>
+            <button onclick="openWindow('win-calc'); toggleStartMenu()">🧮 Calculadora</button>
+            <button style="color: #ff4757;" onclick="location.reload()">🔄 Reiniciar Sistema</button>
+        </div>
+    </div>
+
+    <!-- JANELA: VORTEX ENGINE -->
+    <div id="win-engine" class="window" style="top: 20px; left: 20px; width: 850px; height: 550px;">
+        <div class="window-header" onmousedown="dragWindow(event, 'win-engine')">
+            <span>⚡ Vortex Engine 2D</span>
             <div class="window-controls">
                 <button onclick="closeWindow('win-engine')">❌</button>
             </div>
@@ -51,116 +68,130 @@
                         <button onclick="addHierarchyItem('folder')">+ Pasta</button>
                         <button onclick="addHierarchyItem('square')">+ Quadrado</button>
                         <button onclick="addHierarchyItem('circle')">+ Círculo</button>
-                        <button onclick="addHierarchyItem('button')">+ Botão UI</button>
                         <button onclick="addHierarchyItem('script')">+ Script</button>
                     </div>
                     <ul id="hierarchy-tree" class="tree-list"></ul>
                 </aside>
-
                 <section class="panel viewport-panel">
                     <div class="viewport-header">
-                        <span>🗺️ CENA 2D / MAP BUILDER</span>
+                        <span>CENA 2D / MAPA</span>
                         <div class="map-controls">
                             <button onclick="setTileMode('block')">🧱 Bloco</button>
                             <button onclick="setTileMode('coin')">🪙 Moeda</button>
-                            <button onclick="setTileMode('erase')">❌ Borracha</button>
+                            <button onclick="setTileMode('erase')">❌ Apagar</button>
                         </div>
                     </div>
                     <div id="canvas-2d" class="grid-canvas"></div>
                 </section>
-
                 <aside class="panel inspector-panel">
                     <h3>⚙️ Inspetor</h3>
-                    <div id="inspector-content">
-                        <p class="placeholder-text">Selecione um elemento.</p>
-                    </div>
+                    <div id="inspector-content">Selecione um elemento.</div>
                 </aside>
             </div>
         </div>
     </div>
 
-    <!-- JANELA 2: LOJA GLOBAL (FIREBASE) -->
-    <div id="win-store" class="window">
-        <div class="window-header">
-            <span>🛒 Vortex Global Store & Economia</span>
+    <!-- JANELA: LOJA GLOBAL -->
+    <div id="win-store" class="window" style="top: 50px; left: 100px; width: 700px; height: 450px;">
+        <div class="window-header" onmousedown="dragWindow(event, 'win-store')">
+            <span>🛒 Loja Global (Firebase)</span>
             <div class="window-controls">
                 <button onclick="closeWindow('win-store')">❌</button>
             </div>
         </div>
         <div class="window-body store-layout">
             <div class="store-header">
-                <h2>Loja Global de Jogos & Apps</h2>
-                <button class="btn btn-primary" onclick="openPublishModal()">➕ Publicar Meu Jogo</button>
+                <h2>Apps e Jogos</h2>
+                <button class="btn btn-primary" onclick="openPublishModal()">➕ Publicar App</button>
             </div>
             <div id="global-apps-list" class="apps-grid">
-                <p>Conectando ao banco de dados global...</p>
+                <p>Carregando nuvem...</p>
             </div>
         </div>
     </div>
 
-    <!-- JANELA 3: GERENCIADOR DE ARQUIVOS -->
-    <div id="win-files" class="window">
-        <div class="window-header">
-            <span>📁 Gerenciador de Arquivos do SO</span>
+    <!-- JANELA: TERMINAL -->
+    <div id="win-terminal" class="window" style="top: 80px; left: 150px; width: 500px; height: 350px;">
+        <div class="window-header" onmousedown="dragWindow(event, 'win-terminal')">
+            <span>💻 Terminal do Sistema</span>
+            <div class="window-controls">
+                <button onclick="closeWindow('win-terminal')">❌</button>
+            </div>
+        </div>
+        <div class="window-body" style="background: #000; color: #0f0; font-family: monospace; padding: 10px;">
+            <div id="terminal-output">
+                Vortex OS [Versão 7.5]<br>
+                (c) 2026 Vortex Corporation. Todos os direitos reservados.<br><br>
+                C:\Users\Admin> Conexão segura estabelecida.<br>
+                C:\Users\Admin> Módulos de script carregados.<br>
+            </div>
+            <div style="display: flex; margin-top: 10px;">
+                <span>C:\Users\Admin>&nbsp;</span>
+                <input type="text" id="terminal-input" onkeypress="handleTerminal(event)" style="background: transparent; border: none; color: #0f0; outline: none; flex: 1; font-family: monospace;">
+            </div>
+        </div>
+    </div>
+
+    <!-- JANELA: ARQUIVOS -->
+    <div id="win-files" class="window" style="top: 100px; left: 200px; width: 500px; height: 350px;">
+        <div class="window-header" onmousedown="dragWindow(event, 'win-files')">
+            <span>📁 Meus Arquivos</span>
             <div class="window-controls">
                 <button onclick="closeWindow('win-files')">❌</button>
             </div>
         </div>
         <div class="window-body">
-            <p><strong>Projetos Salvos Localmente:</strong></p>
-            <ul id="file-list" style="margin-top: 10px; list-style: none;">
-                <li>📄 Projeto_MeuJogo_v1.vortex</li>
-                <li>📄 Script_Inimigo.js</li>
-            </ul>
-        </div>
-    </div>
-
-    <!-- JANELA 4: CONFIGURAÇÕES -->
-    <div id="win-settings" class="window">
-        <div class="window-header">
-            <span>⚙️ Configurações do Sistema</span>
-            <div class="window-controls">
-                <button onclick="closeWindow('win-settings')">❌</button>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center;">
+                <div><div style="font-size: 2rem;">📁</div> Projetos</div>
+                <div><div style="font-size: 2rem;">📁</div> Scripts</div>
+                <div><div style="font-size: 2rem;">📄</div> leia-me.txt</div>
             </div>
         </div>
-        <div class="window-body">
-            <h3>Vortex OS - Versão 7.5</h3>
-            <p style="margin-top:10px;">Status da Rede Firebase: <span id="firebase-status">Checando...</span></p>
-            <button class="btn btn-primary" style="margin-top:15px;" onclick="resetOS()">🔄 Resetar Configurações do SO</button>
+    </div>
+
+    <!-- JANELA: CALCULADORA -->
+    <div id="win-calc" class="window" style="top: 120px; left: 250px; width: 250px; height: 350px;">
+        <div class="window-header" onmousedown="dragWindow(event, 'win-calc')">
+            <span>🧮 Calculadora</span>
+            <div class="window-controls">
+                <button onclick="closeWindow('win-calc')">❌</button>
+            </div>
+        </div>
+        <div class="window-body" style="display: flex; flex-direction: column; gap: 5px;">
+            <input type="text" id="calc-display" disabled style="height: 50px; font-size: 1.5rem; text-align: right; margin-bottom: 10px; background: #111; color: #fff; border: 1px solid #444;">
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; flex: 1;">
+                <button class="btn" onclick="calcInput('7')">7</button> <button class="btn" onclick="calcInput('8')">8</button> <button class="btn" onclick="calcInput('9')">9</button> <button class="btn" onclick="calcInput('/')">/</button>
+                <button class="btn" onclick="calcInput('4')">4</button> <button class="btn" onclick="calcInput('5')">5</button> <button class="btn" onclick="calcInput('6')">6</button> <button class="btn" onclick="calcInput('*')">*</button>
+                <button class="btn" onclick="calcInput('1')">1</button> <button class="btn" onclick="calcInput('2')">2</button> <button class="btn" onclick="calcInput('3')">3</button> <button class="btn" onclick="calcInput('-')">-</button>
+                <button class="btn" onclick="calcInput('0')">0</button> <button class="btn" onclick="calcInput('.')">.</button> <button class="btn" onclick="calcEval()">=</button> <button class="btn" onclick="calcInput('+')">+</button>
+                <button class="btn" style="grid-column: span 4;" onclick="document.getElementById('calc-display').value = ''">Limpar</button>
+            </div>
         </div>
     </div>
 
-    <!-- BARRA DE TAREFAS (TASKBAR DO SO) -->
+    <!-- BARRA DE TAREFAS -->
     <footer class="taskbar">
-        <button class="start-btn">⚡ Vortex OS</button>
-        
-        <div class="taskbar-apps">
-            <button class="task-app" onclick="toggleWindow('win-engine')">🎮 Engine</button>
-            <button class="task-app" onclick="toggleWindow('win-store')">🛒 Loja</button>
-            <button class="task-app" onclick="toggleWindow('win-files')">📁 Arquivos</button>
+        <button class="start-btn" onclick="toggleStartMenu()">🌀 Iniciar</button>
+        <div class="taskbar-apps" id="taskbar-apps">
+            <!-- Apps abertos aparecem aqui -->
         </div>
-
         <div class="system-tray">
-            <span class="wallet">💰 R$ <strong id="user-balance">0.00</strong></span>
-            <button class="btn-sm" onclick="claimDailyReward()" title="Recompensa Diária">🎁</button>
-            <button class="btn-sm" onclick="simulateIncomingPix()" title="Receber Pix">💸</button>
+            <span class="wallet" title="Dinheiro Universal">💰 R$ <strong id="user-balance">0.00</strong></span>
+            <button class="btn-sm" onclick="claimDailyReward()">🎁 Diária</button>
+            <button class="btn-sm" onclick="simulateIncomingPix()">💸 Pix</button>
             <span id="os-clock">00:00</span>
         </div>
     </footer>
 
-    <!-- MODAL DE PUBLICAÇÃO DE JOGO -->
+    <!-- MODAL LOJA -->
     <div id="publish-modal" class="modal">
         <div class="modal-content">
-            <h3>🚀 Publicar na Loja Global</h3>
-            <label>Nome do Jogo/App:</label>
-            <input type="text" id="app-title-input" placeholder="Ex: Super Vortex Bros">
-            
-            <label>Preço de Venda (R$):</label>
-            <input type="number" id="app-price-input" value="10" min="0">
-
-            <div class="modal-actions">
-                <button class="btn" onclick="closePublishModal()">Cancelar</button>
-                <button class="btn btn-primary" onclick="publishAppToGlobalStore()">Publicar</button>
+            <h3>🚀 Publicar App na Nuvem</h3>
+            <input type="text" id="app-title-input" placeholder="Nome do Jogo">
+            <input type="number" id="app-price-input" value="10" placeholder="Preço (R$)">
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button class="btn" onclick="closePublishModal()" style="flex: 1;">Cancelar</button>
+                <button class="btn btn-primary" onclick="publishAppToGlobalStore()" style="flex: 1;">Publicar</button>
             </div>
         </div>
     </div>
