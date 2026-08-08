@@ -1,9 +1,9 @@
 // ==========================================
-// 🌀 VORTEX OS - VERSÃO 9.0 (PYTHON-LIKE & PHYSICS ENGINE)
+// 🌀 VORTEX OS - VERSÃO 9.5 (PYTHON-LIKE & PHYSICS ENGINE)
 // ==========================================
 const OS_VERSION = "9.5";
 
-// FIREBASE CONFIG (Mantenha as suas credenciais se necessário)
+// FIREBASE CONFIG
 const firebaseConfig = {
     apiKey: "AIzaSyCAC6tnKdPC6X2SwYWiMGZQI0GxwDq5SeA",
     authDomain: "vortex-os-971fc.firebaseapp.com",
@@ -13,12 +13,14 @@ const firebaseConfig = {
 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
-// INJEÇÃO AUTOMÁTICA DE ESTILOS DA V9.0
-(function initV90Styles() {
-    document.title = `Vortex ${OS_VERSION}`;
+// INJEÇÃO AUTOMÁTICA DE ESTILOS DA V9.5
+(function initV95Styles() {
+    document.title = `Vortex OS ${OS_VERSION}`;
+    console.log(`[Vortex OS] Sistema inicializado na versão ${OS_VERSION}`);
+    
     const style = document.createElement('style');
     style.innerHTML = `
-        /* ESTILOS DE JANELAS E BARRA DE TAREFAS */
+        /* ESTILOS DE JANELAS E BARRA DE TAREFAS - V9.5 */
         .window { position: absolute; background: #12002b; border: 1px solid #a78bfa; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); display: flex; flex-direction: column; overflow: hidden; }
         .window.minimized { display: none !important; }
         .window.maximized { top: 0 !important; left: 0 !important; width: 100vw !important; height: calc(100vh - 45px) !important; border-radius: 0 !important; z-index: 9999 !important; }
@@ -28,7 +30,7 @@ const database = firebase.database();
         .window-controls button:hover { background: rgba(255,255,255,0.25); }
         .window-controls button.btn-close:hover { background: #ef4444; }
 
-        /* TOOLBAR E GRID DA ENGINE */
+        /* TOOLBAR E GRID DA ENGINE V9.5 */
         .engine-toolbar { display: flex; gap: 8px; padding: 10px; background: #1e1b4b; border-bottom: 1px solid #a78bfa; }
         .engine-btn { background: #2d2d2d; color: white; border: 1px solid #555; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
         .engine-btn.active { background: #8b5cf6; border-color: #c084fc; }
@@ -46,7 +48,7 @@ const database = firebase.database();
 })();
 
 // ==========================================
-// 1. SISTEMA DE JANELAS (FIX DEFINITIVO)
+// 1. SISTEMA DE JANELAS
 // ==========================================
 let highestZIndex = 100;
 let openApps = new Set();
@@ -103,7 +105,7 @@ function dragWindow(e, winId) {
 }
 
 // ==========================================
-// 2. ENGINE 2D (FÍSICA E COLISÃO JOGÁVEL)
+// 2. ENGINE 2D (FÍSICA E COLISÃO JOGÁVEL v9.5)
 // ==========================================
 let currentTileMode = 'block';
 let currentSceneGrid = new Array(240).fill(''); 
@@ -122,7 +124,7 @@ function createEngineDOM() {
     win.style.cssText = "top: 40px; left: 100px; width: 640px; height: 500px; display:none; flex-direction:column;";
     win.innerHTML = `
         <div class="window-header" onmousedown="dragWindow(event, 'win-engine')">
-            <span>⚡ Vortex Game Engine</span>
+            <span>⚡ Vortex Game Engine v9.5</span>
             <div class="window-controls">
                 <button onclick="minimizeWindow('win-engine')">➖</button>
                 <button onclick="toggleMaximizeWindow('win-engine')">🔲</button>
@@ -168,7 +170,6 @@ function initMapCanvas() {
 
 function applyTool(index, tileElement) {
     if (currentTileMode === 'player') {
-        // Só pode existir um player
         const oldPlayerIdx = currentSceneGrid.indexOf('player');
         if (oldPlayerIdx !== -1) {
             currentSceneGrid[oldPlayerIdx] = '';
@@ -203,7 +204,6 @@ function togglePlayMode() {
     const screen = document.getElementById('game-screen');
 
     if (btn.innerText.includes("TESTAR")) {
-        // Iniciar Jogo
         if (!currentSceneGrid.includes('player')) return alert("⚠️ Coloque um Player (👾) no mapa primeiro!");
         
         btn.innerText = "🛑 PARAR JOGO";
@@ -214,7 +214,6 @@ function togglePlayMode() {
         buildGameScene(screen);
         startGameLoop();
     } else {
-        // Parar Jogo
         stopGame();
         btn.innerText = "▶️ TESTAR JOGO";
         btn.style.background = "#22c55e";
@@ -227,8 +226,6 @@ function buildGameScene(screen) {
     screen.innerHTML = '';
     physicsData = { player: null, blocks: [], coins: [] };
 
-    // O Canvas tem 640px de largura e aprox 430px de altura.
-    // Grid 20x12 -> Cada bloco tem 32x35 px (aprox)
     const TILE_W = 32; 
     const TILE_H = 35;
 
@@ -260,7 +257,7 @@ function buildGameScene(screen) {
 }
 
 function startGameLoop() {
-    gameLoopInterval = setInterval(updatePhysics, 1000 / 60); // 60 FPS
+    gameLoopInterval = setInterval(updatePhysics, 1000 / 60);
 }
 
 function stopGame() {
@@ -278,76 +275,63 @@ function updatePhysics() {
     let p = physicsData.player;
     if (!p) return;
 
-    // Movimentação Horizontal (A/D ou Setas)
     if (keys['a'] || keys['arrowleft']) p.vx = -p.speed;
     else if (keys['d'] || keys['arrowright']) p.vx = p.speed;
     else p.vx = 0;
 
-    // Gravidade
-    p.vy += 0.6; // Força da gravidade
+    p.vy += 0.6;
 
-    // Pulo (W, Espaço ou Seta Cima)
     if ((keys['w'] || keys[' '] || keys['arrowup']) && p.grounded) {
         p.vy = p.jumpPower;
         p.grounded = false;
     }
 
-    // Aplicar Movimento X
     p.x += p.vx;
     
-    // Limites da tela X
     if (p.x < 0) p.x = 0;
     if (p.x > 640 - p.w) p.x = 640 - p.w;
 
-    // Colisão Horizontal com Blocos
     for (let b of physicsData.blocks) {
         if (checkCollision(p, b)) {
-            if (p.vx > 0) p.x = b.x - p.w; // Batendo na direita
-            else if (p.vx < 0) p.x = b.x + b.w; // Batendo na esquerda
+            if (p.vx > 0) p.x = b.x - p.w;
+            else if (p.vx < 0) p.x = b.x + b.w;
             p.vx = 0;
         }
     }
 
-    // Aplicar Movimento Y
     p.y += p.vy;
     p.grounded = false;
 
-    // Colisão Vertical com Blocos
     for (let b of physicsData.blocks) {
         if (checkCollision(p, b)) {
-            if (p.vy > 0) { // Caindo em cima do bloco
+            if (p.vy > 0) {
                 p.y = b.y - p.h;
                 p.vy = 0;
                 p.grounded = true;
-            } else if (p.vy < 0) { // Batendo a cabeça
+            } else if (p.vy < 0) {
                 p.y = b.y + b.h;
                 p.vy = 0;
             }
         }
     }
 
-    // Limite da tela Y (Morrer ao cair)
     if (p.y > 450) {
         alert("💀 Você caiu no vazio! Reiniciando...");
-        togglePlayMode(); // Para
-        setTimeout(togglePlayMode, 500); // Recomeça
+        togglePlayMode();
+        setTimeout(togglePlayMode, 500);
         return;
     }
 
-    // Coleta de Moedas
     physicsData.coins.forEach(c => {
         if (!c.collected && checkCollision(p, c)) {
             c.collected = true;
             c.el.style.display = 'none';
-            // vortex.giveMoney(1); // Integração futura com o banco de dados
         }
     });
 
-    // Atualiza a posição na tela
     p.el.style.left = p.x + 'px';
     p.el.style.top = p.y + 'px';
     
-    // Vira o rostinho (👾) para o lado certo usando scaleX
     if (p.vx < 0) p.el.style.transform = 'scaleX(-1)';
     if (p.vx > 0) p.el.style.transform = 'scaleX(1)';
 }
@@ -364,7 +348,7 @@ function createVSCodeDOM() {
     win.style.cssText = "top: 60px; left: 160px; width: 680px; height: 460px; display:none; flex-direction:column;";
     win.innerHTML = `
         <div class="window-header" onmousedown="dragWindow(event, 'win-vscode')">
-            <span>📝 Vortex Code Studio (Python-Like API)</span>
+            <span>📝 Vortex Code Studio v9.5 (Python-Like API)</span>
             <div class="window-controls">
                 <button onclick="minimizeWindow('win-vscode')">➖</button>
                 <button onclick="toggleMaximizeWindow('win-vscode')">🔲</button>
@@ -372,9 +356,8 @@ function createVSCodeDOM() {
             </div>
         </div>
         <div class="window-body" style="display:flex; flex:1; background:#1e1e1e; color:#d4d4d4;">
-            <!-- SIDEBAR API DOCS -->
             <div style="width:230px; background:#252526; border-right:1px solid #333; padding:10px; font-size:0.75rem; overflow-y:auto;">
-                <h4 style="color:#a78bfa; margin-bottom:8px;">🐍 API Vortex v2</h4>
+                <h4 style="color:#a78bfa; margin-bottom:8px;">🐍 API Vortex v9.5</h4>
                 <p style="color:#999; margin-bottom:10px;">Sintaxe inspirada em Python. Sem problemas de IndentationError!</p>
                 <p><strong>Básicos:</strong></p>
                 <code style="color:#4ec9b0;">def _ready():</code><br>
@@ -387,7 +370,6 @@ function createVSCodeDOM() {
                 <code style="color:#ce9178;">player.jump(15)</code><br>
             </div>
 
-            <!-- EDITOR AREA -->
             <div style="flex:1; display:flex; flex-direction:column; padding:10px; gap:8px;">
                 <div style="display:flex; gap:10px; align-items:center;">
                     <input type="text" id="vortex-filename" placeholder="meu_jogo" style="padding:4px 8px; background:#2d2d2d; border:1px solid #444; color:#fff; border-radius:4px;">
@@ -400,16 +382,15 @@ function createVSCodeDOM() {
     document.body.appendChild(win);
 }
 
-// INICIALIZAÇÃO ATUALIZADA
+// INICIALIZAÇÃO DA V9.5
 window.onload = () => {
-    // Cria um ícone na área de trabalho para a Engine!
     const desktop = document.getElementById('desktop');
     if (desktop && !document.getElementById('icon-engine')) {
         const icon = document.createElement('div');
         icon.id = 'icon-engine';
         icon.className = 'desktop-icon';
         icon.onclick = () => openWindow('win-engine');
-        icon.innerHTML = `<div class="icon-img">⚡</div><span>Engine</span>`;
+        icon.innerHTML = `<div class="icon-img">⚡</div><span>Engine v9.5</span>`;
         desktop.appendChild(icon);
     }
 };
