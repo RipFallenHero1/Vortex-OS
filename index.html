@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vortex OS v8.0 - NextGen</title>
+    <title>Vortex OS v9.5 - NextGen</title>
     <link rel="stylesheet" href="style.css">
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
@@ -17,6 +17,7 @@
             <div class="auth-header">
                 <h2>🌀 Vortex OS</h2>
                 <p>Identifique-se para acessar o sistema</p>
+                <small style="opacity:0.5;">v9.5</small>
             </div>
             <div class="auth-form">
                 <input type="text" id="auth-username" placeholder="Nome de Usuário *" required>
@@ -41,6 +42,10 @@
         <div class="desktop-icon" onclick="openWindow('win-engine')">
             <div class="icon-img">⚡</div>
             <span>Vortex Engine</span>
+        </div>
+        <div class="desktop-icon" onclick="openWindow('win-vscode')">
+            <div class="icon-img">📝</div>
+            <span>Vortex Code Studio</span>
         </div>
         <div class="desktop-icon" onclick="openWindow('win-store')">
             <div class="icon-img">🛒</div>
@@ -72,6 +77,7 @@
         </div>
         <div class="start-body">
             <button onclick="openWindow('win-engine'); toggleStartMenu()">⚡ Vortex Engine 2D</button>
+            <button onclick="openWindow('win-vscode'); toggleStartMenu()">📝 Vortex Code Studio</button>
             <button onclick="openWindow('win-store'); toggleStartMenu()">🛒 Loja Global (.vexe)</button>
             <button onclick="openWindow('win-files'); toggleStartMenu()">📁 Meus Arquivos</button>
             <button onclick="openWindow('win-settings'); toggleStartMenu()">⚙️ Configurações & Wallpaper</button>
@@ -83,9 +89,9 @@
     </div>
 
     <!-- JANELA: VORTEX ENGINE 2D -->
-    <div id="win-engine" class="window" style="top: 20px; left: 30px; width: 900px; height: 580px;">
+    <div id="win-engine" class="window" style="top: 20px; left: 30px; width: 900px; height: 600px;">
         <div class="window-header" onmousedown="dragWindow(event, 'win-engine')">
-            <span>⚡ Vortex Engine 2D - Criador de Jogos</span>
+            <span>⚡ Vortex Engine 2D - Criador de Jogos (v9.5)</span>
             <div class="window-controls">
                 <button onclick="closeWindow('win-engine')">❌</button>
             </div>
@@ -97,7 +103,7 @@
                     <div class="panel-actions">
                         <button onclick="addHierarchyItem('square')">+ Bloco Solido</button>
                         <button onclick="addHierarchyItem('coin')">+ Item Moeda</button>
-                        <button onclick="addHierarchyItem('script')">+ Script .js</button>
+                        <button onclick="createVortexScript()">📝 Criar Script .vortex</button>
                     </div>
                     <ul id="hierarchy-tree" class="tree-list"></ul>
                     <hr style="border-color: rgba(255,255,255,0.1);">
@@ -105,20 +111,69 @@
                 </aside>
                 <section class="panel viewport-panel">
                     <div class="viewport-header">
-                        <span>CENA 2D (Clique nas células para pintar)</span>
+                        <span id="engine-viewport-label">CENA 2D (Clique nas células para pintar)</span>
                         <div class="map-controls">
-                            <button onclick="setTileMode('block')">🧱 Bloco</button>
-                            <button onclick="setTileMode('coin')">🪙 Moeda</button>
-                            <button onclick="setTileMode('player')">👾 Player</button>
-                            <button onclick="setTileMode('erase')">❌ Apagar</button>
+                            <button id="btn-t-block" onclick="setTileMode('block')">🧱 Bloco</button>
+                            <button id="btn-t-coin" onclick="setTileMode('coin')">🪙 Moeda</button>
+                            <button id="btn-t-player" onclick="setTileMode('player')">👾 Player</button>
+                            <button id="btn-t-erase" onclick="setTileMode('erase')">❌ Apagar</button>
+                            <button id="btn-engine-test" style="background:#22c55e; font-weight:bold;" onclick="toggleEngineTestMode()">▶️ TESTAR</button>
                         </div>
                     </div>
                     <div id="canvas-2d" class="grid-canvas"></div>
+                    <div id="engine-test-screen" style="display:none; width:100%; height:100%; position:relative; background:#87CEEB; overflow:hidden;"></div>
                 </section>
                 <aside class="panel inspector-panel">
                     <h3>⚙️ Inspetor</h3>
                     <div id="inspector-content">Selecione uma ferramenta e pinte na cena acima.</div>
+                    <div id="engine-console" style="margin-top:10px; font-family:monospace; font-size:0.75rem; background:#000; color:#0f0; padding:6px; border-radius:4px; max-height:150px; overflow-y:auto; display:none;"></div>
                 </aside>
+            </div>
+        </div>
+    </div>
+
+    <!-- JANELA: VORTEX CODE STUDIO -->
+    <div id="win-vscode" class="window" style="top: 60px; left: 160px; width: 720px; height: 500px;">
+        <div class="window-header" onmousedown="dragWindow(event, 'win-vscode')">
+            <span>📝 Vortex Code Studio - Linguagem Vortex (Python-Like)</span>
+            <div class="window-controls">
+                <button onclick="closeWindow('win-vscode')">❌</button>
+            </div>
+        </div>
+        <div class="window-body" style="display:flex; background:#1e1e1e; color:#d4d4d4; padding:0;">
+            <!-- SIDEBAR API DOCS -->
+            <div style="width:230px; background:#252526; border-right:1px solid #333; padding:10px; font-size:0.75rem; overflow-y:auto;">
+                <h4 style="color:#a78bfa; margin-bottom:8px;">🐍 API Vortex v1</h4>
+                <p style="color:#999; margin-bottom:10px;">Sintaxe inspirada em Python (beta).</p>
+                <p><strong>Funções especiais:</strong></p>
+                <code style="color:#4ec9b0;">def _ready():</code><br>
+                <code style="color:#4ec9b0;">def _update():</code><br>
+                <code style="color:#4ec9b0;">print("texto")</code><br><br>
+                <p><strong>Controle:</strong></p>
+                <code style="color:#c586c0;">if x &gt; 5:</code><br>
+                <code style="color:#c586c0;">elif x == 0:</code><br>
+                <code style="color:#c586c0;">else:</code><br>
+                <code style="color:#c586c0;">and / or / not</code><br><br>
+                <p><strong>API da Engine:</strong></p>
+                <code style="color:#ce9178;">vortex.spawn('coin', x, y)</code><br>
+                <code style="color:#ce9178;">vortex.destroy(entidade)</code><br>
+                <code style="color:#ce9178;">p = vortex.get_player()</code><br>
+                <code style="color:#ce9178;">p.jump(12)</code><br>
+                <code style="color:#ce9178;">p.x / p.y</code><br>
+                <hr style="border-color:#333; margin:10px 0;">
+                <p id="vscode-scripts-list-label"><strong>Meus Scripts:</strong></p>
+                <ul id="vscode-scripts-list" style="list-style:none; padding:0; color:#9cdcfe;"></ul>
+            </div>
+
+            <!-- EDITOR AREA -->
+            <div style="flex:1; display:flex; flex-direction:column; padding:10px; gap:8px;">
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <input type="text" id="vortex-filename" placeholder="meu_jogo" style="padding:4px 8px; background:#2d2d2d; border:1px solid #444; color:#fff; border-radius:4px; flex:1;">
+                    <span style="color:#a78bfa; font-weight:bold;">.vortex</span>
+                    <button class="btn" onclick="saveVortexScript()">💾 Salvar</button>
+                    <button class="btn btn-primary" onclick="runScriptFromStudio()">▶️ Testar na Engine</button>
+                </div>
+                <textarea id="vortex-code-editor" style="flex:1; background:#181818; color:#9cdcfe; font-family:monospace; padding:10px; border:1px solid #333; outline:none; resize:none; font-size:0.9rem;" placeholder="# Crie sua lógica em Vortex (Python-like)&#10;&#10;def _ready():&#10;    print('Jogo Carregado com Sucesso')&#10;&#10;def _update():&#10;    p = vortex.get_player()&#10;    if p.y > 400:&#10;        p.jump(12)"></textarea>
             </div>
         </div>
     </div>
@@ -202,7 +257,7 @@
             <div class="window-controls"><button onclick="closeWindow('win-terminal')">❌</button></div>
         </div>
         <div class="window-body" style="background: #000; color: #0f0; font-family: monospace;">
-            <div id="terminal-output">Vortex OS Kernel v8.0 Online.<br>Digite 'help' para comandos.<br></div>
+            <div id="terminal-output">Vortex OS Kernel v9.5 Online.<br>Digite 'help' para comandos.<br></div>
             <div style="display: flex;"><input type="text" id="terminal-input" onkeypress="handleTerminal(event)" style="background: transparent; border: none; color: #0f0; outline: none; flex: 1; font-family: monospace;"></div>
         </div>
     </div>
@@ -219,6 +274,7 @@
                 <button class="btn" onclick="calcInput('4')">4</button><button class="btn" onclick="calcInput('5')">5</button><button class="btn" onclick="calcInput('6')">6</button><button class="btn" onclick="calcInput('*')">*</button>
                 <button class="btn" onclick="calcInput('1')">1</button><button class="btn" onclick="calcInput('2')">2</button><button class="btn" onclick="calcInput('3')">3</button><button class="btn" onclick="calcInput('-')">-</button>
                 <button class="btn" onclick="calcInput('0')">0</button><button class="btn" onclick="calcInput('.')">.</button><button class="btn" onclick="calcEval()">=</button><button class="btn" onclick="calcInput('+')">+</button>
+                <button class="btn" style="grid-column: span 4; background:#dc2626;" onclick="calcClear()">C (Limpar)</button>
             </div>
         </div>
     </div>
