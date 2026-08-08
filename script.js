@@ -14,7 +14,7 @@ const database = firebase.database();
 let currentUser=null, highestZIndex=100, openApps=new Set(), clockInterval=null;
 let currentSceneObjects=[], selectedObjectId=null, engineTool="select";
 let vortexScripts=[], activeScriptId=null, currentGameInstance=null, currentRunnerInstance=null;
-let currentChatId=null, currentChatType="dm", messengerListeners=[], currentGroupId=null;
+let currentChatId=null, currentChatType="dm", messengerListeners=[], currentGroupId=null, messengerMessageUnsub=null;
 const globalKeys={};
 const TILE_W=32,TILE_H=35;
 
@@ -284,33 +284,143 @@ function buildVortexAPI(inst){
 }
 function syncVortexRender(pd){if(pd.player){applyStyles(pd.player.el,{left:pd.player.x+"px",top:pd.player.y+"px"});}pd.blocks.forEach(b=>applyStyles(b.el,{left:b.x+"px",top:b.y+"px",width:b.w+"px",height:b.h+"px"}));pd.coins.forEach(c=>{if(!c.collected)applyStyles(c.el,{left:c.x+"px",top:c.y+"px"});});}
 function createVortexGameInstance(container,mapData,scriptCode,opts={}){
-  container.innerHTML="";container.style.position="relative";container.style.overflow="hidden";
-  const world=document.createElement("div");world.className="runtime-world";container.appendChild(world);
-  const ui=document.createElement("div");ui.className="runtime-ui";container.appendChild(ui);
+  container.innerHTML="";
+  container.style.position="relative";
+  container.style.overflow="hidden";
+  container.style.background="#090512";
+  container.style.minHeight="220px";
+  container.style.width="100%";
+  container.style.height="100%";
+
+  const world=document.createElement("div");
+  world.className="runtime-world";
+  Object.assign(world.style,{position:"absolute",left:"0",top:"0",width:"3000px",height:"2000px",transformOrigin:"0 0",pointerEvents:"none"});
+  container.appendChild(world);
+
+  const ui=document.createElement("div");
+  ui.className="runtime-ui";
+  Object.assign(ui.style,{position:"absolute",inset:"0",zIndex:"100",pointerEvents:"none"});
+  container.appendChild(ui);
+
   const inst={containerEl:container,worldEl:world,uiLayerEl:ui,physicsData:{player:null,blocks:[],coins:[]},uiElements:{},camera:{x:0,y:0},coinCount:0,running:false,loopHandle:null,consoleEl:opts.consoleEl};
-  inst.log=(m,err)=>{if(inst.consoleEl){inst.consoleEl.style.display="block";const l=document.createElement("div");l.className=err?"log-error":"";l.innerText=(err?"✖ ":"› ")+m;inst.consoleEl.appendChild(l);inst.consoleEl.scrollTop=inst.consoleEl.scrollHeight;}else console[err?"error":"log"]("[Vortex]",m);};
+  inst.log=(m,err)=>{
+    if(inst.consoleEl){
+      inst.consoleEl.style.display="block";
+      const l=document.createElement("div");
+      l.className=err?"log-error":"";
+      l.innerText=(err?"✖ ":"› ")+m;
+      inst.consoleEl.appendChild(l);
+      inst.consoleEl.scrollTop=inst.consoleEl.scrollHeight;
+    }else console[err?"error":"log"]("[Vortex]",m);
+  };
+
   const data=Array.isArray(mapData)?mapData:[];
-  if(data.length&&typeof data[0]==="object"&&!Array.isArray(data)){
-    data.forEach(o=>{if(o.type==="player"||o.type==="block"||o.type==="coin")makeVortexEntity(inst,o.type,o.x,o.y,o.w,o.h,o.color,o.shape);});
-  }else data.forEach((type,i)=>{if(type)makeVortexEntity(inst,type,(i%20)*TILE_W,Math.floor(i/20)*TILE_H);});
-  try{inst.handlers=compileVortexScript(scriptCode||"")(buildVortexAPI(inst));inst.handlers?._ready?.();}catch(e){inst.handlers=null;inst.log("Erro no script: "+e.message,true);}
-  const tick=()=>{if(!inst.running)return;try{inst.handlers?._update?.();}catch(e){inst.log("Erro em _update(): "+e.message,true);inst.handlers._update=null;}syncVortexRender(inst.physicsData);world.style.transform=`translate(${-inst.camera.x}px,${-inst.camera.y}px)`;};
-  inst.start=()=>{if(!inst.running){inst.running=true;inst.loopHandle=setInterval(tick,1000/60);}};
-  inst.stop=()=>{inst.running=false;if(inst.loopHandle)clearInterval(inst.loopHandle);inst.loopHandle=null;};
+  if(data.length && typeof data[0]==="object" && !Array.isArray(data[0])){
+    data.forEach(o=>{
+      // Editor -> runtime mapping. The editor uses square/circle/triangle/player/coin.
+      // Runtime uses block/coin/player for gameplay while preserving the shape/color.
+      const runtimeType =
+        o.type==="player" ? "player" :
+        o.type==="coin" || o.shape==="circle" ? "coin" :
+        "block";
+      makeVortexEntity(inst,runtimeType,o.x,o.y,o.w,o.h,o.color,o.shape);
+    });
+  }else{
+    data.forEach((type,i)=>{
+      if(type) makeVortexEntity(inst,type,(i%20)*TILE_W,Math.floor(i/20)*TILE_H);
+    });
+  }
+
+  // Keep a visible fallback floor if an old scene has only a player.
+  if(inst.physicsData.blocks.length===0){
+    makeVortexEntity(inst,"block",0,360,900,40,"#6d28d9","square");
+  }
+
+  try{
+    inst.handlers=compileVortexScript(scriptCode||"")(buildVortexAPI(inst));
+    inst.handlers?._ready?.();
+  }catch(e){
+    inst.handlers=null;
+    inst.log("Erro no script: "+e.message,true);
+  }
+
+  const tick=()=>{
+    if(!inst.running)return;
+    try{
+      inst.handlers?._update?.();
+    }catch(e){
+      inst.log("Erro em _update(): "+e.message,true);
+      if(inst.handlers)inst.handlers._update=null;
+    }
+    syncVortexRender(inst.physicsData);
+    world.style.transform=`translate(${-inst.camera.x}px,${-inst.camera.y}px)`;
+  };
+
+  inst.start=()=>{
+    if(!inst.running){
+      inst.running=true;
+      tick();
+      inst.loopHandle=setInterval(tick,1000/60);
+    }
+  };
+  inst.stop=()=>{
+    inst.running=false;
+    if(inst.loopHandle)clearInterval(inst.loopHandle);
+    inst.loopHandle=null;
+  };
   return inst;
 }
 function toggleEngineTestMode(){
-  const screen=document.getElementById("engine-test-screen"),editor=document.getElementById("canvas-2d"),btn=document.getElementById("btn-engine-test"),consoleEl=document.getElementById("engine-console");
-  if(screen.style.display==="none"){
-    if(!currentSceneObjects.some(o=>o.type==="player"))return alert("Adicione um Player à cena.");
+  const screen=document.getElementById("engine-test-screen"),
+        editor=document.getElementById("canvas-2d"),
+        btn=document.getElementById("btn-engine-test"),
+        consoleEl=document.getElementById("engine-console");
+
+  if(screen.style.display==="none" || !screen.style.display){
+    if(!currentSceneObjects.some(o=>o.type==="player"))
+      return alert("Adicione um Player à cena.");
+
     saveVortexScript();
     const s=vortexScripts.find(x=>x.id===activeScriptId);
-    if(consoleEl){consoleEl.innerHTML="";consoleEl.style.display="none";}
-    editor.style.display="none";screen.style.display="block";btn.innerText="■ PARAR";btn.classList.add("stop");
-    currentGameInstance=createVortexGameInstance(screen,currentSceneObjects,s?.code||"",{consoleEl});currentGameInstance.start();
-  }else stopEngineTestLoop();
+
+    if(consoleEl){
+      consoleEl.innerHTML="";
+      consoleEl.style.display="none";
+    }
+
+    editor.style.display="none";
+    screen.style.display="block";
+    screen.style.position="relative";
+    screen.style.overflow="hidden";
+    screen.style.background="#090512";
+    screen.style.border="1px solid rgba(168,85,247,.35)";
+    screen.style.minHeight="300px";
+    screen.style.height="calc(100% - 42px)";
+
+    btn.innerText="■ PARAR";
+    btn.classList.add("stop");
+
+    currentGameInstance=createVortexGameInstance(
+      screen,
+      currentSceneObjects,
+      s?.code||"",
+      {consoleEl}
+    );
+    currentGameInstance.start();
+  }else{
+    stopEngineTestLoop();
+  }
 }
-function stopEngineTestLoop(){currentGameInstance?.stop();currentGameInstance=null;const s=document.getElementById("engine-test-screen"),c=document.getElementById("canvas-2d"),b=document.getElementById("btn-engine-test");if(s){s.style.display="none";}if(c)c.style.display="block";if(b){b.innerText="▶ TESTAR";b.classList.remove("stop");}}
+function stopEngineTestLoop(){
+  currentGameInstance?.stop();
+  currentGameInstance=null;
+  const s=document.getElementById("engine-test-screen"),
+        c=document.getElementById("canvas-2d"),
+        b=document.getElementById("btn-engine-test");
+  if(s)s.style.display="none";
+  if(c)c.style.display="block";
+  if(b){b.innerText="▶ TESTAR";b.classList.remove("stop");}
+}
 function openPublishModalFromEngine(){document.getElementById("publish-modal").style.display="flex";}
 function closePublishModal(){document.getElementById("publish-modal").style.display="none";}
 function compileAndPublishEngineGame(){
@@ -326,55 +436,139 @@ function runVexeApp(app){openWindow("win-runner");document.getElementById("runne
 function stopRunnerInstance(){currentRunnerInstance?.stop();currentRunnerInstance=null;}
 
 /* ================= VORTEX MESSENGER ================= */
-function clearMessengerListeners(){messengerListeners.forEach(u=>{try{u();}catch{}});messengerListeners=[];}
+function clearMessengerListeners(){
+  messengerListeners.forEach(u=>{try{u();}catch{}});
+  messengerListeners=[];
+  if(messengerMessageUnsub){
+    try{messengerMessageUnsub();}catch{}
+    messengerMessageUnsub=null;
+  }
+}
 function messengerRef(path){return database.ref(path);}
-function loadFriends(){const l=document.getElementById("friends-list");if(!l||!currentUser)return;const ref=database.ref("users/"+currentUser.key+"/friends");const handler=s=>{l.innerHTML="";if(!s.exists()){l.innerHTML="<div class='muted'>Nenhum amigo. Adicione pelo nick.</div>";return;}Object.keys(s.val()).forEach(k=>{const f=s.val()[k];const b=document.createElement("button");b.className="friend-row";b.innerHTML=`<span class='avatar'>${escapeHtml((f.displayName||k)[0].toUpperCase())}</span><span>@${escapeHtml(f.displayName||k)}</span>`;b.onclick=()=>openDM(k,f.displayName||k);l.appendChild(b);});};ref.on("value",handler);messengerListeners.push(()=>ref.off("value",handler));}
+function safeUserName(data,key){
+  return String(data?.displayName||data?.username||data?.nick||key||"Usuário");
+}
+function loadFriends(){
+  const l=document.getElementById("friends-list");
+  if(!l||!currentUser)return;
+  const ref=database.ref("users/"+currentUser.key+"/friends");
+  const handler=s=>{
+    l.innerHTML="";
+    if(!s.exists()){
+      l.innerHTML="<div class='muted'>Nenhum amigo. Adicione pelo nick.</div>";
+      return;
+    }
+    Object.keys(s.val()).forEach(k=>{
+      const f=s.val()[k]||{}, name=safeUserName(f,k);
+      const b=document.createElement("button");
+      b.className="friend-row";
+      b.innerHTML=`<span class='avatar'>${escapeHtml(name[0].toUpperCase())}</span><span>@${escapeHtml(name)}</span>`;
+      b.onclick=()=>openDM(k,name);
+      l.appendChild(b);
+    });
+  };
+  ref.on("value",handler);
+  messengerListeners.push(()=>ref.off("value",handler));
+}
 function addFriend(){
-  if(!currentUser)return;const nick=document.getElementById("friend-nick").value.trim();if(!nick)return;
-  const k=keyForNick(nick);if(k===currentUser.key)return alert("Você não pode adicionar a si mesmo.");
-  database.ref("users/"+k).once("value").then(s=>{if(!s.exists())throw new Error("Nick não encontrado.");const d=s.val();return Promise.all([database.ref("users/"+currentUser.key+"/friends/"+k).set({displayName:d.displayName}),database.ref("users/"+k+"/friends/"+currentUser.key).set({displayName:currentUser.displayName})]);}).then(()=>{document.getElementById("friend-nick").value="";alert("Amizade adicionada.");}).catch(e=>alert(e.message));
+  if(!currentUser)return;
+  const nick=document.getElementById("friend-nick").value.trim();
+  if(!nick)return;
+  const k=keyForNick(nick);
+  if(k===currentUser.key)return alert("Você não pode adicionar a si mesmo.");
+
+  database.ref("users/"+k).once("value").then(s=>{
+    if(!s.exists())throw new Error("Nick não encontrado.");
+    const d=s.val()||{}, targetName=safeUserName(d,k), myName=safeUserName(currentUser,currentUser.key);
+    return Promise.all([
+      database.ref("users/"+currentUser.key+"/friends/"+k).set({displayName:targetName,nick:k}),
+      database.ref("users/"+k+"/friends/"+currentUser.key).set({displayName:myName,nick:currentUser.key})
+    ]);
+  }).then(()=>{
+    document.getElementById("friend-nick").value="";
+    alert("Amizade adicionada.");
+  }).catch(e=>alert("Não foi possível adicionar: "+e.message));
 }
 function dmId(a,b){return [a,b].sort().join("__");}
-function openDM(k,name){currentChatType="dm";currentChatId=dmId(currentUser.key,k);currentGroupId=null;document.getElementById("chat-title").innerText="@"+name;document.getElementById("chat-subtitle").innerText="Conversa privada";listenMessages(currentChatId,"dm");}
-function openGroupCreator(){openWindow("win-group-create");renderGroupMembers();}
-function createGroup(){
-  const name=document.getElementById("group-name").value.trim();if(!name)return alert("Dê um nome ao grupo.");
-  const members={};document.querySelectorAll(".group-member-check:checked").forEach(c=>members[c.value]=true);members[currentUser.key]=true;
-  const id="group_"+Date.now(), updates={["groups/"+id]:{name,owner:currentUser.key,members,createdAt:Date.now()}};
-  Object.keys(members).forEach(k=>updates["users/"+k+"/groups/"+id]={name});
-  return database.ref().update(updates).then(()=>{document.getElementById("group-name").value="";closeWindow("win-group-create");loadGroups();});
+function openDM(key,name){
+  currentChatType="dm";
+  currentChatId=dmId(currentUser.key,key);
+  currentGroupId=null;
+  document.getElementById("chat-title").innerText="@"+safeUserName({displayName:name},key);
+  document.getElementById("chat-subtitle").innerText="Conversa privada";
+  listenMessages(currentChatId,"dm");
 }
-function loadGroups(){const l=document.getElementById("groups-list");if(!l||!currentUser)return;database.ref("users/"+currentUser.key+"/groups").once("value").then(s=>{l.innerHTML="";if(!s.exists()){l.innerHTML="<div class='muted'>Nenhum grupo.</div>";return;}Object.entries(s.val()).forEach(([id,g])=>{const b=document.createElement("button");b.className="friend-row";b.innerHTML=`<span class='avatar'>G</span><span>${escapeHtml(g.name)}</span>`;b.onclick=()=>openGroup(id,g.name);l.appendChild(b);});});}
-function openGroup(id,name){currentChatType="group";currentChatId=id;currentGroupId=id;document.getElementById("chat-title").innerText=name;document.getElementById("chat-subtitle").innerText="Grupo Vortex";listenMessages(id,"group");}
+function openGroup(id,name){
+  currentChatType="group";
+  currentChatId=id;
+  currentGroupId=id;
+  document.getElementById("chat-title").innerText=name;
+  document.getElementById("chat-subtitle").innerText="Grupo Vortex";
+  listenMessages(id,"group");
+}
+function prepareMessengerLayout(){
+  const messages=document.getElementById("messages");
+  const chat=document.querySelector("#win-messenger .chat");
+  const composer=document.querySelector("#win-messenger .composer");
+  const emoji=document.querySelector("#win-messenger .emoji-bar");
+  if(chat)Object.assign(chat.style,{display:"flex",flexDirection:"column",minHeight:"0",overflow:"hidden"});
+  if(messages)Object.assign(messages.style,{flex:"1 1 auto",minHeight:"0",overflowY:"auto",overflowX:"hidden",display:"flex",flexDirection:"column",gap:"8px",padding:"12px",scrollBehavior:"smooth"});
+  if(emoji)Object.assign(emoji.style,{flex:"0 0 auto"});
+  if(composer)Object.assign(composer.style,{flex:"0 0 auto"});
+}
 function listenMessages(id,type){
-  clearMessengerListeners();const box=document.getElementById("messages");box.innerHTML="<div class='muted'>Carregando mensagens...</div>";
+  prepareMessengerLayout();
+  if(messengerMessageUnsub){
+    try{messengerMessageUnsub();}catch{}
+    messengerMessageUnsub=null;
+  }
+
+  const box=document.getElementById("messages");
+  if(!box)return;
+  box.innerHTML="<div class='muted'>Carregando mensagens...</div>";
+
   const path=type==="dm"?"conversations/"+id+"/messages":"groups/"+id+"/messages";
-  const ref=database.ref(path).limitToLast(100),handler=s=>{
-    const wasNearBottom=box.scrollHeight-box.scrollTop-box.clientHeight<80;
+  const ref=database.ref(path).limitToLast(100);
+
+  const handler=s=>{
+    const nearBottom=(box.scrollHeight-box.scrollTop-box.clientHeight)<120;
     box.innerHTML="";
-    if(!s.exists()){box.innerHTML="<div class='muted'>Nenhuma mensagem ainda.</div>";return;}
-    s.forEach(c=>{renderMessage(box,c.val());});
-    if(wasNearBottom) box.scrollTop=box.scrollHeight;
+
+    if(!s.exists()){
+      box.innerHTML="<div class='muted'>Nenhuma mensagem ainda.</div>";
+      return;
+    }
+
+    s.forEach(c=>renderMessage(box,c.val()||{}));
+
+    if(nearBottom){
+      requestAnimationFrame(()=>{box.scrollTop=box.scrollHeight;});
+    }
   };
-  ref.on("value",handler);messengerListeners.push(()=>ref.off("value",handler));
+
+  ref.on("value",handler);
+  messengerMessageUnsub=()=>ref.off("value",handler);
 }
 function renderMessage(box,m){
-  const wrap=document.createElement("div");wrap.className="message "+(m.senderKey===currentUser.key?"mine":"theirs");
+  const wrap=document.createElement("div");
+  wrap.className="message "+(m.senderKey===currentUser.key?"mine":"theirs");
   let content=escapeHtml(m.text||"").replace(/\n/g,"<br>");
-  if(m.image)content+=`<img class="chat-image" src="${m.image}" alt="imagem enviada">`;
-  wrap.innerHTML=`<div class="message-name">${escapeHtml(m.senderName||"Usuário")}</div><div>${content}</div><small>${new Date(m.createdAt||Date.now()).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</small>`;
+  if(m.image){
+    content+=`<img class="chat-image" src="${escapeHtml(m.image)}" alt="imagem enviada">`;
+  }
+  wrap.innerHTML=`<div class="message-name">${escapeHtml(safeUserName(m,m.senderKey))}</div><div>${content}</div><small>${new Date(m.createdAt||Date.now()).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</small>`;
   box.appendChild(wrap);
 }
 function sendMessage(){
   if(!currentUser||!currentChatId)return;const input=document.getElementById("message-input"),text=input.value.trim();if(!text)return;
   const path=currentChatType==="dm"?"conversations/"+currentChatId+"/messages":"groups/"+currentChatId+"/messages";
-  database.ref(path).push({senderKey:currentUser.key,senderName:currentUser.displayName,text,createdAt:Date.now()});input.value="";
+  database.ref(path).push({senderKey:currentUser.key,senderName:safeUserName(currentUser,currentUser.key),text,createdAt:Date.now()});input.value="";
 }
 function sendEmoji(e){const i=document.getElementById("message-input");i.value+=(e||"🙂");i.focus();}
 function sendImage(){
-  if(!currentUser||!currentChatId)return;const input=document.getElementById("image-input");input.click();input.onchange=()=>{const file=input.files[0];if(!file)return;if(file.size>700*1024)return alert("Imagem muito grande. Use até 700 KB.");const r=new FileReader();r.onload=()=>{const path=currentChatType==="dm"?"conversations/"+currentChatId+"/messages":"groups/"+currentChatId+"/messages";database.ref(path).push({senderKey:currentUser.key,senderName:currentUser.displayName,image:r.result,createdAt:Date.now()});};r.readAsDataURL(file);input.value="";};
+  if(!currentUser||!currentChatId)return;const input=document.getElementById("image-input");input.click();input.onchange=()=>{const file=input.files[0];if(!file)return;if(file.size>700*1024)return alert("Imagem muito grande. Use até 700 KB.");const r=new FileReader();r.onload=()=>{const path=currentChatType==="dm"?"conversations/"+currentChatId+"/messages":"groups/"+currentChatId+"/messages";database.ref(path).push({senderKey:currentUser.key,senderName:safeUserName(currentUser,currentUser.key),image:r.result,createdAt:Date.now()});};r.readAsDataURL(file);input.value="";};
 }
-function loadMessengerHome(){loadFriends();loadGroups();renderGroupMembers();if(!currentChatId){document.getElementById("chat-title").innerText="Vortex Messenger";document.getElementById("chat-subtitle").innerText="Escolha um amigo para conversar";}}
+function loadMessengerHome(){prepareMessengerLayout();loadFriends();loadGroups();renderGroupMembers();if(!currentChatId){document.getElementById("chat-title").innerText="Vortex Messenger";document.getElementById("chat-subtitle").innerText="Escolha um amigo para conversar";}}
 function renderGroupMembers(){const l=document.getElementById("group-members");if(!l||!currentUser)return;database.ref("users/"+currentUser.key+"/friends").once("value").then(s=>{l.innerHTML="";if(s.exists())Object.entries(s.val()).forEach(([k,f])=>{l.innerHTML+=`<label><input class="group-member-check" type="checkbox" value="${k}"> @${escapeHtml(f.displayName||k)}</label>`;});});}
 
 /* ================= STARTUP ================= */
