@@ -16,28 +16,144 @@ firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
 // ==========================================
-// 2. TELA DE LOGIN & SISTEMA DE CONTA
+// 2. SISTEMA DE AUTENTICAÇÃO (ENTRAR / CRIAR / RECUPERAR)
 // ==========================================
 let currentUser = null;
+let authMode = 'login'; // 'login', 'register', 'recover'
 
-function loginUser() {
-    const username = document.getElementById('auth-username').value.trim();
-    const pin = document.getElementById('auth-pin').value.trim();
-    const email = document.getElementById('auth-email').value.trim();
+function renderAuthUI() {
+    const card = document.querySelector('.auth-card');
+    if (!card) return;
 
-    if (!username || !pin) return alert("Por favor, preencha o Usuário e o PIN!");
+    if (authMode === 'login') {
+        card.innerHTML = `
+            <div class="auth-header">
+                <h2>🌀 Vortex OS</h2>
+                <p>Acesse sua conta</p>
+            </div>
+            <div class="auth-form" style="display:flex; flex-direction:column; gap:10px;">
+                <input type="text" id="auth-username" placeholder="Nome de Usuário" style="padding:10px; background:#000; border:1px solid #a78bfa; color:#fff; border-radius:6px; outline:none;">
+                <input type="password" id="auth-pin" placeholder="PIN (4 dígitos)" maxlength="4" style="padding:10px; background:#000; border:1px solid #a78bfa; color:#fff; border-radius:6px; outline:none;">
+                <button class="btn btn-primary" onclick="handleAuthSubmit()" style="padding:10px; background:#a855f7; border:none; color:#fff; font-weight:bold; border-radius:6px; cursor:pointer;">Entrar no Vortex OS</button>
+                <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-top:5px;">
+                    <a href="#" onclick="setAuthMode('register')" style="color:#c084fc; text-decoration:none;">✨ Criar Conta</a>
+                    <a href="#" onclick="setAuthMode('recover')" style="color:#a78bfa; text-decoration:none;">🔑 Esqueci o PIN</a>
+                </div>
+            </div>
+        `;
+    } else if (authMode === 'register') {
+        card.innerHTML = `
+            <div class="auth-header">
+                <h2>✨ Criar Conta</h2>
+                <p>Cadastre-se no Vortex OS</p>
+            </div>
+            <div class="auth-form" style="display:flex; flex-direction:column; gap:10px;">
+                <input type="text" id="auth-username" placeholder="Novo Usuário" style="padding:10px; background:#000; border:1px solid #a78bfa; color:#fff; border-radius:6px; outline:none;">
+                <input type="password" id="auth-pin" placeholder="Crie um PIN (4 dígitos)" maxlength="4" style="padding:10px; background:#000; border:1px solid #a78bfa; color:#fff; border-radius:6px; outline:none;">
+                <input type="email" id="auth-email" placeholder="E-mail (Opcional p/ recuperar)" style="padding:10px; background:#000; border:1px solid #a78bfa; color:#fff; border-radius:6px; outline:none;">
+                <button class="btn btn-primary" onclick="handleAuthSubmit()" style="padding:10px; background:#a855f7; border:none; color:#fff; font-weight:bold; border-radius:6px; cursor:pointer;">Cadastrar e Entrar</button>
+                <div style="text-align:center; font-size:0.8rem; margin-top:5px;">
+                    <a href="#" onclick="setAuthMode('login')" style="color:#c084fc; text-decoration:none;">Já tem uma conta? Entrar</a>
+                </div>
+            </div>
+        `;
+    } else if (authMode === 'recover') {
+        card.innerHTML = `
+            <div class="auth-header">
+                <h2>🔑 Recuperar PIN</h2>
+                <p>Informe seu Usuário e E-mail</p>
+            </div>
+            <div class="auth-form" style="display:flex; flex-direction:column; gap:10px;">
+                <input type="text" id="auth-username" placeholder="Seu Usuário" style="padding:10px; background:#000; border:1px solid #a78bfa; color:#fff; border-radius:6px; outline:none;">
+                <input type="email" id="auth-email" placeholder="Seu E-mail Cadastrado" style="padding:10px; background:#000; border:1px solid #a78bfa; color:#fff; border-radius:6px; outline:none;">
+                <button class="btn btn-primary" onclick="handleAuthSubmit()" style="padding:10px; background:#a855f7; border:none; color:#fff; font-weight:bold; border-radius:6px; cursor:pointer;">Recuperar PIN</button>
+                <div style="text-align:center; font-size:0.8rem; margin-top:5px;">
+                    <a href="#" onclick="setAuthMode('login')" style="color:#c084fc; text-decoration:none;">Voltar ao Login</a>
+                </div>
+            </div>
+        `;
+    }
+}
 
-    currentUser = { username, pin, email: email || "Não informado" };
-    
-    // Salva perfil no Firebase
-    database.ref('users/' + username).set(currentUser);
+function setAuthMode(mode) {
+    authMode = mode;
+    renderAuthUI();
+}
 
-    // Atualiza interface
-    document.getElementById('start-username').innerText = username;
+function handleAuthSubmit() {
+    const usernameInput = document.getElementById('auth-username');
+    const pinInput = document.getElementById('auth-pin');
+    const emailInput = document.getElementById('auth-email');
+
+    const username = usernameInput ? usernameInput.value.trim() : '';
+    const pin = pinInput ? pinInput.value.trim() : '';
+    const email = emailInput ? emailInput.value.trim() : '';
+
+    if (authMode === 'register') {
+        if (!username || !pin) return alert("Preencha o Nome de Usuário e o PIN!");
+        if (pin.length !== 4) return alert("O PIN precisa ter exatamente 4 dígitos!");
+
+        database.ref('users/' + username).once('value', (snapshot) => {
+            if (snapshot.exists()) {
+                alert("❌ Este nome de usuário já existe! Escolha outro.");
+            } else {
+                const newUser = {
+                    username: username,
+                    pin: pin,
+                    email: email || "Não informado",
+                    balance: 50.00,
+                    lastDaily: ""
+                };
+                database.ref('users/' + username).set(newUser).then(() => {
+                    alert("🎉 Conta criada com sucesso!");
+                    loginSuccess(newUser);
+                });
+            }
+        });
+    } else if (authMode === 'login') {
+        if (!username || !pin) return alert("Digite o Usuário e o PIN!");
+
+        database.ref('users/' + username).once('value', (snapshot) => {
+            if (snapshot.exists()) {
+                const userData = snapshot.val();
+                if (userData.pin === pin) {
+                    loginSuccess(userData);
+                } else {
+                    alert("❌ PIN incorreto!");
+                }
+            } else {
+                alert("❌ Usuário não encontrado! Crie uma conta primeiro.");
+            }
+        });
+    } else if (authMode === 'recover') {
+        if (!username || !email) return alert("Preencha o Usuário e o E-mail!");
+
+        database.ref('users/' + username).once('value', (snapshot) => {
+            if (snapshot.exists()) {
+                const userData = snapshot.val();
+                if (userData.email && userData.email.toLowerCase() === email.toLowerCase()) {
+                    alert(`🔑 Seu PIN cadastrado é: ${userData.pin}`);
+                    setAuthMode('login');
+                } else {
+                    alert("❌ O e-mail informado não bate com o da conta!");
+                }
+            } else {
+                alert("❌ Usuário não encontrado!");
+            }
+        });
+    }
+}
+
+function loginSuccess(userData) {
+    currentUser = userData;
+    userBalance = userData.balance !== undefined ? parseFloat(userData.balance) : 50.00;
+
+    document.getElementById('start-username').innerText = currentUser.username;
     document.getElementById('start-email').innerText = currentUser.email;
-    document.getElementById('settings-user').innerText = username;
+    document.getElementById('settings-user').innerText = currentUser.username;
     document.getElementById('settings-email').innerText = currentUser.email;
 
+    updateBalanceUI();
     document.getElementById('login-screen').style.display = 'none';
 }
 
@@ -48,10 +164,11 @@ function shutdownPC() {
 function powerOn() {
     document.getElementById('shutdown-screen').style.display = 'none';
     document.getElementById('login-screen').style.display = 'flex';
+    setAuthMode('login');
 }
 
 // ==========================================
-// 3. GERENCIAMENTO DO SO (JANELAS E WALLPAPER)
+// 3. GERENCIAMENTO DO SO
 // ==========================================
 let highestZIndex = 100;
 let openApps = new Set();
@@ -122,52 +239,105 @@ setInterval(() => {
 }, 1000);
 
 // ==========================================
-// 4. ECONOMIA (PIX E SALDO)
+// 4. ECONOMIA (DIÁRIA RIGOROSA E PIX PROTEGIDO)
 // ==========================================
-let userBalance = parseFloat(localStorage.getItem('vortex_balance')) || 50.00;
+let userBalance = 0.00;
 
 function updateBalanceUI() {
     document.getElementById('user-balance').innerText = userBalance.toFixed(2);
-    localStorage.setItem('vortex_balance', userBalance);
+    if (currentUser) {
+        database.ref('users/' + currentUser.username).update({ balance: userBalance });
+    }
 }
 
 function claimDailyReward() {
+    if (!currentUser) return alert("Faça login primeiro!");
+
+    const today = new Date().toDateString(); // Ex: "Sat Aug 08 2026"
+
+    if (currentUser.lastDaily === today) {
+        alert("⏳ Você já resgatou sua recompensa diária hoje! Volte amanhã.");
+        return;
+    }
+
     userBalance += 25.00;
+    currentUser.lastDaily = today;
     updateBalanceUI();
-    alert("🎁 Recompensa de R$ 25,00 resgatada!");
+
+    database.ref('users/' + currentUser.username).update({
+        balance: userBalance,
+        lastDaily: today
+    });
+
+    alert("🎁 Recompensa Diária de R$ 25,00 resgatada com sucesso!");
 }
 
 function simulateIncomingPix() {
-    const senders = ["Mano King", "Developer Pro", "Staff Server"];
+    if (!currentUser) return;
+
+    // Garante que o remetente nunca seja o próprio usuário logado
+    const senders = ["Mano King", "Developer Pro", "Staff Server", "Lucas Dev"];
+    const validSenders = senders.filter(s => s.toLowerCase() !== currentUser.username.toLowerCase());
+    const sender = validSenders[Math.floor(Math.random() * validSenders.length)] || "Amigo Dev";
+
     const amount = (Math.random() * 40 + 10).toFixed(2);
     userBalance += parseFloat(amount);
     updateBalanceUI();
-    alert(`💸 Pix Recebido!\nDe: ${senders[Math.floor(Math.random() * senders.length)]}\nValor: R$ ${amount}`);
+    alert(`💸 Pix Recebido!\nDe: ${sender}\nValor: R$ ${amount}`);
 }
 
 // ==========================================
-// 5. VORTEX ENGINE 2D (CENA FIXA E .VEXE)
+// 5. VORTEX ENGINE 2D (SISTEMA DE PINTURA VISUAL CORRIGIDO)
 // ==========================================
 let currentTileMode = 'block';
 let currentSceneGrid = new Array(240).fill('');
 
 function initMapCanvas() {
     const canvas = document.getElementById('canvas-2d');
+    if (!canvas) return;
     canvas.innerHTML = '';
+
     for (let i = 0; i < 240; i++) {
         const tile = document.createElement('div');
         tile.className = 'tile';
         tile.dataset.index = i;
+
+        applyTileStyle(tile, currentSceneGrid[i]);
+
         tile.onclick = () => {
-            tile.className = 'tile';
-            if (currentTileMode !== 'erase') {
-                tile.classList.add(currentTileMode);
-                currentSceneGrid[i] = currentTileMode;
-            } else {
+            if (currentTileMode === 'erase') {
                 currentSceneGrid[i] = '';
+            } else {
+                currentSceneGrid[i] = currentTileMode;
             }
+            applyTileStyle(tile, currentSceneGrid[i]);
         };
         canvas.appendChild(tile);
+    }
+}
+
+// Garante visualização imediata dos blocos na cena
+function applyTileStyle(tile, mode) {
+    tile.className = 'tile';
+    if (mode === 'block') {
+        tile.classList.add('block');
+        tile.style.backgroundColor = '#8b5cf6';
+        tile.style.border = '1px solid #a78bfa';
+        tile.innerText = '🧱';
+    } else if (mode === 'coin') {
+        tile.classList.add('coin');
+        tile.style.backgroundColor = '#eab308';
+        tile.style.border = 'none';
+        tile.innerText = '🪙';
+    } else if (mode === 'player') {
+        tile.classList.add('player');
+        tile.style.backgroundColor = '#22c55e';
+        tile.style.border = 'none';
+        tile.innerText = '👾';
+    } else {
+        tile.style.backgroundColor = 'rgba(255, 255, 255, 0.03)';
+        tile.style.border = '1px solid rgba(168, 85, 247, 0.1)';
+        tile.innerText = '';
     }
 }
 
@@ -185,6 +355,7 @@ function addHierarchyItem(type) {
 function openPublishModalFromEngine() {
     document.getElementById('publish-modal').style.display = 'flex';
 }
+
 function closePublishModal() {
     document.getElementById('publish-modal').style.display = 'none';
 }
@@ -203,7 +374,6 @@ function compileAndPublishEngineGame() {
         sceneData: [...currentSceneGrid]
     };
 
-    // Salva na Nuvem Firebase
     database.ref('global_apps').push(buildVexe).then(() => {
         alert(`🚀 Compilação concluída! Jogo "${title}.vexe" publicado na Loja Global!`);
         closePublishModal();
@@ -256,6 +426,7 @@ function buyAndInstallApp(title, filename, price, appKey) {
 
 function renderFileManager() {
     const container = document.getElementById('files-list');
+    if (!container) return;
     container.innerHTML = '';
 
     if (installedFiles.length === 0) {
@@ -294,7 +465,8 @@ function runVexeGame(index) {
 
     file.sceneData.forEach(tileClass => {
         const tile = document.createElement('div');
-        tile.className = 'tile ' + (tileClass || '');
+        tile.className = 'tile';
+        applyTileStyle(tile, tileClass);
         canvas.appendChild(tile);
     });
 
@@ -316,7 +488,7 @@ function handleTerminal(e) {
         const out = document.getElementById('terminal-output');
         out.innerHTML += `> ${input.value}<br>`;
         if (input.value === 'clear') out.innerHTML = '';
-        else if (input.value === 'help') out.innerHTML += `Comandos: clear, help, status, apps<br>`;
+        else if (input.value === 'help') out.innerHTML += `Comandos: clear, help, status<br>`;
         else if (input.value === 'status') out.innerHTML += `Vortex OS Kernel v8.0 OK.<br>`;
         else out.innerHTML += `Comando não reconhecido.<br>`;
         input.value = '';
@@ -325,7 +497,7 @@ function handleTerminal(e) {
 
 // INICIALIZAÇÃO
 window.onload = () => {
-    updateBalanceUI();
+    renderAuthUI();
     initMapCanvas();
     loadGlobalStore();
     renderFileManager();
