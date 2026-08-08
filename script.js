@@ -1,5 +1,5 @@
 /* =========================================================
-   VORTEX OS v10.0 — OS + Vortex Engine + Vortex Messenger
+   VORTEX OS v10.0 — OS + Vortex Engine + Vortex Messenger + Browser
    ========================================================= */
 const OS_VERSION = "10.1";
 const firebaseConfig = {
@@ -21,6 +21,10 @@ function isAdmin(){return !!currentUser && ADMIN_KEYS.has(currentUser.key);}
 function isMessengerBanned(){return !!currentUser?.messengerBanned;}
 const globalKeys={};
 const TILE_W=32,TILE_H=35;
+
+/* ================= VORTEX BROWSER DATA ================= */
+let browserHistory = [];
+let browserHistoryIndex = -1;
 
 window.addEventListener("keydown",e=>{globalKeys[e.key.toLowerCase()]=true;});
 window.addEventListener("keyup",e=>{globalKeys[e.key.toLowerCase()]=false;});
@@ -67,7 +71,7 @@ function logoutUser(){localStorage.removeItem("vortex_current_user");currentUser
 function shutdownPC(){closeStartMenuIfOpen();document.getElementById("shutdown-screen").style.display="flex";if(clockInterval)clearInterval(clockInterval);stopEngineTestLoop();stopRunnerInstance();clearMessengerListeners();}
 function powerOn(){document.getElementById("shutdown-screen").style.display="none";if(currentUser){document.getElementById("login-screen").style.display="none";startClock();}else document.getElementById("login-screen").style.display="flex";}
 function startClock(){if(clockInterval)clearInterval(clockInterval);const u=()=>{const e=document.getElementById("os-clock");if(e){const d=new Date();e.innerText=String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");}};u();clockInterval=setInterval(u,30000);}
-function openWindow(id){if(id==="win-messenger"&&isMessengerBanned())return alert("Seu acesso ao Messenger está bloqueado.");if(id==="win-admin"&&!isAdmin())return alert("Acesso negado.");const w=document.getElementById(id);if(!w)return;w.style.display="flex";bringToFront(w);openApps.add(id);addTaskbarButton(id);if(id==="win-engine")initEngineEditor();if(id==="win-messenger")loadMessengerHome();if(id==="win-vscode")renderScriptsSidebarList();if(id==="win-admin")loadAdminState();}
+function openWindow(id){if(id==="win-messenger"&&isMessengerBanned())return alert("Seu acesso ao Messenger está bloqueado.");if(id==="win-admin"&&!isAdmin())return alert("Acesso negado.");const w=document.getElementById(id);if(!w)return;w.style.display="flex";bringToFront(w);openApps.add(id);addTaskbarButton(id);if(id==="win-engine")initEngineEditor();if(id==="win-messenger")loadMessengerHome();if(id==="win-vscode")renderScriptsSidebarList();if(id==="win-admin")loadAdminState();if(id==="win-browser"&&browserHistory.length===0)navigateBrowser("https://www.bing.com");}
 function closeWindow(id){const w=document.getElementById(id);if(w)w.style.display="none";openApps.delete(id);removeTaskbarButton(id);if(id==="win-engine")stopEngineTestLoop();if(id==="win-runner")stopRunnerInstance();if(id==="win-messenger")clearMessengerListeners();}
 function bringToFront(w){if(!w)return;w.style.zIndex=++highestZIndex;}
 function dragWindow(e,id){if(e.target.closest("button,input,textarea"))return;const w=document.getElementById(id);if(!w)return;bringToFront(w);let sx=e.clientX,sy=e.clientY,ox=w.offsetLeft,oy=w.offsetTop;const move=ev=>{w.style.left=(ox+ev.clientX-sx)+"px";w.style.top=(oy+ev.clientY-sy)+"px";};const up=()=>{document.removeEventListener("mousemove",move);document.removeEventListener("mouseup",up);};document.addEventListener("mousemove",move);document.addEventListener("mouseup",up);}
@@ -76,6 +80,56 @@ function removeTaskbarButton(id){document.getElementById("task-"+id)?.remove();}
 function toggleStartMenu(){const m=document.getElementById("start-menu");m.classList.toggle("open");m.style.display=m.classList.contains("open")?"block":"none";}
 function closeStartMenuIfOpen(){const m=document.getElementById("start-menu");if(m){m.classList.remove("open");m.style.display="none";}}
 document.addEventListener("click",e=>{const m=document.getElementById("start-menu"),b=document.querySelector(".start-btn");if(m?.classList.contains("open")&&!m.contains(e.target)&&e.target!==b)closeStartMenuIfOpen();});
+
+/* ================= VORTEX BROWSER LOGIC ================= */
+function navigateBrowser(targetUrl){
+  const input = document.getElementById("browser-url");
+  const iframe = document.getElementById("browser-iframe");
+  if(!input || !iframe) return;
+
+  let query = targetUrl || input.value.trim();
+  if(!query) query = "https://www.bing.com";
+
+  let finalUrl = query;
+  if(!/^https?:\/\//i.test(query)){
+    if(query.includes(".") && !query.includes(" ")){
+      finalUrl = "https://" + query;
+    } else {
+      finalUrl = "https://www.bing.com/search?q=" + encodeURIComponent(query);
+    }
+  }
+
+  input.value = finalUrl;
+  iframe.src = finalUrl;
+
+  if(browserHistoryIndex === -1 || browserHistory[browserHistoryIndex] !== finalUrl){
+    browserHistory = browserHistory.slice(0, browserHistoryIndex + 1);
+    browserHistory.push(finalUrl);
+    browserHistoryIndex = browserHistory.length - 1;
+  }
+}
+
+function browserNav(action){
+  const iframe = document.getElementById("browser-iframe");
+  const input = document.getElementById("browser-url");
+  if(!iframe || !input) return;
+
+  if(action === "back" && browserHistoryIndex > 0){
+    browserHistoryIndex--;
+    const url = browserHistory[browserHistoryIndex];
+    input.value = url;
+    iframe.src = url;
+  } else if(action === "forward" && browserHistoryIndex < browserHistory.length - 1){
+    browserHistoryIndex++;
+    const url = browserHistory[browserHistoryIndex];
+    input.value = url;
+    iframe.src = url;
+  } else if(action === "reload"){
+    iframe.src = iframe.src;
+  } else if(action === "home"){
+    navigateBrowser("https://www.bing.com");
+  }
+}
 
 /* ================= ADMIN / GLOBAL SYSTEM ================= */
 function updateAdminVisibility(){
@@ -117,7 +171,7 @@ function adminBanUser(){
   return database.ref("users/"+key).once("value").then(s=>{if(!s.exists())throw new Error("Usuário não encontrado.");return database.ref("users/"+key+"/messengerBanned").set(true);}).then(()=>{alert("Usuário bloqueado no Messenger.");loadAdminUsers();}).catch(e=>alert("Erro: "+e.message));
 }
 function adminUnbanUser(){
-  if(!requireAdmin())return; const nick=document.getElementById("admin-ban-user").value.trim(), key=keyForNick(nick); if(!key)return alert("Informe um nick."); return database.ref("users/"+key+"/messengerBanned").set(false).then(()=>{alert("Bloqueio removido.");loadAdminUsers();}).catch(e=>alert("Erro: "+e.message));
+  if(!requireAdmin())return; const nick=document.getElementById("admin-ban-user").value.trim(), key=keyForNick(nick); if(!key)return alert("Informe um nick."); return database.ref("users/"+key).once("value").then(s=>{if(!s.exists())throw new Error("Usuário não encontrado.");return database.ref("users/"+key+"/messengerBanned").set(false);}).then(()=>{alert("Bloqueio removido.");loadAdminUsers();}).catch(e=>alert("Erro: "+e.message));
 }
 function loadAdminUsers(){
   const l=document.getElementById("admin-users-list");if(!l||!isAdmin())return; database.ref("users").once("value").then(s=>{l.innerHTML="";if(!s.exists()){l.innerHTML="<div class='muted'>Nenhum usuário.</div>";return;}s.forEach(c=>{const u=c.val()||{},name=safeUserName(u,c.key);const row=document.createElement("div");row.className="admin-row";row.innerHTML=`<span>@${escapeHtml(name)}</span><span>R$ ${Number(u.balance||0).toFixed(2)}</span><span>${u.messengerBanned?"🚫":"✓"}</span>`;l.appendChild(row);});});
@@ -156,7 +210,7 @@ function sendPix(){
 }
 
 /* ================= TERMINAL / CALC ================= */
-function handleTerminal(e){if(e.key!=="Enter")return;const i=document.getElementById("terminal-input"),o=document.getElementById("terminal-output"),c=i.value.trim();i.value="";o.innerHTML+="<br>&gt; "+escapeHtml(c)+"<br>";const cmd=c.toLowerCase();if(cmd==="help")o.innerHTML+="Comandos: help, clear, whoami, balance, date, apps, version, messenger, shutdown";else if(cmd==="clear")o.innerHTML="";else if(cmd==="whoami")o.innerHTML+=escapeHtml(currentUser?.displayName||"Nenhum usuário");else if(cmd==="balance")o.innerHTML+="R$ "+Number(currentUser?.balance||0).toFixed(2);else if(cmd==="date")o.innerHTML+=new Date().toLocaleString("pt-BR");else if(cmd==="apps")o.innerHTML+=Array.from(openApps).join(", ")||"Nenhum";else if(cmd==="version")o.innerHTML+="Vortex OS v"+OS_VERSION;else if(cmd==="messenger")openWindow("win-messenger");else if(cmd==="shutdown")shutdownPC();else o.innerHTML+="Comando não reconhecido.";o.scrollTop=o.scrollHeight;}
+function handleTerminal(e){if(e.key!=="Enter")return;const i=document.getElementById("terminal-input"),o=document.getElementById("terminal-output"),c=i.value.trim();i.value="";o.innerHTML+="<br>&gt; "+escapeHtml(c)+"<br>";const cmd=c.toLowerCase();if(cmd==="help")o.innerHTML+="Comandos: help, clear, whoami, balance, date, apps, version, messenger, browser, shutdown";else if(cmd==="clear")o.innerHTML="";else if(cmd==="whoami")o.innerHTML+=escapeHtml(currentUser?.displayName||"Nenhum usuário");else if(cmd==="balance")o.innerHTML+="R$ "+Number(currentUser?.balance||0).toFixed(2);else if(cmd==="date")o.innerHTML+=new Date().toLocaleString("pt-BR");else if(cmd==="apps")o.innerHTML+=Array.from(openApps).join(", ")||"Nenhum";else if(cmd==="version")o.innerHTML+="Vortex OS v"+OS_VERSION;else if(cmd==="messenger")openWindow("win-messenger");else if(cmd==="browser")openWindow("win-browser");else if(cmd==="shutdown")shutdownPC();else o.innerHTML+="Comando não reconhecido.";o.scrollTop=o.scrollHeight;}
 function calcInput(v){document.getElementById("calc-display").value+=v}
 function calcClear(){document.getElementById("calc-display").value=""}
 function calcEval(){const d=document.getElementById("calc-display");try{if(!/^[0-9+\-*/.\s]+$/.test(d.value))throw 0;d.value=String(Function('"use strict";return ('+d.value+')')());}catch{d.value="Erro";}}
@@ -277,12 +331,10 @@ function saveVortexScript(){const name=document.getElementById("vortex-filename"
 function runScriptFromStudio(){saveVortexScript();openWindow("win-engine");setTimeout(()=>{if(document.getElementById("engine-test-screen").style.display==="none")toggleEngineTestMode();},50);}
 
 function transpileVortexToJS(code){
-  // 1. Remove caracteres invisíveis e sanitiza aspas inteligentes/curvadas
   let safeCode = String(code || "")
     .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"')
     .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'");
 
-  // 2. Função interna para ignorar o '#' quando estiver dentro de textos (ex: "#ffffff")
   function removeComments(line) {
     let inSingle = false, inDouble = false;
     for (let i = 0; i < line.length; i++) {
