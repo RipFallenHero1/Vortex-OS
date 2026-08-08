@@ -3,13 +3,14 @@
 // ==========================================
 // Substitua pelas credenciais do seu projeto Firebase Console
 const firebaseConfig = {
-    apiKey: "SUA_API_KEY_AQUI",
-    authDomain: "seu-projeto.firebaseapp.com",
-    databaseURL: "https://seu-projeto-default-rtdb.firebaseio.com",
-    projectId: "seu-projeto",
-    storageBucket: "seu-projeto.appspot.com",
-    messagingSenderId: "123456789",
-    appId: "1:123456789:web:abcdef"
+  apiKey: "AIzaSyCAC6tnKdPC6X2SwYWiMGZQI0GxwDq5SeA",
+  authDomain: "vortex-os-971fc.firebaseapp.com",
+  databaseURL: "https://vortex-os-971fc-default-rtdb.firebaseio.com",
+  projectId: "vortex-os-971fc",
+  storageBucket: "vortex-os-971fc.firebasestorage.app",
+  messagingSenderId: "128698321803",
+  appId: "1:128698321803:web:fa6ad595d268980019bd8e",
+  measurementId: "G-387R68F77S"
 };
 
 // Inicializa Firebase se configurado, senão usa modo fallback local
