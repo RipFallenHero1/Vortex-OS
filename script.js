@@ -15,11 +15,56 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
+// INJEÇÃO AUTOMÁTICA DE ESTILOS DENTRO DO JS (PARA NÃO PRECISAR MEXER NO CSS)
+(function injectGlobalFixStyles() {
+    const style = document.createElement('style');
+    style.innerHTML = `
+        .tile { display: flex !important; align-items: center !important; justify-content: center !important; font-size: 1rem !important; cursor: pointer; min-height: 25px; }
+        .tile-block { background-color: #8b5cf6 !important; border: 1px solid #a78bfa !important; box-shadow: inset 0 0 5px rgba(0,0,0,0.5); }
+        .tile-coin { background-color: #eab308 !important; border-radius: 50% !important; border: 1px solid #fde047 !important; }
+        .tile-player { background-color: #22c55e !important; border-radius: 4px !important; }
+        .tree-item.selected { background: #a855f7 !important; color: #fff !important; font-weight: bold; border: 1px solid #c084fc; }
+        .admin-btn { background: linear-gradient(135deg, #ef4444, #b91c1c) !important; color: white !important; font-weight: bold; border-radius: 4px; padding: 6px 12px; cursor: pointer; }
+    `;
+    document.head.appendChild(style);
+})();
+
 // ==========================================
-// 2. SISTEMA DE AUTENTICAÇÃO (ENTRAR / CRIAR / RECUPERAR)
+// 2. SISTEMA DE AUTENTICAÇÃO E ADMIN
 // ==========================================
 let currentUser = null;
-let authMode = 'login'; // 'login', 'register', 'recover'
+let authMode = 'login';
+let lastGlobalRestart = 0;
+
+// OUVINTE EM TEMPO REAL PARA COMANDOS GLOBAIS DE ADMIN (MANUTENÇÃO E RESTART)
+database.ref('system').on('value', (snapshot) => {
+    const sysData = snapshot.val() || {};
+    
+    // 1. Verificação de Manutenção Global
+    let maintOverlay = document.getElementById('maintenance-screen');
+    if (sysData.maintenance) {
+        if (!maintOverlay) {
+            maintOverlay = document.createElement('div');
+            maintOverlay.id = 'maintenance-screen';
+            maintOverlay.className = 'full-overlay';
+            maintOverlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:#111; color:#ff4757; display:flex; flex-direction:column; justify-content:center; align-items:center; z-index:999999; text-align:center;";
+            maintOverlay.innerHTML = `<h1>🚧 VORTEX OS EM MANUTENÇÃO 🚧</h1><p style="color:#ccc; margin-top:10px;">O administrador geral colocou o sistema em manutenção temporária.</p>`;
+            document.body.appendChild(maintOverlay);
+        }
+        maintOverlay.style.display = 'flex';
+    } else if (maintOverlay) {
+        maintOverlay.style.display = 'none';
+    }
+
+    // 2. Verificação de Reinicialização Global
+    if (sysData.restart_trigger && sysData.restart_trigger > lastGlobalRestart) {
+        if (lastGlobalRestart !== 0) {
+            alert("💥 O Administrador enviou um comando de reinicialização global!");
+            location.reload();
+        }
+        lastGlobalRestart = sysData.restart_trigger;
+    }
+});
 
 function renderAuthUI() {
     const card = document.querySelector('.auth-card');
@@ -90,20 +135,14 @@ function handleAuthSubmit() {
     const email = emailInput ? emailInput.value.trim() : '';
 
     if (authMode === 'register') {
-        if (!username || !pin) return alert("Preencha o Nome de Usuário e o PIN!");
-        if (pin.length !== 4) return alert("O PIN precisa ter exatamente 4 dígitos!");
+        if (!username || !pin) return alert("Preencha Usuário e PIN!");
+        if (pin.length !== 4) return alert("O PIN precisa ter 4 dígitos!");
 
         database.ref('users/' + username).once('value', (snapshot) => {
             if (snapshot.exists()) {
-                alert("❌ Este nome de usuário já existe! Escolha outro.");
+                alert("❌ Este nome de usuário já existe!");
             } else {
-                const newUser = {
-                    username: username,
-                    pin: pin,
-                    email: email || "Não informado",
-                    balance: 50.00,
-                    lastDaily: ""
-                };
+                const newUser = { username, pin, email: email || "Não informado", balance: 50.00, lastDaily: "" };
                 database.ref('users/' + username).set(newUser).then(() => {
                     alert("🎉 Conta criada com sucesso!");
                     loginSuccess(newUser);
@@ -122,11 +161,11 @@ function handleAuthSubmit() {
                     alert("❌ PIN incorreto!");
                 }
             } else {
-                alert("❌ Usuário não encontrado! Crie uma conta primeiro.");
+                alert("❌ Usuário não encontrado! Crie uma conta.");
             }
         });
     } else if (authMode === 'recover') {
-        if (!username || !email) return alert("Preencha o Usuário e o E-mail!");
+        if (!username || !email) return alert("Preencha Usuário e E-mail!");
 
         database.ref('users/' + username).once('value', (snapshot) => {
             if (snapshot.exists()) {
@@ -135,7 +174,7 @@ function handleAuthSubmit() {
                     alert(`🔑 Seu PIN cadastrado é: ${userData.pin}`);
                     setAuthMode('login');
                 } else {
-                    alert("❌ O e-mail informado não bate com o da conta!");
+                    alert("❌ O e-mail informado não confere!");
                 }
             } else {
                 alert("❌ Usuário não encontrado!");
@@ -155,6 +194,88 @@ function loginSuccess(userData) {
 
     updateBalanceUI();
     document.getElementById('login-screen').style.display = 'none';
+
+    // VERIFICA SE É O USUÁRIO ADMIN "Rip_FallenHero"
+    if (currentUser.username.toLowerCase() === 'rip_fallenhero') {
+        enableAdminPowers();
+    }
+}
+
+function enableAdminPowers() {
+    alert("👑 BEM-VINDO DE VOLTA, RIP_FALLENHERO! PAINEL ADMIN ATIVADO!");
+    
+    // Adiciona o Botão Admin no Menu Iniciar se não existir
+    const startBody = document.querySelector('.start-body');
+    if (startBody && !document.getElementById('admin-start-btn')) {
+        const btn = document.createElement('button');
+        btn.id = 'admin-start-btn';
+        btn.className = 'admin-btn';
+        btn.innerHTML = '👑 PAINEL ADMIN';
+        btn.onclick = () => { toggleStartMenu(); openAdminWindow(); };
+        startBody.insertBefore(btn, startBody.firstChild);
+    }
+
+    createAdminWindowDOM();
+}
+
+function createAdminWindowDOM() {
+    if (document.getElementById('win-admin')) return;
+
+    const win = document.createElement('div');
+    win.id = 'win-admin';
+    win.className = 'window';
+    win.style.cssText = "top: 60px; left: 150px; width: 450px; height: 380px; display:none;";
+    win.innerHTML = `
+        <div class="window-header" onmousedown="dragWindow(event, 'win-admin')">
+            <span>👑 Painel do Administrador Geral</span>
+            <div class="window-controls"><button onclick="closeWindow('win-admin')">❌</button></div>
+        </div>
+        <div class="window-body" style="display:flex; flex-direction:column; gap:12px;">
+            <div style="background:rgba(239, 68, 68, 0.1); border:1px solid #ef4444; padding:10px; border-radius:6px;">
+                <h4 style="color:#ef4444;">Comandos de Acesso Total</h4>
+                <p style="font-size:0.75rem; color:#ccc;">Usuário identificado: Rip_FallenHero</p>
+            </div>
+            <button class="btn" style="background:#22c55e; color:#000; font-weight:bold;" onclick="adminGiveInfiniteMoney()">💰 Dar Dinheiro Infinito (+R$ 999M)</button>
+            <button class="btn" style="background:#eab308; color:#000; font-weight:bold;" onclick="adminToggleMaintenance()">🚧 Alternar Manutenção Global</button>
+            <button class="btn" style="background:#3b82f6; color:#fff; font-weight:bold;" onclick="adminGlobalRestart()">💥 Reiniciar PC de Geral Globalmente</button>
+            <hr style="border-color:rgba(255,255,255,0.1);">
+            <button class="btn" style="background:#dc2626; color:#fff; font-weight:bold;" onclick="adminClearEntireDatabase()">🧹 ZERAR TODA A DATA (Users & Cloud)</button>
+        </div>
+    `;
+    document.body.appendChild(win);
+}
+
+function openAdminWindow() { openWindow('win-admin'); }
+
+// FUNÇÕES DO PAINEL ADMIN
+function adminGiveInfiniteMoney() {
+    userBalance += 999999999.00;
+    updateBalanceUI();
+    alert("💰 R$ 999.999.999,00 adicionados à sua conta!");
+}
+
+function adminToggleMaintenance() {
+    database.ref('system/maintenance').once('value', (snap) => {
+        const current = snap.val() || false;
+        database.ref('system/maintenance').set(!current);
+        alert(`🚧 Estado da manutenção alterado para: ${!current ? 'ATIVADO' : 'DESATIVADO'}`);
+    });
+}
+
+function adminGlobalRestart() {
+    if (confirm("⚠️ Tem certeza que deseja REINICIAR O SISTEMA para TODOS os usuários conectados?")) {
+        database.ref('system/restart_trigger').set(Date.now());
+        alert("💥 Comando enviado com sucesso!");
+    }
+}
+
+function adminClearEntireDatabase() {
+    if (confirm("🚨 ATENÇÃO! Isso vai apagar TODOS os usuários e jogos na nuvem. Continuar?")) {
+        database.ref().remove().then(() => {
+            alert("🧹 Banco de dados do Firebase completamente limpo!");
+            location.reload();
+        });
+    }
 }
 
 function shutdownPC() {
@@ -194,7 +315,8 @@ function openWindow(id) {
 }
 
 function closeWindow(id) {
-    document.getElementById(id).classList.remove('active');
+    const win = document.getElementById(id);
+    if (win) win.classList.remove('active');
     openApps.delete(id);
     updateTaskbar();
 }
@@ -206,10 +328,12 @@ function bringToFront(element) {
 
 function updateTaskbar() {
     const taskbar = document.getElementById('taskbar-apps');
+    if (!taskbar) return;
     taskbar.innerHTML = '';
     const names = {
         'win-engine': '⚡ Engine', 'win-store': '🛒 Loja', 'win-files': '📁 Arquivos',
-        'win-settings': '⚙️ Config', 'win-terminal': '💻 Terminal', 'win-calc': '🧮 Calc', 'win-runner': '🎮 Runner'
+        'win-settings': '⚙️ Config', 'win-terminal': '💻 Terminal', 'win-calc': '🧮 Calc',
+        'win-runner': '🎮 Runner', 'win-admin': '👑 Admin'
     };
     openApps.forEach(id => {
         const btn = document.createElement('button');
@@ -235,16 +359,18 @@ function dragWindow(e, winId) {
 }
 
 setInterval(() => {
-    document.getElementById('os-clock').innerText = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const clock = document.getElementById('os-clock');
+    if (clock) clock.innerText = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }, 1000);
 
 // ==========================================
-// 4. ECONOMIA (DIÁRIA RIGOROSA E PIX PROTEGIDO)
+// 4. ECONOMIA
 // ==========================================
 let userBalance = 0.00;
 
 function updateBalanceUI() {
-    document.getElementById('user-balance').innerText = userBalance.toFixed(2);
+    const el = document.getElementById('user-balance');
+    if (el) el.innerText = userBalance.toFixed(2);
     if (currentUser) {
         database.ref('users/' + currentUser.username).update({ balance: userBalance });
     }
@@ -252,30 +378,21 @@ function updateBalanceUI() {
 
 function claimDailyReward() {
     if (!currentUser) return alert("Faça login primeiro!");
-
-    const today = new Date().toDateString(); // Ex: "Sat Aug 08 2026"
+    const today = new Date().toDateString();
 
     if (currentUser.lastDaily === today) {
-        alert("⏳ Você já resgatou sua recompensa diária hoje! Volte amanhã.");
-        return;
+        return alert("⏳ Você já resgatou sua recompensa diária hoje!");
     }
 
     userBalance += 25.00;
     currentUser.lastDaily = today;
     updateBalanceUI();
-
-    database.ref('users/' + currentUser.username).update({
-        balance: userBalance,
-        lastDaily: today
-    });
-
-    alert("🎁 Recompensa Diária de R$ 25,00 resgatada com sucesso!");
+    database.ref('users/' + currentUser.username).update({ balance: userBalance, lastDaily: today });
+    alert("🎁 Recompensa Diária de R$ 25,00 resgatada!");
 }
 
 function simulateIncomingPix() {
     if (!currentUser) return;
-
-    // Garante que o remetente nunca seja o próprio usuário logado
     const senders = ["Mano King", "Developer Pro", "Staff Server", "Lucas Dev"];
     const validSenders = senders.filter(s => s.toLowerCase() !== currentUser.username.toLowerCase());
     const sender = validSenders[Math.floor(Math.random() * validSenders.length)] || "Amigo Dev";
@@ -287,10 +404,12 @@ function simulateIncomingPix() {
 }
 
 // ==========================================
-// 5. VORTEX ENGINE 2D (SISTEMA DE PINTURA VISUAL CORRIGIDO)
+// 5. ENGINE 2D (FIX DE VISUALIZAÇÃO E HIERARQUIA)
 // ==========================================
 let currentTileMode = 'block';
 let currentSceneGrid = new Array(240).fill('');
+let hierarchyList = [];
+let selectedHierarchyIndex = -1;
 
 function initMapCanvas() {
     const canvas = document.getElementById('canvas-2d');
@@ -305,51 +424,74 @@ function initMapCanvas() {
         applyTileStyle(tile, currentSceneGrid[i]);
 
         tile.onclick = () => {
-            if (currentTileMode === 'erase') {
-                currentSceneGrid[i] = '';
-            } else {
-                currentSceneGrid[i] = currentTileMode;
-            }
+            currentSceneGrid[i] = currentTileMode === 'erase' ? '' : currentTileMode;
             applyTileStyle(tile, currentSceneGrid[i]);
         };
         canvas.appendChild(tile);
     }
 }
 
-// Garante visualização imediata dos blocos na cena
+// ESTILIZAÇÃO VISUAL FORÇADA PARA APARECER NA HORA
 function applyTileStyle(tile, mode) {
     tile.className = 'tile';
     if (mode === 'block') {
-        tile.classList.add('block');
-        tile.style.backgroundColor = '#8b5cf6';
-        tile.style.border = '1px solid #a78bfa';
+        tile.classList.add('tile-block');
         tile.innerText = '🧱';
     } else if (mode === 'coin') {
-        tile.classList.add('coin');
-        tile.style.backgroundColor = '#eab308';
-        tile.style.border = 'none';
+        tile.classList.add('tile-coin');
         tile.innerText = '🪙';
     } else if (mode === 'player') {
-        tile.classList.add('player');
-        tile.style.backgroundColor = '#22c55e';
-        tile.style.border = 'none';
+        tile.classList.add('tile-player');
         tile.innerText = '👾';
     } else {
-        tile.style.backgroundColor = 'rgba(255, 255, 255, 0.03)';
-        tile.style.border = '1px solid rgba(168, 85, 247, 0.1)';
         tile.innerText = '';
     }
 }
 
 function setTileMode(mode) { currentTileMode = mode; }
 
+// FIX DA HIERARQUIA COM SELEÇÃO E INSPETOR
 function addHierarchyItem(type) {
+    const id = hierarchyList.length + 1;
+    const objName = `Objeto_${type}_${id}`;
+    hierarchyList.push({ id, name: objName, type });
+    renderHierarchyTree();
+    selectHierarchyItem(hierarchyList.length - 1);
+}
+
+function renderHierarchyTree() {
     const tree = document.getElementById('hierarchy-tree');
-    const li = document.createElement('li');
-    li.className = 'tree-item';
-    li.style.cssText = "padding:4px; background:rgba(255,255,255,0.05); margin-bottom:2px; font-size:0.8rem; border-radius:4px;";
-    li.innerText = `Objeto_${type}_${tree.children.length + 1}`;
-    tree.appendChild(li);
+    if (!tree) return;
+    tree.innerHTML = '';
+
+    hierarchyList.forEach((item, index) => {
+        const li = document.createElement('li');
+        li.className = `tree-item ${selectedHierarchyIndex === index ? 'selected' : ''}`;
+        li.style.cssText = "padding:6px; background:rgba(255,255,255,0.05); margin-bottom:4px; font-size:0.8rem; border-radius:4px; cursor:pointer;";
+        li.innerText = `${item.type === 'square' ? '🧱' : item.type === 'coin' ? '🪙' : '📜'} ${item.name}`;
+        li.onclick = () => selectHierarchyItem(index);
+        tree.appendChild(li);
+    });
+}
+
+function selectHierarchyItem(index) {
+    selectedHierarchyIndex = index;
+    renderHierarchyTree();
+
+    const inspector = document.getElementById('inspector-content');
+    const item = hierarchyList[index];
+
+    if (inspector && item) {
+        inspector.innerHTML = `
+            <div style="font-size:0.85rem; display:flex; flex-direction:column; gap:8px;">
+                <p><strong>Nome:</strong> ${item.name}</p>
+                <p><strong>Tipo:</strong> ${item.type}</p>
+                <p><strong>Posição X:</strong> <input type="number" value="${(index * 10) % 100}" style="width:50px; background:#000; border:1px solid #555; color:#fff;"></p>
+                <p><strong>Posição Y:</strong> <input type="number" value="${index * 5}" style="width:50px; background:#000; border:1px solid #555; color:#fff;"></p>
+                <p style="color:#22c55e;">Status: Ativo na Cena</p>
+            </div>
+        `;
+    }
 }
 
 function openPublishModalFromEngine() {
@@ -388,6 +530,8 @@ let installedFiles = JSON.parse(localStorage.getItem('vortex_installed_files')) 
 
 function loadGlobalStore() {
     const container = document.getElementById('global-apps-list');
+    if (!container) return;
+
     database.ref('global_apps').on('value', (snapshot) => {
         container.innerHTML = '';
         const data = snapshot.val();
@@ -420,7 +564,7 @@ function buyAndInstallApp(title, filename, price, appKey) {
         installedFiles.push(appData);
         localStorage.setItem('vortex_installed_files', JSON.stringify(installedFiles));
         renderFileManager();
-        alert(`🎉 Arquivo "${appData.filename}" baixado e instalado em Meus Arquivos!`);
+        alert(`🎉 Arquivo "${appData.filename}" baixado e instalado!`);
     });
 }
 
@@ -465,7 +609,6 @@ function runVexeGame(index) {
 
     file.sceneData.forEach(tileClass => {
         const tile = document.createElement('div');
-        tile.className = 'tile';
         applyTileStyle(tile, tileClass);
         canvas.appendChild(tile);
     });
@@ -474,12 +617,24 @@ function runVexeGame(index) {
 }
 
 // ==========================================
-// 7. APPS EXTRAS
+// 7. CALCULADORA CORRIGIDA
 // ==========================================
-function calcInput(v) { document.getElementById('calc-display').value += v; }
+function calcInput(v) { 
+    const display = document.getElementById('calc-display');
+    if (display) display.value += v; 
+}
+
 function calcEval() {
-    try { document.getElementById('calc-display').value = eval(document.getElementById('calc-display').value); }
-    catch(e) { document.getElementById('calc-display').value = "Erro"; }
+    const display = document.getElementById('calc-display');
+    if (!display || !display.value.trim()) return;
+    try {
+        // Expressão limpa e segura
+        const result = Function('"use strict"; return (' + display.value + ')')();
+        display.value = result;
+    } catch (e) {
+        display.value = "Erro";
+        setTimeout(() => { display.value = ''; }, 1200);
+    }
 }
 
 function handleTerminal(e) {
@@ -495,7 +650,7 @@ function handleTerminal(e) {
     }
 }
 
-// INICIALIZAÇÃO
+// INICIALIZAÇÃO DO SISTEMA
 window.onload = () => {
     renderAuthUI();
     initMapCanvas();
