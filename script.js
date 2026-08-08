@@ -1,6 +1,9 @@
 // ==========================================
-// 1. FIREBASE CONFIG
+// 🌀 VORTEX OS - VERSÃO 8.5
 // ==========================================
+const OS_VERSION = "8.5";
+
+// FIREBASE CONFIG
 const firebaseConfig = {
     apiKey: "AIzaSyCAC6tnKdPC6X2SwYWiMGZQI0GxwDq5SeA",
     authDomain: "vortex-os-971fc.firebaseapp.com",
@@ -15,32 +18,41 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
-// INJEÇÃO AUTOMÁTICA DE ESTILOS DENTRO DO JS (PARA NÃO PRECISAR MEXER NO CSS)
-(function injectGlobalFixStyles() {
+// INJEÇÃO AUTOMÁTICA DE ESTILOS E COMPONENTES VISUAIS DA V8.5
+(function initV85EngineAndStyles() {
+    document.title = `Vortex ${OS_VERSION}`;
+
     const style = document.createElement('style');
     style.innerHTML = `
-        .tile { display: flex !important; align-items: center !important; justify-content: center !important; font-size: 1rem !important; cursor: pointer; min-height: 25px; }
-        .tile-block { background-color: #8b5cf6 !important; border: 1px solid #a78bfa !important; box-shadow: inset 0 0 5px rgba(0,0,0,0.5); }
-        .tile-coin { background-color: #eab308 !important; border-radius: 50% !important; border: 1px solid #fde047 !important; }
+        /* SCROLL NA LOJA */
+        .apps-grid { max-height: 330px !important; overflow-y: auto !important; padding-right: 5px; }
+        .apps-grid::-webkit-scrollbar { width: 6px; }
+        .apps-grid::-webkit-scrollbar-thumb { background: #a855f7; border-radius: 4px; }
+
+        /* VISUALIZAÇÃO DOS BLOCOS 2D */
+        .grid-canvas { display: grid !important; grid-template-columns: repeat(20, 1fr) !important; grid-template-rows: repeat(12, 1fr) !important; gap: 1px !important; background: #000 !important; }
+        .tile { display: flex !important; align-items: center !important; justify-content: center !important; font-size: 0.9rem !important; cursor: pointer; min-height: 25px; border: 1px solid rgba(255,255,255,0.05); }
+        .tile-block { background-color: #8b5cf6 !important; border: 1px solid #a78bfa !important; }
+        .tile-coin { background-color: #eab308 !important; border-radius: 50% !important; }
         .tile-player { background-color: #22c55e !important; border-radius: 4px !important; }
-        .tree-item.selected { background: #a855f7 !important; color: #fff !important; font-weight: bold; border: 1px solid #c084fc; }
-        .admin-btn { background: linear-gradient(135deg, #ef4444, #b91c1c) !important; color: white !important; font-weight: bold; border-radius: 4px; padding: 6px 12px; cursor: pointer; }
+        
+        .tree-item.selected { background: #a855f7 !important; color: #fff !important; font-weight: bold; }
+        .admin-btn { background: linear-gradient(135deg, #ef4444, #b91c1c) !important; color: white !important; font-weight: bold; border-radius: 4px; padding: 6px 12px; cursor: pointer; margin-bottom: 5px; }
     `;
     document.head.appendChild(style);
 })();
 
 // ==========================================
-// 2. SISTEMA DE AUTENTICAÇÃO E ADMIN
+// 1. AUTENTICAÇÃO E PAINEL ADMIN FIX
 // ==========================================
 let currentUser = null;
 let authMode = 'login';
 let lastGlobalRestart = 0;
 
-// OUVINTE EM TEMPO REAL PARA COMANDOS GLOBAIS DE ADMIN (MANUTENÇÃO E RESTART)
+// OUVINTE EM TEMPO REAL (MANUTENÇÃO E RESTART)
 database.ref('system').on('value', (snapshot) => {
     const sysData = snapshot.val() || {};
     
-    // 1. Verificação de Manutenção Global
     let maintOverlay = document.getElementById('maintenance-screen');
     if (sysData.maintenance) {
         if (!maintOverlay) {
@@ -48,7 +60,7 @@ database.ref('system').on('value', (snapshot) => {
             maintOverlay.id = 'maintenance-screen';
             maintOverlay.className = 'full-overlay';
             maintOverlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:#111; color:#ff4757; display:flex; flex-direction:column; justify-content:center; align-items:center; z-index:999999; text-align:center;";
-            maintOverlay.innerHTML = `<h1>🚧 VORTEX OS EM MANUTENÇÃO 🚧</h1><p style="color:#ccc; margin-top:10px;">O administrador geral colocou o sistema em manutenção temporária.</p>`;
+            maintOverlay.innerHTML = `<h1>🚧 VORTEX OS EM MANUTENÇÃO 🚧</h1><p style="color:#ccc; margin-top:10px;">O administrador colocou o sistema em manutenção.</p>`;
             document.body.appendChild(maintOverlay);
         }
         maintOverlay.style.display = 'flex';
@@ -56,10 +68,9 @@ database.ref('system').on('value', (snapshot) => {
         maintOverlay.style.display = 'none';
     }
 
-    // 2. Verificação de Reinicialização Global
     if (sysData.restart_trigger && sysData.restart_trigger > lastGlobalRestart) {
         if (lastGlobalRestart !== 0) {
-            alert("💥 O Administrador enviou um comando de reinicialização global!");
+            alert("💥 O Administrador reiniciou o sistema globalmente!");
             location.reload();
         }
         lastGlobalRestart = sysData.restart_trigger;
@@ -73,7 +84,7 @@ function renderAuthUI() {
     if (authMode === 'login') {
         card.innerHTML = `
             <div class="auth-header">
-                <h2>🌀 Vortex OS</h2>
+                <h2>🌀 Vortex OS v${OS_VERSION}</h2>
                 <p>Acesse sua conta</p>
             </div>
             <div class="auth-form" style="display:flex; flex-direction:column; gap:10px;">
@@ -120,10 +131,7 @@ function renderAuthUI() {
     }
 }
 
-function setAuthMode(mode) {
-    authMode = mode;
-    renderAuthUI();
-}
+function setAuthMode(mode) { authMode = mode; renderAuthUI(); }
 
 function handleAuthSubmit() {
     const usernameInput = document.getElementById('auth-username');
@@ -195,27 +203,27 @@ function loginSuccess(userData) {
     updateBalanceUI();
     document.getElementById('login-screen').style.display = 'none';
 
-    // VERIFICA SE É O USUÁRIO ADMIN "Rip_FallenHero"
+    // CHECAGEM DE ADMIN PARA RIP_FALLENHERO
     if (currentUser.username.toLowerCase() === 'rip_fallenhero') {
         enableAdminPowers();
     }
+
+    loadGlobalStore();
 }
 
 function enableAdminPowers() {
-    alert("👑 BEM-VINDO DE VOLTA, RIP_FALLENHERO! PAINEL ADMIN ATIVADO!");
+    createAdminWindowDOM();
     
-    // Adiciona o Botão Admin no Menu Iniciar se não existir
     const startBody = document.querySelector('.start-body');
     if (startBody && !document.getElementById('admin-start-btn')) {
         const btn = document.createElement('button');
         btn.id = 'admin-start-btn';
         btn.className = 'admin-btn';
         btn.innerHTML = '👑 PAINEL ADMIN';
-        btn.onclick = () => { toggleStartMenu(); openAdminWindow(); };
+        btn.onclick = () => { toggleStartMenu(); openWindow('win-admin'); };
         startBody.insertBefore(btn, startBody.firstChild);
     }
-
-    createAdminWindowDOM();
+    alert("👑 PAINEL DE ADMINISTRADOR ATIVADO PARA RIP_FALLENHERO!");
 }
 
 function createAdminWindowDOM() {
@@ -227,61 +235,51 @@ function createAdminWindowDOM() {
     win.style.cssText = "top: 60px; left: 150px; width: 450px; height: 380px; display:none;";
     win.innerHTML = `
         <div class="window-header" onmousedown="dragWindow(event, 'win-admin')">
-            <span>👑 Painel do Administrador Geral</span>
+            <span>👑 Painel de Admin Geral</span>
             <div class="window-controls"><button onclick="closeWindow('win-admin')">❌</button></div>
         </div>
         <div class="window-body" style="display:flex; flex-direction:column; gap:12px;">
             <div style="background:rgba(239, 68, 68, 0.1); border:1px solid #ef4444; padding:10px; border-radius:6px;">
-                <h4 style="color:#ef4444;">Comandos de Acesso Total</h4>
-                <p style="font-size:0.75rem; color:#ccc;">Usuário identificado: Rip_FallenHero</p>
+                <h4 style="color:#ef4444;">Modo Administrador Supremod</h4>
+                <p style="font-size:0.75rem; color:#ccc;">Logado como: Rip_FallenHero</p>
             </div>
-            <button class="btn" style="background:#22c55e; color:#000; font-weight:bold;" onclick="adminGiveInfiniteMoney()">💰 Dar Dinheiro Infinito (+R$ 999M)</button>
+            <button class="btn" style="background:#22c55e; color:#000; font-weight:bold;" onclick="adminGiveInfiniteMoney()">💰 Dinheiro Infinito (+R$ 999M)</button>
             <button class="btn" style="background:#eab308; color:#000; font-weight:bold;" onclick="adminToggleMaintenance()">🚧 Alternar Manutenção Global</button>
             <button class="btn" style="background:#3b82f6; color:#fff; font-weight:bold;" onclick="adminGlobalRestart()">💥 Reiniciar PC de Geral Globalmente</button>
             <hr style="border-color:rgba(255,255,255,0.1);">
-            <button class="btn" style="background:#dc2626; color:#fff; font-weight:bold;" onclick="adminClearEntireDatabase()">🧹 ZERAR TODA A DATA (Users & Cloud)</button>
+            <button class="btn" style="background:#dc2626; color:#fff; font-weight:bold;" onclick="adminClearEntireDatabase()">🧹 ZERAR BANCO DE DADOS COMPLETO</button>
         </div>
     `;
     document.body.appendChild(win);
 }
 
-function openAdminWindow() { openWindow('win-admin'); }
-
-// FUNÇÕES DO PAINEL ADMIN
 function adminGiveInfiniteMoney() {
     userBalance += 999999999.00;
     updateBalanceUI();
-    alert("💰 R$ 999.999.999,00 adicionados à sua conta!");
+    alert("💰 R$ 999.999.999,00 adicionados!");
 }
 
 function adminToggleMaintenance() {
     database.ref('system/maintenance').once('value', (snap) => {
         const current = snap.val() || false;
         database.ref('system/maintenance').set(!current);
-        alert(`🚧 Estado da manutenção alterado para: ${!current ? 'ATIVADO' : 'DESATIVADO'}`);
+        alert(`🚧 Manutenção alterada para: ${!current ? 'ATIVADA' : 'DESATIVADA'}`);
     });
 }
 
 function adminGlobalRestart() {
-    if (confirm("⚠️ Tem certeza que deseja REINICIAR O SISTEMA para TODOS os usuários conectados?")) {
+    if (confirm("Reiniciar PC de todo mundo online?")) {
         database.ref('system/restart_trigger').set(Date.now());
-        alert("💥 Comando enviado com sucesso!");
     }
 }
 
 function adminClearEntireDatabase() {
-    if (confirm("🚨 ATENÇÃO! Isso vai apagar TODOS os usuários e jogos na nuvem. Continuar?")) {
-        database.ref().remove().then(() => {
-            alert("🧹 Banco de dados do Firebase completamente limpo!");
-            location.reload();
-        });
+    if (confirm("🚨 Apagar todos os usuários e dados da nuvem?")) {
+        database.ref().remove().then(() => { location.reload(); });
     }
 }
 
-function shutdownPC() {
-    document.getElementById('shutdown-screen').style.display = 'flex';
-}
-
+function shutdownPC() { document.getElementById('shutdown-screen').style.display = 'flex'; }
 function powerOn() {
     document.getElementById('shutdown-screen').style.display = 'none';
     document.getElementById('login-screen').style.display = 'flex';
@@ -289,7 +287,7 @@ function powerOn() {
 }
 
 // ==========================================
-// 3. GERENCIAMENTO DO SO
+// 2. GERENCIAMENTO DO SISTEMA OPERACIONAL
 // ==========================================
 let highestZIndex = 100;
 let openApps = new Set();
@@ -333,7 +331,7 @@ function updateTaskbar() {
     const names = {
         'win-engine': '⚡ Engine', 'win-store': '🛒 Loja', 'win-files': '📁 Arquivos',
         'win-settings': '⚙️ Config', 'win-terminal': '💻 Terminal', 'win-calc': '🧮 Calc',
-        'win-runner': '🎮 Runner', 'win-admin': '👑 Admin'
+        'win-runner': '🎮 Runner', 'win-admin': '👑 Admin', 'win-vscode': '📝 VS Code'
     };
     openApps.forEach(id => {
         const btn = document.createElement('button');
@@ -364,7 +362,7 @@ setInterval(() => {
 }, 1000);
 
 // ==========================================
-// 4. ECONOMIA
+// 3. ECONOMIA
 // ==========================================
 let userBalance = 0.00;
 
@@ -404,7 +402,7 @@ function simulateIncomingPix() {
 }
 
 // ==========================================
-// 5. ENGINE 2D (FIX DE VISUALIZAÇÃO E HIERARQUIA)
+// 4. ENGINE 2D (FIX DOS BLOCOS VISÍVEIS)
 // ==========================================
 let currentTileMode = 'block';
 let currentSceneGrid = new Array(240).fill('');
@@ -431,7 +429,6 @@ function initMapCanvas() {
     }
 }
 
-// ESTILIZAÇÃO VISUAL FORÇADA PARA APARECER NA HORA
 function applyTileStyle(tile, mode) {
     tile.className = 'tile';
     if (mode === 'block') {
@@ -450,7 +447,6 @@ function applyTileStyle(tile, mode) {
 
 function setTileMode(mode) { currentTileMode = mode; }
 
-// FIX DA HIERARQUIA COM SELEÇÃO E INSPETOR
 function addHierarchyItem(type) {
     const id = hierarchyList.length + 1;
     const objName = `Objeto_${type}_${id}`;
@@ -486,8 +482,7 @@ function selectHierarchyItem(index) {
             <div style="font-size:0.85rem; display:flex; flex-direction:column; gap:8px;">
                 <p><strong>Nome:</strong> ${item.name}</p>
                 <p><strong>Tipo:</strong> ${item.type}</p>
-                <p><strong>Posição X:</strong> <input type="number" value="${(index * 10) % 100}" style="width:50px; background:#000; border:1px solid #555; color:#fff;"></p>
-                <p><strong>Posição Y:</strong> <input type="number" value="${index * 5}" style="width:50px; background:#000; border:1px solid #555; color:#fff;"></p>
+                <p><strong>Linguagem:</strong> Vortex Script (.vortex)</p>
                 <p style="color:#22c55e;">Status: Ativo na Cena</p>
             </div>
         `;
@@ -524,7 +519,58 @@ function compileAndPublishEngineGame() {
 }
 
 // ==========================================
-// 6. LOJA GLOBAL E GERENCIADOR DE ARQUIVOS
+// 5. VORTEX CODE STUDIO (VS CODE) & .VORTEX
+// ==========================================
+function createVSCodeDOM() {
+    if (document.getElementById('win-vscode')) return;
+
+    const win = document.createElement('div');
+    win.id = 'win-vscode';
+    win.className = 'window';
+    win.style.cssText = "top: 70px; left: 160px; width: 620px; height: 420px; display:none;";
+    win.innerHTML = `
+        <div class="window-header" onmousedown="dragWindow(event, 'win-vscode')">
+            <span>📝 Vortex Code Studio (Editor .vortex)</span>
+            <div class="window-controls"><button onclick="closeWindow('win-vscode')">❌</button></div>
+        </div>
+        <div class="window-body" style="display:flex; flex-direction:column; gap:8px; background:#1e1e1e; color:#d4d4d4;">
+            <div style="display:flex; gap:10px; align-items:center;">
+                <input type="text" id="vortex-filename" placeholder="nome_do_script" value="meu_script" style="padding:4px 8px; background:#2d2d2d; border:1px solid #444; color:#fff; border-radius:4px; font-family:monospace;">
+                <span style="color:#a78bfa; font-weight:bold;">.vortex</span>
+                <button class="btn btn-primary" onclick="saveVortexScriptFile()" style="margin-left:auto;">💾 Salvar Arquivo</button>
+            </div>
+            <textarea id="vortex-code-editor" style="flex:1; background:#181818; color:#9cdcfe; font-family:monospace; padding:10px; border:1px solid #333; outline:none; resize:none; font-size:0.9rem;" placeholder="// Digite seu código na Linguagem Vortex...&#10;vortex.onCreate(() => {&#10;   vortex.print('Vortex OS Engine Online!');&#10;});"></textarea>
+        </div>
+    `;
+    document.body.appendChild(win);
+
+    // Adiciona Ícone no Desktop se não existir
+    const desktop = document.getElementById('desktop');
+    if (desktop && !document.getElementById('icon-vscode')) {
+        const icon = document.createElement('div');
+        icon.id = 'icon-vscode';
+        icon.className = 'desktop-icon';
+        icon.onclick = () => openWindow('win-vscode');
+        icon.innerHTML = `<div class="icon-img">📝</div><span>VS Code</span>`;
+        desktop.appendChild(icon);
+    }
+}
+
+function saveVortexScriptFile() {
+    const nameInput = document.getElementById('vortex-filename').value.trim();
+    const code = document.getElementById('vortex-code-editor').value;
+
+    if (!nameInput) return alert("Digite um nome para o arquivo .vortex!");
+
+    const fileName = `${nameInput.toLowerCase().replace(/\s+/g, '_')}.vortex`;
+    installedFiles.push({ title: nameInput, filename: fileName, type: 'vortex', code: code });
+    localStorage.setItem('vortex_installed_files', JSON.stringify(installedFiles));
+    renderFileManager();
+    alert(`📄 Arquivo "${fileName}" criado e salvo em Meus Arquivos!`);
+}
+
+// ==========================================
+// 6. LOJA GLOBAL (REMOÇÃO + SCROLL) E ARQUIVOS
 // ==========================================
 let installedFiles = JSON.parse(localStorage.getItem('vortex_installed_files')) || [];
 
@@ -539,6 +585,8 @@ function loadGlobalStore() {
 
         Object.keys(data).forEach(key => {
             const app = data[key];
+            const isOwner = currentUser && (app.author === currentUser.username || currentUser.username.toLowerCase() === 'rip_fallenhero');
+            
             const card = document.createElement('div');
             card.className = 'app-card';
             card.innerHTML = `
@@ -546,11 +594,22 @@ function loadGlobalStore() {
                 <p><small>Build: ${app.filename || 'app.vexe'}</small></p>
                 <p><small>Por: ${app.author}</small></p>
                 <p style="color:#22c55e;"><strong>R$ ${app.price.toFixed(2)}</strong></p>
-                <button class="btn btn-primary" onclick="buyAndInstallApp('${app.title}', '${app.filename}', ${app.price}, '${key}')">🛒 Baixar .vexe</button>
+                <div style="display:flex; gap:5px;">
+                    <button class="btn btn-primary" style="flex:1;" onclick="buyAndInstallApp('${app.title}', '${app.filename}', ${app.price}, '${key}')">🛒 Baixar</button>
+                    ${isOwner ? `<button class="btn" style="background:#dc2626;" onclick="removeAppFromStore('${key}', '${app.title}')">🗑️</button>` : ''}
+                </div>
             `;
             container.appendChild(card);
         });
     });
+}
+
+function removeAppFromStore(key, title) {
+    if (confirm(`Tem certeza que deseja remover "${title}" da Loja Global?`)) {
+        database.ref('global_apps/' + key).remove().then(() => {
+            alert(`🗑️ Jogo "${title}" removido da loja com sucesso!`);
+        });
+    }
 }
 
 function buyAndInstallApp(title, filename, price, appKey) {
@@ -574,23 +633,32 @@ function renderFileManager() {
     container.innerHTML = '';
 
     if (installedFiles.length === 0) {
-        container.innerHTML = '<p style="font-size:0.85rem; color:#888;">Nenhum executável .vexe instalado.</p>';
+        container.innerHTML = '<p style="font-size:0.85rem; color:#888;">Nenhum arquivo .vexe ou .vortex encontrado.</p>';
         return;
     }
 
     installedFiles.forEach((file, index) => {
+        const isVortex = file.filename && file.filename.endsWith('.vortex');
         const card = document.createElement('div');
         card.className = 'file-card';
         card.innerHTML = `
-            <div><strong>📄 ${file.filename || file.title + '.vexe'}</strong></div>
-            <div style="font-size: 0.75rem; color: #a78bfa;">Tamanho: 24 KB</div>
+            <div><strong>${isVortex ? '📝' : '📄'} ${file.filename || file.title + '.vexe'}</strong></div>
+            <div style="font-size: 0.75rem; color: #a78bfa;">Tipo: ${isVortex ? 'Código Vortex' : 'Executável Exec'}</div>
             <div style="display: flex; gap: 5px; margin-top: 5px;">
-                <button class="btn btn-primary" style="flex:1;" onclick="runVexeGame(${index})">▶️ Executar</button>
+                <button class="btn btn-primary" style="flex:1;" onclick="${isVortex ? `openVortexScriptInEditor(${index})` : `runVexeGame(${index})`}">${isVortex ? '✏️ Editar' : '▶️ Executar'}</button>
                 <button class="btn" style="background:#dc2626;" onclick="uninstallFile(${index})">🗑️</button>
             </div>
         `;
         container.appendChild(card);
     });
+}
+
+function openVortexScriptInEditor(index) {
+    const file = installedFiles[index];
+    if (!file) return;
+    openWindow('win-vscode');
+    document.getElementById('vortex-filename').value = file.title || 'script';
+    document.getElementById('vortex-code-editor').value = file.code || '';
 }
 
 function uninstallFile(index) {
@@ -601,7 +669,7 @@ function uninstallFile(index) {
 
 function runVexeGame(index) {
     const file = installedFiles[index];
-    if (!file || !file.sceneData) return alert("Erro ao carregar os dados do arquivo .vexe!");
+    if (!file || !file.sceneData) return alert("Erro ao carregar o arquivo .vexe!");
 
     document.getElementById('runner-title').innerText = `🎮 Executando: ${file.title} (${file.filename})`;
     const canvas = document.getElementById('runner-canvas');
@@ -617,7 +685,7 @@ function runVexeGame(index) {
 }
 
 // ==========================================
-// 7. CALCULADORA CORRIGIDA
+// 7. CALCULADORA & TERMINAL
 // ==========================================
 function calcInput(v) { 
     const display = document.getElementById('calc-display');
@@ -628,7 +696,6 @@ function calcEval() {
     const display = document.getElementById('calc-display');
     if (!display || !display.value.trim()) return;
     try {
-        // Expressão limpa e segura
         const result = Function('"use strict"; return (' + display.value + ')')();
         display.value = result;
     } catch (e) {
@@ -643,17 +710,18 @@ function handleTerminal(e) {
         const out = document.getElementById('terminal-output');
         out.innerHTML += `> ${input.value}<br>`;
         if (input.value === 'clear') out.innerHTML = '';
-        else if (input.value === 'help') out.innerHTML += `Comandos: clear, help, status<br>`;
-        else if (input.value === 'status') out.innerHTML += `Vortex OS Kernel v8.0 OK.<br>`;
+        else if (input.value === 'help') out.innerHTML += `Comandos: clear, help, status, version<br>`;
+        else if (input.value === 'version') out.innerHTML += `Vortex OS Kernel v${OS_VERSION} Online.<br>`;
         else out.innerHTML += `Comando não reconhecido.<br>`;
         input.value = '';
     }
 }
 
-// INICIALIZAÇÃO DO SISTEMA
+// INICIALIZAÇÃO
 window.onload = () => {
     renderAuthUI();
     initMapCanvas();
+    createVSCodeDOM();
     loadGlobalStore();
     renderFileManager();
 };
