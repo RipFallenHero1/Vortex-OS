@@ -3,38 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vortex Engine & Ecosystem v7.5</title>
+    <title>Vortex OS v7.5</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Firebase SDKs (Compat v9/v10 para navegador) -->
+    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
 </head>
 <body>
 
-    <!-- BARRA SUPERIOR / NAVEGAÇÃO & ECONOMIA -->
-    <header class="topbar">
-        <div class="logo">⚡ Vortex Engine <small>v7.5</small></div>
-        
-        <div class="economy-bar">
-            <span class="wallet">💰 Saldo: R$ <strong id="user-balance">0.00</strong></span>
-            <button class="btn btn-reward" onclick="claimDailyReward()">🎁 Recompensa Diária</button>
-            <button class="btn btn-pix" onclick="simulateIncomingPix()">💸 Receber Pix</button>
+    <!-- ÁREA DE TRABALHO (DESKTOP) -->
+    <div id="desktop" class="desktop">
+        <!-- ÍCONES DOS APLICATIVOS -->
+        <div class="desktop-icon" onclick="openWindow('win-engine')">
+            <div class="icon-img">⚡</div>
+            <span>Vortex Engine</span>
         </div>
 
-        <nav class="nav-tabs">
-            <button class="tab-btn active" onclick="switchTab('engine')">🎮 Engine 2D</button>
-            <button class="tab-btn" onclick="switchTab('store')">🌐 Loja Global</button>
-        </nav>
-    </header>
+        <div class="desktop-icon" onclick="openWindow('win-store')">
+            <div class="icon-img">🛒</div>
+            <span>Loja Global</span>
+        </div>
 
-    <!-- ÁREA PRINCIPAL -->
-    <main class="main-container">
+        <div class="desktop-icon" onclick="openWindow('win-files')">
+            <div class="icon-img">📁</div>
+            <span>Meus Arquivos</span>
+        </div>
 
-        <!-- ABA 1: VORTEX ENGINE 2D -->
-        <section id="tab-engine" class="tab-content active">
+        <div class="desktop-icon" onclick="openWindow('win-settings')">
+            <div class="icon-img">⚙️</div>
+            <span>Configurações</span>
+        </div>
+    </div>
+
+    <!-- JANELA 1: VORTEX ENGINE 2D -->
+    <div id="win-engine" class="window">
+        <div class="window-header">
+            <span>⚡ Vortex Engine 2D - Desenvolvimento</span>
+            <div class="window-controls">
+                <button onclick="closeWindow('win-engine')">❌</button>
+            </div>
+        </div>
+        <div class="window-body">
             <div class="engine-layout">
-                
-                <!-- HIERARQUIA (PASTAS, OBJETOS, SCRIPTS) -->
                 <aside class="panel hierarchy-panel">
                     <h3>📂 Hierarquia</h3>
                     <div class="panel-actions">
@@ -44,53 +54,99 @@
                         <button onclick="addHierarchyItem('button')">+ Botão UI</button>
                         <button onclick="addHierarchyItem('script')">+ Script</button>
                     </div>
-                    <ul id="hierarchy-tree" class="tree-list">
-                        <!-- Itens gerados via JS -->
-                    </ul>
+                    <ul id="hierarchy-tree" class="tree-list"></ul>
                 </aside>
 
-                <!-- VIEWPORT / MAP BUILDER 2D -->
                 <section class="panel viewport-panel">
                     <div class="viewport-header">
                         <span>🗺️ CENA 2D / MAP BUILDER</span>
                         <div class="map-controls">
-                            <label>Ferramenta de Mapa:</label>
                             <button onclick="setTileMode('block')">🧱 Bloco</button>
                             <button onclick="setTileMode('coin')">🪙 Moeda</button>
                             <button onclick="setTileMode('erase')">❌ Borracha</button>
                         </div>
                     </div>
-                    <div id="canvas-2d" class="grid-canvas">
-                        <!-- Grid 2D interativo -->
-                    </div>
+                    <div id="canvas-2d" class="grid-canvas"></div>
                 </section>
 
-                <!-- INSPECTOR & PROPRIEDADES -->
                 <aside class="panel inspector-panel">
                     <h3>⚙️ Inspetor</h3>
                     <div id="inspector-content">
-                        <p class="placeholder-text">Selecione um elemento na hierarquia.</p>
+                        <p class="placeholder-text">Selecione um elemento.</p>
                     </div>
                 </aside>
-
             </div>
-        </section>
+        </div>
+    </div>
 
-        <!-- ABA 2: LOJA GLOBAL (FIREBASE) -->
-        <section id="tab-store" class="tab-content">
-            <div class="store-layout">
-                <div class="store-header">
-                    <h2>🛒 Loja Global de Jogos & Apps</h2>
-                    <button class="btn btn-primary" onclick="openPublishModal()">➕ Publicar Meu Jogo</button>
-                </div>
-
-                <div id="global-apps-list" class="apps-grid">
-                    <p>Carregando aplicativos da nuvem...</p>
-                </div>
+    <!-- JANELA 2: LOJA GLOBAL (FIREBASE) -->
+    <div id="win-store" class="window">
+        <div class="window-header">
+            <span>🛒 Vortex Global Store & Economia</span>
+            <div class="window-controls">
+                <button onclick="closeWindow('win-store')">❌</button>
             </div>
-        </section>
+        </div>
+        <div class="window-body store-layout">
+            <div class="store-header">
+                <h2>Loja Global de Jogos & Apps</h2>
+                <button class="btn btn-primary" onclick="openPublishModal()">➕ Publicar Meu Jogo</button>
+            </div>
+            <div id="global-apps-list" class="apps-grid">
+                <p>Conectando ao banco de dados global...</p>
+            </div>
+        </div>
+    </div>
 
-    </main>
+    <!-- JANELA 3: GERENCIADOR DE ARQUIVOS -->
+    <div id="win-files" class="window">
+        <div class="window-header">
+            <span>📁 Gerenciador de Arquivos do SO</span>
+            <div class="window-controls">
+                <button onclick="closeWindow('win-files')">❌</button>
+            </div>
+        </div>
+        <div class="window-body">
+            <p><strong>Projetos Salvos Localmente:</strong></p>
+            <ul id="file-list" style="margin-top: 10px; list-style: none;">
+                <li>📄 Projeto_MeuJogo_v1.vortex</li>
+                <li>📄 Script_Inimigo.js</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- JANELA 4: CONFIGURAÇÕES -->
+    <div id="win-settings" class="window">
+        <div class="window-header">
+            <span>⚙️ Configurações do Sistema</span>
+            <div class="window-controls">
+                <button onclick="closeWindow('win-settings')">❌</button>
+            </div>
+        </div>
+        <div class="window-body">
+            <h3>Vortex OS - Versão 7.5</h3>
+            <p style="margin-top:10px;">Status da Rede Firebase: <span id="firebase-status">Checando...</span></p>
+            <button class="btn btn-primary" style="margin-top:15px;" onclick="resetOS()">🔄 Resetar Configurações do SO</button>
+        </div>
+    </div>
+
+    <!-- BARRA DE TAREFAS (TASKBAR DO SO) -->
+    <footer class="taskbar">
+        <button class="start-btn">⚡ Vortex OS</button>
+        
+        <div class="taskbar-apps">
+            <button class="task-app" onclick="toggleWindow('win-engine')">🎮 Engine</button>
+            <button class="task-app" onclick="toggleWindow('win-store')">🛒 Loja</button>
+            <button class="task-app" onclick="toggleWindow('win-files')">📁 Arquivos</button>
+        </div>
+
+        <div class="system-tray">
+            <span class="wallet">💰 R$ <strong id="user-balance">0.00</strong></span>
+            <button class="btn-sm" onclick="claimDailyReward()" title="Recompensa Diária">🎁</button>
+            <button class="btn-sm" onclick="simulateIncomingPix()" title="Receber Pix">💸</button>
+            <span id="os-clock">00:00</span>
+        </div>
+    </footer>
 
     <!-- MODAL DE PUBLICAÇÃO DE JOGO -->
     <div id="publish-modal" class="modal">
