@@ -277,29 +277,61 @@ function saveVortexScript(){const name=document.getElementById("vortex-filename"
 function runScriptFromStudio(){saveVortexScript();openWindow("win-engine");setTimeout(()=>{if(document.getElementById("engine-test-screen").style.display==="none")toggleEngineTestMode();},50);}
 
 function transpileVortexToJS(code){
-  const lines=String(code||"").split("\n"),out=[],stack=[0];
-  for(const raw of lines){
-    const clean=raw.split("#")[0],trim=clean.trim();if(!trim)continue;
-    const indent=raw.match(/^\s*/)[0].replace(/\t/g,"    ").length;
-    while(indent<stack.at(-1)){out.push("}");stack.pop();}
-    let x=trim.replace(/\bTrue\b/g,"true").replace(/\bFalse\b/g,"false").replace(/\bNone\b/g,"null").replace(/\band\b/g,"&&").replace(/\bor\b/g,"||").replace(/\bnot\s+/g,"!").replace(/\.append\(/g,".push(");
-    if(/^def\s+\w+\s*\(.*\)\s*:$/.test(x)){out.push(x.replace(/^def\s+(\w+)\s*\((.*)\)\s*:$/,"function $1($2) {"));stack.push(indent+4);}
-    else if(/^for\s+\w+\s+in\s+range\(.+\)\s*:$/.test(x)){const m=x.match(/^for\s+(\w+)\s+in\s+range\((.+)\)\s*:$/),p=m[2].split(",").map(a=>a.trim());out.push(p.length===1?`for(let ${m[1]}=0;${m[1]}<${p[0]};${m[1]}++){`:`for(let ${m[1]}=${p[0]};${m[1]}<${p[1]};${m[1]}+=${p[2]||1}){`);stack.push(indent+4);}
-    else if(/^for\s+\w+\s+in\s+.+:$/.test(x)){out.push(x.replace(/^for\s+(\w+)\s+in\s+(.+):$/,"for(let $1 of $2){"));stack.push(indent+4);}
-    else if(/^if\s+.+:$/.test(x)){out.push(x.replace(/^if\s+(.+):$/,"if($1){"));stack.push(indent+4);}
-    else if(/^elif\s+.+:$/.test(x)){out.push(x.replace(/^elif\s+(.+):$/,"}else if($1){"));stack.push(indent+4);}
-    else if(/^else\s*:$/.test(x)){out.push("}else{");stack.push(indent+4);}
-    else if(/^while\s+.+:$/.test(x)){out.push(x.replace(/^while\s+(.+):$/,"while($1){"));stack.push(indent+4);}
-    else {
-      x=x.replace(/\bprint\s*\(/g,"vortex.print(");
-      if(/^[a-zA-Z_$][a-zA-Z0-9_$]*\s*=\s*/.test(x) && !/^(let|var|const)\s/.test(x)){
-        x="var "+x;
+  // Normaliza aspas inteligentes se foram copiadas do chat
+  const safeCode = String(code||"").replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
+  const lines = safeCode.split("\n"), out = [], stack = [0];
+
+  for (const raw of lines) {
+    const clean = stripPythonComments(raw), trim = clean.trim();
+    if (!trim) continue;
+
+    const indent = raw.match(/^\s*/)[0].replace(/\t/g, "    ").length;
+    while (indent < stack.at(-1)) { out.push("}"); stack.pop(); }
+
+    let x = trim
+      .replace(/\bTrue\b/g, "true")
+      .replace(/\bFalse\b/g, "false")
+      .replace(/\bNone\b/g, "null")
+      .replace(/\band\b/g, "&&")
+      .replace(/\bor\b/g, "||")
+      .replace(/\bnot\s+/g, "!")
+      .replace(/\.append\(/g, ".push(");
+
+    if (/^def\s+\w+\s*\(.*\)\s*:$/.test(x)) {
+      out.push(x.replace(/^def\s+(\w+)\s*\((.*)\)\s*:$/, "function $1($2) {"));
+      stack.push(indent + 4);
+    } else if (/^for\s+\w+\s+in\s+range\(.+\)\s*:$/.test(x)) {
+      const m = x.match(/^for\s+(\w+)\s+in\s+range\((.+)\)\s*:$/), p = m[2].split(",").map(a => a.trim());
+      out.push(p.length === 1 ? `for(let ${m[1]}=0;${m[1]}<${p[0]};${m[1]}++){` : `for(let ${m[1]}=${p[0]};${m[1]}<${p[1]};${m[1]}+=${p[2]||1}){`);
+      stack.push(indent + 4);
+    } else if (/^for\s+\w+\s+in\s+.+:$/.test(x)) {
+      out.push(x.replace(/^for\s+(\w+)\s+in\s+(.+):$/, "for(let $1 of $2){"));
+      stack.push(indent + 4);
+    } else if (/^if\s+.+:$/.test(x)) {
+      out.push(x.replace(/^if\s+(.+):$/, "if($1){"));
+      stack.push(indent + 4);
+    } else if (/^elif\s+.+:$/.test(x)) {
+      out.push(x.replace(/^elif\s+(.+):$/, "}else if($1){"));
+      stack.push(indent + 4);
+    } else if (/^else\s*:$/.test(x)) {
+      out.push("}else{");
+      stack.push(indent + 4);
+    } else if (/^while\s+.+:$/.test(x)) {
+      out.push(x.replace(/^while\s+(.+):$/, "while($1){"));
+      stack.push(indent + 4);
+    } else {
+      x = x.replace(/\bprint\s*\(/g, "vortex.print(");
+      if (/^[a-zA-Z_$][a-zA-Z0-9_$]*\s*=\s*/.test(x) && !/^(let|var|const)\s/.test(x)) {
+        x = "var " + x;
       }
-      out.push(/[;{}]$/.test(x)?x:x+";");
+      out.push(/[;{}]$/.test(x) ? x : x + ";");
     }
   }
-  while(stack.length>1){out.push("}");stack.pop();}return out.join("\n");
+
+  while (stack.length > 1) { out.push("}"); stack.pop(); }
+  return out.join("\n");
 }
+
 function extractVortexTopLevelFunctions(code){return String(code||"").split("\n").map(r=>{const m=r.match(/^\s{0}def\s+(\w+)\s*\(/);return m?.[1]}).filter(Boolean);}
 function compileVortexScript(code){
   const js=transpileVortexToJS(code), names=extractVortexTopLevelFunctions(code);
