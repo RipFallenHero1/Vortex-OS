@@ -779,33 +779,41 @@ function duplicateVortexScript(id){
   vortexScripts.push(copy); activeScriptId=copy.id; saveEngineLocal(); renderHierarchy(); renderScriptsSidebarList();
 }
 
-function deleteVortexScript(id) {
-  const scriptToDelete = vortexScripts.find(x => x.id === id);
-  if (!scriptToDelete) return;
-
-  if (!confirm(`Deseja excluir o script "${scriptToDelete.name}.vortex"?`)) return;
-
-  // Remove o script da lista
-  vortexScripts = vortexScripts.filter(x => x.id !== id);
-
-  // Se o script deletado era o ativo, escolhe o primeiro da lista restante
-  if (activeScriptId === id) {
-    activeScriptId = vortexScripts[0]?.id || null;
+/**
+ * Deleta o script que está selecionado atualmente na Engine/Code
+ */
+function deleteActiveVortexScript() {
+  if (!activeScriptId) {
+    return alert("Nenhum script selecionado para excluir!");
   }
+
+  const scriptToDelete = vortexScripts.find(x => x.id === activeScriptId);
+  if (!scriptToDelete) {
+    return alert("Nenhum script encontrado!");
+  }
+
+  if (!confirm(`Deseja realmente apagar o script "${scriptToDelete.name}.vortex"?`)) {
+    return;
+  }
+
+  // Remove o script ativo da lista
+  vortexScripts = vortexScripts.filter(x => x.id !== activeScriptId);
+
+  // Define o próximo script ativo (se existir)
+  activeScriptId = vortexScripts[0]?.id || null;
 
   saveEngineLocal();
   renderHierarchy();
   renderScriptsSidebarList();
 
-  // Atualiza a tela do editor de código
+  // Atualiza a tela do editor
   if (activeScriptId) {
     openVortexScriptEditor(activeScriptId);
   } else {
-    // Se não restou nenhum script
     const fileNameEl = document.getElementById("vortex-filename");
     const codeEditorEl = document.getElementById("vortex-code-editor");
     if (fileNameEl) fileNameEl.value = "";
-    if (codeEditorEl) codeEditorEl.value = "# Nenhum script aberto. Crie um novo script!";
+    if (codeEditorEl) codeEditorEl.value = "# Nenhum script aberto.";
   }
 }
 
@@ -817,18 +825,10 @@ function renderScriptsSidebarList() {
 
   vortexScripts.forEach(s => {
     const li = document.createElement("li");
-    li.style.cssText = "display:flex; justify-content:space-between; align-items:center; padding:6px; cursor:pointer; gap:6px; overflow:hidden;";
     if (s.id === activeScriptId) li.classList.add("active");
-
-    li.innerHTML = `
-      <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0;" title="${escapeHtml(s.name)}.vortex">
-        ${s.id === activeScriptId ? "➤ " : ""}▣ ${escapeHtml(s.name)}.vortex
-      </span>
-      <div style="display:flex; gap:4px; flex-shrink:0;">
-        <button style="background:none;border:none;color:#8b5cf6;cursor:pointer;font-size:12px;padding:2px;" onclick="event.stopPropagation(); duplicateVortexScript('${s.id}')" title="Duplicar">📋</button>
-        <button style="background:none;border:none;color:#f38ba8;cursor:pointer;font-size:12px;padding:2px;" onclick="event.stopPropagation(); deleteVortexScript('${s.id}')" title="Excluir">🗑</button>
-      </div>
-    `;
+    li.style.cssText = "padding:6px 10px; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;";
+    li.title = `${escapeHtml(s.name)}.vortex`;
+    li.innerText = `${s.id === activeScriptId ? "➤ " : ""}▣ ${s.name}.vortex`;
 
     li.onclick = () => openVortexScriptEditor(s.id);
     list.appendChild(li);
