@@ -19,7 +19,7 @@
 //   `len()`.
 //
 // ==========================================
-const OS_VERSION = "10.5";
+const OS_VERSION = "11.00";
 
 // ---- FIREBASE CONFIG ----
 const firebaseConfig = {
@@ -49,6 +49,29 @@ let selectedSceneIndex = -1;
 let vortexScripts = [];          // [{id, name, code}]
 let activeScriptId = null;       // script atualmente ligado ao teste da engine
 
+
+// ==========================================
+// VORTEX UI NOTIFICATIONS (sem popups nativos)
+// ==========================================
+function vortexNotify(message, kind = 'info', duration = 3600) {
+    const host = document.getElementById('vortex-notifications') || (() => {
+        const el = document.createElement('div');
+        el.id = 'vortex-notifications';
+        document.body.appendChild(el);
+        return el;
+    })();
+    const item = document.createElement('div');
+    item.className = 'vortex-toast ' + kind;
+    const title = kind === 'error' ? 'Vortex' : kind === 'success' ? 'Concluído' : 'Vortex OS';
+    item.innerHTML = `<div class="vortex-toast-title">${escapeHTML(title)}</div><div class="vortex-toast-text">${escapeHTML(message)}</div>`;
+    host.appendChild(item);
+    requestAnimationFrame(() => item.classList.add('show'));
+    setTimeout(() => { item.classList.remove('show'); setTimeout(() => item.remove(), 220); }, duration);
+}
+function vortexConfirm(message) {
+    return window.confirm(message);
+}
+
 // ==========================================
 // 1. AUTENTICAÇÃO (LOGIN / CADASTRO AUTOMÁTICO)
 // ==========================================
@@ -61,8 +84,8 @@ function loginUser() {
     const pin = pinInput.value.trim();
     const email = emailInput.value.trim();
 
-    if (!username) { alert('⚠️ Digite um nome de usuário.'); return; }
-    if (!/^\d{4}$/.test(pin)) { alert('⚠️ O PIN deve ter exatamente 4 dígitos numéricos.'); return; }
+    if (!username) { vortexNotify('⚠️ Digite um nome de usuário.'); return; }
+    if (!/^\d{4}$/.test(pin)) { vortexNotify('⚠️ O PIN deve ter exatamente 4 dígitos numéricos.'); return; }
 
     const userKey = username.toLowerCase().replace(/[.#$/\[\]]/g, '_');
     const userRef = database.ref('users/' + userKey);
@@ -77,7 +100,7 @@ function loginUser() {
                 if (data.pin === pin) {
                     startSession(userKey, data);
                 } else {
-                    alert('❌ PIN incorreto para o usuário "' + username + '".');
+                    vortexNotify('❌ PIN incorreto para o usuário "' + username + '".');
                 }
             } else {
                 const newUser = {
@@ -90,13 +113,13 @@ function loginUser() {
                 };
                 return userRef.set(newUser).then(() => {
                     startSession(userKey, newUser);
-                    alert('✅ Conta criada com sucesso! Bem-vindo(a), ' + username + '.');
+                    vortexNotify('✅ Conta criada com sucesso! Bem-vindo(a), ' + username + '.');
                 });
             }
         })
         .catch(err => {
             console.error(err);
-            alert('❌ Erro de conexão com o Firebase: ' + err.message);
+            vortexNotify('❌ Erro de conexão com o Firebase: ' + err.message);
         })
         .finally(() => {
             if (loginBtn) { loginBtn.disabled = false; loginBtn.innerText = 'Entrar no Vortex OS'; }
@@ -116,6 +139,8 @@ function startSession(userKey, data) {
     document.getElementById('settings-user').innerText = displayName;
     document.getElementById('settings-email').innerText = data.email || '-';
     updateBalanceUI();
+    watchCurrentUserBalance(userKey);
+    loadVortexScriptsLocal();
 
     startClock();
     loadGlobalStore();
@@ -313,31 +338,43 @@ function addBalance(amount) {
     });
 }
 
+
+function watchCurrentUserBalance(userKey) {
+    if (!userKey) return;
+    if (window._vortexBalanceRef) window._vortexBalanceRef.off();
+    window._vortexBalanceRef = database.ref('users/' + userKey + '/balance');
+    window._vortexBalanceRef.on('value', snap => {
+        if (!currentUser || currentUser.key !== userKey) return;
+        currentUser.balance = Number(snap.val() || 0);
+        updateBalanceUI();
+    });
+}
+
 function claimDailyReward() {
-    if (!currentUser) return alert('Faça login primeiro.');
+    if (!currentUser) return vortexNotify('Faça login primeiro.');
     const now = Date.now();
     const last = currentUser.lastDaily || 0;
     const oneDay = 1000 * 60 * 60 * 24;
 
     if (now - last < oneDay) {
         const horasRestantes = Math.ceil((oneDay - (now - last)) / (1000 * 60 * 60));
-        alert(`⏳ Você já coletou sua recompensa diária. Volte em ~${horasRestantes}h.`);
+        vortexNotify(`⏳ Você já coletou sua recompensa diária. Volte em ~${horasRestantes}h.`);
         return;
     }
 
     addBalance(10).then(() => {
         currentUser.lastDaily = now;
         database.ref('users/' + currentUser.key + '/lastDaily').set(now);
-        alert('🎁 Você recebeu R$ 10,00 de recompensa diária!');
-    }).catch(err => alert('Erro: ' + err));
+        vortexNotify('🎁 Você recebeu R$ 10,00 de recompensa diária!');
+    }).catch(err => vortexNotify('Erro: ' + err));
 }
 
 function simulateIncomingPix() {
-    if (!currentUser) return alert('Faça login primeiro.');
+    if (!currentUser) return vortexNotify('Faça login primeiro.');
     const valor = Math.floor(Math.random() * 41) + 10;
     addBalance(valor).then(() => {
-        alert(`💸 Você recebeu um Pix simulado de R$ ${valor.toFixed(2)}!`);
-    }).catch(err => alert('Erro: ' + err));
+        vortexNotify(`💸 Você recebeu um Pix simulado de R$ ${valor.toFixed(2)}!`);
+    }).catch(err => vortexNotify('Erro: ' + err));
 }
 
 // ==========================================
@@ -407,230 +444,42 @@ function calcEval() {
 }
 
 // ==========================================
-// 10. VORTEX ENGINE 2D - EDITOR DE MAPA
+// 10. VORTEX ENGINE 2D — SCENE EDITOR 11.00
 // ==========================================
-// Este editor só define a PLANTA do nível (onde tem bloco, moeda e player).
-// Nenhum desses elementos tem comportamento aqui — o comportamento é 100%
-// definido pelo script .vortex ligado ao teste/publicação (ver Seção 11/12).
-let mapCanvasInitialized = false;
+let mapCanvasInitialized=false;
+let editorCamera={x:0,y:0,zoom:1};
+let editorPan={active:false,startX:0,startY:0,camX:0,camY:0};
+const EDITOR_W=1200, EDITOR_H=800;
+const SHAPES=['square','circle','triangle','player','coin','text','button'];
 
-function initMapCanvasOnce() {
-    if (mapCanvasInitialized) return;
-    const canvas = document.getElementById('canvas-2d');
-    if (!canvas) return;
-
-    canvas.style.display = 'grid';
-    canvas.style.gridTemplateColumns = 'repeat(20, 1fr)';
-    canvas.style.gridTemplateRows = 'repeat(12, 1fr)';
-    canvas.style.gap = '1px';
-    canvas.style.background = '#000';
-
-    canvas.innerHTML = '';
-    for (let i = 0; i < 240; i++) {
-        const tile = document.createElement('div');
-        tile.dataset.index = i;
-        tile.style.display = 'flex';
-        tile.style.alignItems = 'center';
-        tile.style.justifyContent = 'center';
-        tile.style.background = '#111';
-        tile.style.cursor = 'crosshair';
-        tile.style.fontSize = '1.1rem';
-        tile.style.userSelect = 'none';
-        tile.onmousedown = () => applyTool(i, tile);
-        tile.onmouseenter = (e) => {
-            // Texto/Botão pedem um prompt por clique — não faz sentido "arrastar" eles.
-            if (e.buttons === 1 && currentTileMode !== 'text' && currentTileMode !== 'button') {
-                applyTool(i, tile);
-            }
-        };
-        canvas.appendChild(tile);
-    }
-    mapCanvasInitialized = true;
+function initMapCanvasOnce(){
+  if(mapCanvasInitialized)return;
+  const canvas=document.getElementById('canvas-2d'); if(!canvas)return;
+  canvas.innerHTML=''; canvas.classList.add('vortex-scene-viewport');
+  canvas.oncontextmenu=e=>e.preventDefault();
+  canvas.onmousedown=e=>{
+    if(e.button===2){editorPan.active=true;editorPan.startX=e.clientX;editorPan.startY=e.clientY;editorPan.camX=editorCamera.x;editorPan.camY=editorCamera.y;canvas.classList.add('panning');}
+    else if(e.button===0 && e.target===canvas && currentTileMode!=='resize' && currentTileMode!=='select') createSceneObjectAtEvent(e);
+  };
+  canvas.onmousemove=e=>{if(editorPan.active){editorCamera.x=editorPan.camX-(e.clientX-editorPan.startX)/editorCamera.zoom;editorCamera.y=editorPan.camY-(e.clientY-editorPan.startY)/editorCamera.zoom;applyEditorCamera();}};
+  window.addEventListener('mouseup',()=>{editorPan.active=false;canvas.classList.remove('panning');});
+  canvas.addEventListener('wheel',e=>{e.preventDefault();const old=editorCamera.zoom;editorCamera.zoom=Math.max(.35,Math.min(2.5,old*(e.deltaY<0?1.1:.9)));applyEditorCamera();},{passive:false});
+  const world=document.createElement('div'); world.id='vortex-scene-world'; world.className='vortex-scene-world'; canvas.appendChild(world);
+  mapCanvasInitialized=true; renderScene(); applyEditorCamera();
 }
-
-function setTileMode(mode) {
-    currentTileMode = mode;
-    ['block', 'coin', 'player', 'erase', 'text', 'button', 'resize'].forEach(m => {
-        const btn = document.getElementById(`btn-t-${m}`);
-        if (btn) btn.classList.toggle('active', m === mode);
-    });
-    const inspector = document.getElementById('inspector-content');
-    if (inspector) inspector.innerText = mode === 'resize' ? 'Ferramenta Tamanho: selecione um objeto e arraste os pontos brancos, como na Unity.' : `Ferramenta ativa: ${mode}. Clique e arraste na cena para pintar.`;
-    renderSceneSelectionHandles();
-}
-
-function applyTool(index, tileElement) {
-    if (currentTileMode === 'player') {
-        const oldIdx = currentSceneGrid.indexOf('player');
-        if (oldIdx !== -1) {
-            currentSceneGrid[oldIdx] = '';
-            const oldTile = document.querySelector(`#canvas-2d [data-index='${oldIdx}']`);
-            if (oldTile) oldTile.innerText = '';
-        }
-    }
-
-    if (currentTileMode === 'resize') {
-        if (!currentSceneGrid[index]) return;
-        selectedSceneIndex = index;
-        const tr = currentSceneTransforms[index] || { x:(index%20)*TILE_W, y:Math.floor(index/20)*TILE_H, w:TILE_W, h:TILE_H, rotation:0 };
-        currentSceneTransforms[index] = tr;
-        selectSceneObject(index);
-        renderSceneSelectionHandles();
-        return;
-    }
-
-    if (currentTileMode === 'erase') {
-        currentSceneGrid[index] = '';
-        delete currentSceneMeta[index];
-        renderTile(tileElement, '');
-        return;
-    }
-
-    if (currentTileMode === 'text') {
-        const existing = (currentSceneMeta[index] && currentSceneMeta[index].text) || '';
-        const text = prompt('Texto a exibir no jogo:', existing);
-        if (text === null) return; // cancelou o prompt, não altera nada
-        currentSceneGrid[index] = 'text';
-        currentSceneMeta[index] = { text };
-        renderTile(tileElement, 'text');
-        return;
-    }
-
-    if (currentTileMode === 'button') {
-        const existingMeta = currentSceneMeta[index] || {};
-        const label = prompt('Texto do botão:', existingMeta.text || 'Botão');
-        if (label === null) return;
-        const action = prompt(
-            'Nome da função do script .vortex a chamar quando clicarem no botão\n(ex: abrir_porta) — deixe em branco pra não chamar nada:',
-            existingMeta.action || ''
-        );
-        currentSceneGrid[index] = 'button';
-        currentSceneMeta[index] = { text: label, action: (action || '').trim() };
-        renderTile(tileElement, 'button');
-        return;
-    }
-
-    // block / coin / player
-    currentSceneGrid[index] = currentTileMode;
-    currentSceneTransforms[index] = currentSceneTransforms[index] || { x:(index%20)*TILE_W, y:Math.floor(index/20)*TILE_H, w:TILE_W, h:TILE_H, rotation:0 };
-    delete currentSceneMeta[index];
-    renderTile(tileElement, currentTileMode);
-    selectedSceneIndex=index; renderHierarchy();
-}
-
-function renderTile(tile, mode) {
-    tile.innerText = '';
-    tile.className = 'tile' + (mode ? ' ' + mode : '');
-    if (mode === 'block') tile.innerText = '';
-    if (mode === 'coin') tile.innerText = '';
-    if (mode === 'player') tile.innerText = '';
-    if (mode === 'text') tile.innerText = '🔤';
-    if (mode === 'button') tile.innerText = '🔘';
-    const i=Number(tile.dataset.index); const tr=currentSceneTransforms[i]; const meta=currentSceneMeta[i]||{};
-    if(tr){ tile.style.width=tr.w+'px'; tile.style.height=tr.h+'px'; tile.style.zIndex='5'; }
-    if(meta.color) tile.style.background=meta.color;
-    tile.onclick=()=>selectSceneObject(i);
-}
-
-function addHierarchyItem(type) {
-    const index = currentSceneGrid.findIndex(v => !v);
-    if (index === -1) return alert('A cena está cheia.');
-    currentSceneGrid[index] = type === 'square' ? 'block' : type;
-    currentSceneTransforms[index] = { x: (index % 20) * TILE_W, y: Math.floor(index / 20) * TILE_H, w: TILE_W, h: TILE_H, rotation: 0 };
-    const tile = document.querySelector(`#canvas-2d [data-index='${index}']`);
-    if (tile) renderTile(tile, currentSceneGrid[index]);
-    renderHierarchy();
-    selectSceneObject(index);
-}
-
-function renderHierarchy() {
-    const tree = document.getElementById('hierarchy-tree');
-    if (!tree) return;
-    tree.innerHTML = '';
-    currentSceneGrid.forEach((type, i) => {
-        if (!type) return;
-        const li = document.createElement('li');
-        li.style.cssText='cursor:pointer;padding:4px;border-radius:4px;';
-        li.innerText = `${type === 'block' ? '■' : type === 'coin' ? '●' : type === 'player' ? '◆' : type === 'text' ? 'T' : '▣'} ${type} #${i+1}`;
-        li.onclick = () => selectSceneObject(i);
-        if (i === selectedSceneIndex) li.style.background='rgba(168,85,247,.25)';
-        tree.appendChild(li);
-    });
-    vortexScripts.forEach(s => {
-        const li=document.createElement('li'); li.style.cssText='cursor:pointer;padding:4px;color:#c4b5fd;';
-        li.innerText=`📜 ${s.name}.vortex`; li.onclick=()=>openVortexScriptEditor(s.id); tree.appendChild(li);
-    });
-}
-
-function selectSceneObject(index) {
-    selectedSceneIndex = index;
-    const type = currentSceneGrid[index];
-    if (!type) return;
-    const meta = currentSceneMeta[index] || {};
-    const tr = currentSceneTransforms[index] || {x:(index%20)*TILE_W,y:Math.floor(index/20)*TILE_H,w:TILE_W,h:TILE_H,rotation:0};
-    currentSceneTransforms[index] = tr;
-    const inspector=document.getElementById('inspector-content');
-    if(inspector) inspector.innerHTML = `
-      <div style="display:grid;gap:7px;">
-        <strong>Objeto: ${type}</strong>
-        <label>X <input id="insp-x" type="number" value="${tr.x}"></label>
-        <label>Y <input id="insp-y" type="number" value="${tr.y}"></label>
-        <label>Largura <input id="insp-w" type="number" min="4" value="${tr.w}"></label>
-        <label>Altura <input id="insp-h" type="number" min="4" value="${tr.h}"></label>
-        <label>Cor <input id="insp-color" type="color" value="${meta.color || (type==='coin'?'#eab308':type==='player'?'#22c55e':'#8b5cf6')}"></label>
-        <button class="btn btn-primary" onclick="applyInspectorTransform()">Aplicar</button>
-        <button class="btn" style="color:#ff6b81" onclick="deleteSelectedSceneObject()">🗑️ Excluir objeto</button>
-      </div>`;
-    renderHierarchy();
-    renderSceneSelectionHandles();
-}
-
-function applyInspectorTransform(){
-    if(selectedSceneIndex<0) return;
-    const i=selectedSceneIndex, tr=currentSceneTransforms[i] || {};
-    tr.x=Number(document.getElementById('insp-x').value)||0; tr.y=Number(document.getElementById('insp-y').value)||0;
-    tr.w=Math.max(4,Number(document.getElementById('insp-w').value)||32); tr.h=Math.max(4,Number(document.getElementById('insp-h').value)||35);
-    currentSceneTransforms[i]=tr; currentSceneMeta[i]=Object.assign({},currentSceneMeta[i],{color:document.getElementById('insp-color').value});
-    const tile=document.querySelector(`#canvas-2d [data-index='${i}']`); if(tile) renderTile(tile,currentSceneGrid[i]);
-    renderSceneSelectionHandles();
-}
-
-function deleteSelectedSceneObject(){
-    if(selectedSceneIndex<0) return;
-    currentSceneGrid[selectedSceneIndex]=''; delete currentSceneMeta[selectedSceneIndex]; delete currentSceneTransforms[selectedSceneIndex];
-    const tile=document.querySelector(`#canvas-2d [data-index='${selectedSceneIndex}']`); if(tile) renderTile(tile,'');
-    selectedSceneIndex=-1; renderHierarchy();
-}
-
-function renderSceneSelectionHandles(){
-    const canvas=document.getElementById('canvas-2d'); if(!canvas) return;
-    let overlay=document.getElementById('vortex-resize-overlay');
-    if(overlay) overlay.remove();
-    if(selectedSceneIndex<0 || !currentSceneGrid[selectedSceneIndex] || currentTileMode!=='resize') return;
-    const tr=currentSceneTransforms[selectedSceneIndex] || {x:0,y:0,w:32,h:35};
-    overlay=document.createElement('div'); overlay.id='vortex-resize-overlay';
-    overlay.style.cssText=`position:absolute;left:${tr.x}px;top:${tr.y}px;width:${tr.w}px;height:${tr.h}px;border:2px solid #a855f7;box-sizing:border-box;z-index:100;pointer-events:none;`;
-    ['nw','ne','sw','se'].forEach(pos=>{
-      const h=document.createElement('div'); h.dataset.handle=pos; h.style.cssText='position:absolute;width:10px;height:10px;background:#fff;border:2px solid #a855f7;box-sizing:border-box;pointer-events:auto;';
-      if(pos.includes('n')) h.style.top='-6px'; else h.style.bottom='-6px'; if(pos.includes('w')) h.style.left='-6px'; else h.style.right='-6px';
-      h.onmousedown=e=>startResizeHandle(e,pos); overlay.appendChild(h);
-    });
-    canvas.style.position='relative'; canvas.appendChild(overlay);
-}
-
-function startResizeHandle(e,pos){
-    e.preventDefault(); e.stopPropagation(); if(selectedSceneIndex<0) return;
-    const i=selectedSceneIndex, start={...currentSceneTransforms[i]}, sx=e.clientX, sy=e.clientY;
-    const move=ev=>{
-      let dx=ev.clientX-sx, dy=ev.clientY-sy, tr={...start};
-      if(pos.includes('e')) tr.w=Math.max(8,start.w+dx); if(pos.includes('s')) tr.h=Math.max(8,start.h+dy);
-      if(pos.includes('w')){tr.x=start.x+dx;tr.w=Math.max(8,start.w-dx);} if(pos.includes('n')){tr.y=start.y+dy;tr.h=Math.max(8,start.h-dy);}
-      currentSceneTransforms[i]=tr; const tile=document.querySelector(`#canvas-2d [data-index='${i}']`); if(tile) renderTile(tile,currentSceneGrid[i]); renderSceneSelectionHandles();
-    };
-    const up=()=>{window.removeEventListener('mousemove',move);window.removeEventListener('mouseup',up);};
-    window.addEventListener('mousemove',move);window.addEventListener('mouseup',up);
-}
-
+function applyEditorCamera(){const world=document.getElementById('vortex-scene-world');if(world)world.style.transform=`translate(${-editorCamera.x*editorCamera.zoom}px,${-editorCamera.y*editorCamera.zoom}px) scale(${editorCamera.zoom})`;const label=document.getElementById('engine-viewport-label');if(label)label.innerText=`CENA 2D  •  Câmera ${Math.round(editorCamera.x)}, ${Math.round(editorCamera.y)}  •  Zoom ${Math.round(editorCamera.zoom*100)}%  •  Botão direito: mover câmera`}
+function sceneFreeIndex(){let i=0;while(currentSceneGrid[i])i++;if(i>=1000)currentSceneGrid.length=1100;return i;}
+function defaultTransform(i){return currentSceneTransforms[i]||{x:80+(i%10)*64,y:80+Math.floor(i/10)*64,w:56,h:56,rotation:0};}
+function setTileMode(mode){currentTileMode=mode;['square','circle','triangle','player','coin','text','button','select','resize','erase'].forEach(m=>{const b=document.getElementById('btn-t-'+m);if(b)b.classList.toggle('active',m===mode);});const ins=document.getElementById('inspector-content');if(ins)ins.innerHTML=mode==='resize'?'<strong>Tamanho</strong><p>Selecione um objeto e arraste qualquer alça. O redimensionamento funciona direto na cena.</p>':mode==='select'?'<strong>Seleção</strong><p>Clique em um objeto para selecionar. Arraste para mover.</p>':`<strong>Ferramenta</strong><p>${escapeHTML(mode)}</p>`;renderScene();}
+function createSceneObjectAtEvent(e){const canvas=document.getElementById('canvas-2d');const rect=canvas.getBoundingClientRect();const x=(e.clientX-rect.left)/editorCamera.zoom+editorCamera.x;const y=(e.clientY-rect.top)/editorCamera.zoom+editorCamera.y;const i=sceneFreeIndex();if(currentTileMode==='erase')return;let type=currentTileMode;if(!SHAPES.includes(type))type='square';if(type==='player'){const old=currentSceneGrid.indexOf('player');if(old>=0){currentSceneGrid[old]='';delete currentSceneTransforms[old];}}currentSceneGrid[i]=type;currentSceneTransforms[i]={x:x-28,y:y-28,w:56,h:56,rotation:0};selectedSceneIndex=i;renderScene();selectSceneObject(i);}
+function applyTool(index){selectSceneObject(index);}
+function renderScene(){const world=document.getElementById('vortex-scene-world');if(!world)return;world.innerHTML='';const grid=document.createElement('div');grid.className='vortex-scene-grid';grid.style.width='2400px';grid.style.height='1600px';world.appendChild(grid);currentSceneGrid.forEach((type,i)=>{if(!type)return;const tr=defaultTransform(i),meta=currentSceneMeta[i]||{};const o=document.createElement('div');o.className='scene-object scene-'+type+(i===selectedSceneIndex?' selected':'');o.dataset.index=i;Object.assign(o.style,{left:tr.x+'px',top:tr.y+'px',width:tr.w+'px',height:tr.h+'px',transform:`rotate(${tr.rotation||0}deg)`});if(meta.color)o.style.background=meta.color;o.onmousedown=e=>{if(e.button!==0)return;e.stopPropagation();if(currentTileMode==='erase'){deleteSelectedSceneObject();return;}selectSceneObject(i);if(currentTileMode==='select'){const sx=e.clientX,sy=e.clientY,ox=tr.x,oy=tr.y;const move=ev=>{tr.x=ox+(ev.clientX-sx)/editorCamera.zoom;tr.y=oy+(ev.clientY-sy)/editorCamera.zoom;renderScene();};const up=()=>{window.removeEventListener('mousemove',move);window.removeEventListener('mouseup',up);};window.addEventListener('mousemove',move);window.addEventListener('mouseup',up);}};world.appendChild(o);});renderSceneSelectionHandles();renderHierarchy();}
+function renderHierarchy(){const tree=document.getElementById('hierarchy-tree');if(!tree)return;tree.innerHTML='';currentSceneGrid.forEach((type,i)=>{if(!type)return;const li=document.createElement('li');li.className='tree-item '+(i===selectedSceneIndex?'selected':'');li.innerHTML=`<span class="shape-mini shape-${type}"></span><span>${type} #${i+1}</span>`;li.onclick=()=>selectSceneObject(i);tree.appendChild(li);});vortexScripts.forEach(s=>{const li=document.createElement('li');li.className='tree-script';li.innerHTML=`<span>V</span>${escapeHTML(s.name)}.vortex`;li.onclick=()=>openVortexScriptEditor(s.id);tree.appendChild(li);});}
+function selectSceneObject(index){selectedSceneIndex=index;const type=currentSceneGrid[index];if(!type)return;const tr=defaultTransform(index),meta=currentSceneMeta[index]||{};currentSceneTransforms[index]=tr;const color=meta.color||(type==='coin'?'#facc15':type==='player'?'#22c55e':'#8b5cf6');const ins=document.getElementById('inspector-content');if(ins)ins.innerHTML=`<div class="inspector-form"><strong>${type.toUpperCase()}</strong><label>X<input id="insp-x" type="number" value="${Math.round(tr.x)}"></label><label>Y<input id="insp-y" type="number" value="${Math.round(tr.y)}"></label><label>Largura<input id="insp-w" type="number" min="4" value="${Math.round(tr.w)}"></label><label>Altura<input id="insp-h" type="number" min="4" value="${Math.round(tr.h)}"></label><label>Cor<input id="insp-color" type="color" value="${color}"></label><button class="btn btn-primary" onclick="applyInspectorTransform()">Aplicar</button><button class="btn danger-btn" onclick="deleteSelectedSceneObject()">Excluir objeto</button></div>`;renderScene();}
+function applyInspectorTransform(){if(selectedSceneIndex<0)return;const i=selectedSceneIndex,tr=currentSceneTransforms[i]||defaultTransform(i);tr.x=Number(document.getElementById('insp-x').value)||0;tr.y=Number(document.getElementById('insp-y').value)||0;tr.w=Math.max(4,Number(document.getElementById('insp-w').value)||4);tr.h=Math.max(4,Number(document.getElementById('insp-h').value)||4);currentSceneTransforms[i]=tr;currentSceneMeta[i]=Object.assign({},currentSceneMeta[i],{color:document.getElementById('insp-color').value});renderScene();}
+function deleteSelectedSceneObject(){if(selectedSceneIndex<0)return;currentSceneGrid[selectedSceneIndex]='';delete currentSceneMeta[selectedSceneIndex];delete currentSceneTransforms[selectedSceneIndex];selectedSceneIndex=-1;renderScene();}
+function renderSceneSelectionHandles(){const old=document.getElementById('vortex-resize-overlay');if(old)old.remove();if(selectedSceneIndex<0)return;const world=document.getElementById('vortex-scene-world');const tr=defaultTransform(selectedSceneIndex);const o=document.querySelector(`.scene-object[data-index="${selectedSceneIndex}"]`);if(!world||!o)return;const overlay=document.createElement('div');overlay.id='vortex-resize-overlay';overlay.className='resize-selection-box';Object.assign(overlay.style,{left:tr.x+'px',top:tr.y+'px',width:tr.w+'px',height:tr.h+'px'});['nw','ne','sw','se'].forEach(c=>{const h=document.createElement('div');h.className='resize-handle '+c;h.onmousedown=e=>{e.stopPropagation();e.preventDefault();const sx=e.clientX,sy=e.clientY,ox=tr.x,oy=tr.y,ow=tr.w,oh=tr.h;const move=ev=>{let dx=(ev.clientX-sx)/editorCamera.zoom,dy=(ev.clientY-sy)/editorCamera.zoom;if(c.includes('e'))tr.w=Math.max(8,ow+dx);if(c.includes('s'))tr.h=Math.max(8,oh+dy);if(c.includes('w')){tr.x=ox+dx;tr.w=Math.max(8,ow-dx);}if(c.includes('n')){tr.y=oy+dy;tr.h=Math.max(8,oh-dy);}renderScene();};const up=()=>{window.removeEventListener('mousemove',move);window.removeEventListener('mouseup',up);};window.addEventListener('mousemove',move);window.addEventListener('mouseup',up);};overlay.appendChild(h);});world.appendChild(overlay);}
+function addHierarchyItem(type){currentTileMode=type;createSceneObjectAtEvent({clientX:document.getElementById('canvas-2d').getBoundingClientRect().left+120,clientY:document.getElementById('canvas-2d').getBoundingClientRect().top+120});}
 
 // ==========================================
 // 11. LINGUAGEM VORTEX (PYTHON-LIKE) — CRIAÇÃO DE SCRIPTS
@@ -659,6 +508,9 @@ function startResizeHandle(e,pos){
 //
 // Nada de física, movimento ou colisão é automático: o script precisa
 // implementar isso chamando as funções acima dentro de _update().
+
+function saveVortexScriptsLocal(){if(currentUser)localStorage.setItem('vortex_scripts_'+currentUser.key,JSON.stringify(vortexScripts));}
+function loadVortexScriptsLocal(){if(!currentUser)return;try{vortexScripts=JSON.parse(localStorage.getItem('vortex_scripts_'+currentUser.key)||'[]')||[];activeScriptId=vortexScripts[0]?.id||null;}catch(e){vortexScripts=[];activeScriptId=null;}}
 
 function createVortexScript() {
     const name = prompt('Nome do script (sem extensão):', 'meu_script') || 'script_' + (vortexScripts.length + 1);
@@ -713,6 +565,7 @@ def abrir_bau():
     vortex.add_coins(5)`;
 
     vortexScripts.push({ id, name, code: defaultCode });
+    saveVortexScriptsLocal();
 
     // Adiciona na hierarquia da engine
     const tree = document.getElementById('hierarchy-tree');
@@ -773,6 +626,7 @@ function deleteVortexScript(scriptId) {
     if (!script) return;
     if (!confirm(`Excluir o script \"${script.name}.vortex\"?`)) return;
     vortexScripts = vortexScripts.filter(s => s.id !== scriptId);
+    saveVortexScriptsLocal();
     if (activeScriptId === scriptId) {
         activeScriptId = vortexScripts[0]?.id || null;
         if (activeScriptId) openVortexScriptEditor(activeScriptId);
@@ -812,7 +666,7 @@ function saveVortexScript() {
     }
 
     renderScriptsSidebarList();
-    alert(`💾 "${name}.vortex" foi salvo!`);
+    vortexNotify(`💾 "${name}.vortex" foi salvo!`);
 }
 
 function runScriptFromStudio() {
@@ -984,42 +838,20 @@ function checkCollision(rect1, rect2) {
 }
 
 function makeVortexEntity(inst, type, x, y, w, h, meta = {}) {
-    w = Number(w || meta.w || TILE_W); h = Number(h || meta.h || TILE_H);
+    type = type === 'block' ? 'square' : type;
+    w = Math.max(1, Number(w || meta.w || TILE_W)); h = Math.max(1, Number(h || meta.h || TILE_H));
     const el = document.createElement('div');
-    el.style.position = 'absolute';
-    el.style.display = 'flex';
-    el.style.alignItems = 'center';
-    el.style.justifyContent = 'center';
-    el.style.fontSize = '1.5rem';
-    el.style.background = meta.color || '';
-    el.style.borderRadius = meta.shape === 'circle' || type === 'coin' ? '50%' : meta.shape === 'triangle' ? '0' : '6px';
-    if (meta.shape === 'triangle') { el.style.clipPath='polygon(50% 0, 0 100%, 100% 100%)'; }
-
-    el.style.width = w + 'px';
-    el.style.height = h + 'px';
-    el.style.left = x + 'px';
-    el.style.top = y + 'px';
-
-    const entity = { x, y, w, h, vx: 0, vy: 0, el, type };
-
-    if (type === 'block') {
-        el.innerText = '🧱';
-        inst.physicsData.blocks.push(entity);
-    } else if (type === 'coin') {
-        el.innerText = '';
-        entity.collected = false;
-        inst.physicsData.coins.push(entity);
-    } else if (type === 'player') {
-        el.innerText = '';
-        el.style.zIndex = '10';
-        entity.w = 28; entity.h = 32;
-        inst.physicsData.player = entity;
-    } else {
-        el.innerText = '❔';
-    }
-
-    inst.worldEl.appendChild(el);
-    return entity;
+    el.className='runtime-object runtime-'+type;
+    Object.assign(el.style,{position:'absolute',left:x+'px',top:y+'px',width:w+'px',height:h+'px',boxSizing:'border-box',background:meta.color || (type==='coin'?'#facc15':type==='player'?'#22c55e':'#8b5cf6'),border:'1px solid rgba(255,255,255,.25)',zIndex:type==='player'?'10':'2'});
+    if(type==='circle'||type==='coin') el.style.borderRadius='50%';
+    if(type==='triangle') el.style.clipPath='polygon(50% 0%, 100% 100%, 0% 100%)';
+    if(type==='coin') el.style.boxShadow='0 0 16px rgba(250,204,21,.55)';
+    if(type==='player') el.style.borderRadius='7px';
+    const entity={x:Number(x)||0,y:Number(y)||0,w,h,vx:0,vy:0,el,type,shape:type};
+    if(type==='coin'){entity.collected=false;inst.physicsData.coins.push(entity);}
+    else if(type==='player'){inst.physicsData.player=entity;}
+    else {inst.physicsData.blocks.push(entity);}
+    inst.worldEl.appendChild(el); return entity;
 }
 
 // Texto/Botão colocados no editor (não via script) ficam fixos numa posição
@@ -1065,81 +897,42 @@ function createWorldButton(inst, x, y, text, action) {
 }
 
 function buildVortexAPI(inst) {
+    const now=()=>performance.now()/1000;
     return {
-        print: (...args) => inst.log(args.map(String).join(' ')),
-
-        get_player: () => inst.physicsData.player,
-        get_blocks: () => inst.physicsData.blocks,
-        get_coins: () => inst.physicsData.coins,
-
-        is_key_down: (key) => !!globalKeys[String(key).toLowerCase()],
-        check_collision: (a, b) => checkCollision(a, b),
-
-        spawn: (type, gridX, gridY) => makeVortexEntity(inst, type, Number(gridX) * TILE_W, Number(gridY) * TILE_H),
-        spawn_at: (type, x, y) => makeVortexEntity(inst, type, Number(x), Number(y)),
-        destroy: (entity) => {
-            if (!entity) return;
-            if (entity.el) entity.el.remove();
-            inst.physicsData.blocks = inst.physicsData.blocks.filter(b => b !== entity);
-            inst.physicsData.coins = inst.physicsData.coins.filter(c => c !== entity);
-            if (inst.physicsData.player === entity) inst.physicsData.player = null;
-        },
-        collect_coin: (coin) => {
-            if (!coin || coin.collected) return;
-            coin.collected = true;
-            coin.el.style.display = 'none';
-        },
-
-        add_coins: (n) => { inst.coinCount += (Number(n) || 0); return inst.coinCount; },
-        set_coins: (n) => { inst.coinCount = Number(n) || 0; },
-        get_coins_count: () => inst.coinCount,
-
-        set_camera: (x, y) => { inst.camera.x = Number(x) || 0; inst.camera.y = Number(y) || 0; },
-        get_position: (entity) => entity ? { x: entity.x, y: entity.y } : null,
-        set_position: (entity, x, y) => { if(entity){ entity.x=Number(x)||0; entity.y=Number(y)||0; } },
-        set_size: (entity, w, h) => { if(entity){ entity.w=Math.max(1,Number(w)||1); entity.h=Math.max(1,Number(h)||1); entity.el.style.width=entity.w+'px'; entity.el.style.height=entity.h+'px'; } },
-
-        create_text: (id, text, x, y, color) => {
-            const el = document.createElement('div');
-            el.style.position = 'absolute';
-            el.style.left = (Number(x) || 0) + 'px';
-            el.style.top = (Number(y) || 0) + 'px';
-            el.style.color = color || '#fff';
-            el.style.fontFamily = 'monospace';
-            el.style.fontSize = '1rem';
-            el.style.fontWeight = 'bold';
-            el.style.textShadow = '0 0 4px rgba(0,0,0,0.85)';
-            el.innerText = text;
-            inst.uiLayerEl.appendChild(el);
-            inst.uiElements[id] = { el, type: 'text' };
-            return el;
-        },
-        create_button: (id, text, x, y, onClick) => {
-            const btn = document.createElement('button');
-            btn.innerText = text;
-            btn.className = 'btn btn-sm btn-primary';
-            btn.style.position = 'absolute';
-            btn.style.left = (Number(x) || 0) + 'px';
-            btn.style.top = (Number(y) || 0) + 'px';
-            btn.style.pointerEvents = 'auto';
-            btn.style.cursor = 'pointer';
-            btn.onclick = () => {
-                if (typeof onClick !== 'function') return;
-                try { onClick(); }
-                catch (err) { inst.log('Erro no botão "' + id + '": ' + err.message, true); }
-            };
-            inst.uiLayerEl.appendChild(btn);
-            inst.uiElements[id] = { el: btn, type: 'button' };
-            return btn;
-        },
-        set_text: (id, text) => {
-            const item = inst.uiElements[id];
-            if (item) item.el.innerText = text;
-        },
-        remove_ui: (id) => {
-            const item = inst.uiElements[id];
-            if (item) { item.el.remove(); delete inst.uiElements[id]; }
-        }
+        print:(...args)=>inst.log(args.map(String).join(' ')),
+        get_delta:()=>1/60,
+        get_time:()=>now(),
+        get_player:()=>inst.physicsData.player,
+        get_blocks:()=>inst.physicsData.blocks,
+        get_coins:()=>inst.physicsData.coins,
+        get_objects:()=>[...inst.physicsData.blocks,...inst.physicsData.coins,...(inst.physicsData.player?[inst.physicsData.player]:[])],
+        is_key_down:key=>!!globalKeys[String(key).toLowerCase()],
+        check_collision:(a,b)=>checkCollision(a,b),
+        is_on_floor:(entity)=>{if(!entity)return false;return inst.physicsData.blocks.some(b=>entity.x< b.x+b.w && entity.x+entity.w>b.x && Math.abs((entity.y+entity.h)-b.y)<=4);},
+        spawn:(type,gridX,gridY)=>makeVortexEntity(inst,type,Number(gridX)*TILE_W,Number(gridY)*TILE_H),
+        spawn_at:(type,x,y)=>makeVortexEntity(inst,type,Number(x),Number(y)),
+        destroy:(entity)=>{if(!entity)return;if(entity.el)entity.el.remove();inst.physicsData.blocks=inst.physicsData.blocks.filter(b=>b!==entity);inst.physicsData.coins=inst.physicsData.coins.filter(c=>c!==entity);if(inst.physicsData.player===entity)inst.physicsData.player=null;},
+        collect_coin:(coin)=>{if(!coin||coin.collected)return;coin.collected=true;coin.el.style.display='none';},
+        add_coins:n=>{inst.coinCount+=(Number(n)||0);return inst.coinCount;},
+        set_coins:n=>{inst.coinCount=Number(n)||0;},
+        get_coins_count:()=>inst.coinCount,
+        set_camera:(x,y)=>{inst.camera.x=Number(x)||0;inst.camera.y=Number(y)||0;},
+        follow_camera:(entity,offsetX=320,offsetY=180)=>{if(entity) {inst.camera.x=entity.x-offsetX;inst.camera.y=entity.y-offsetY;}},
+        get_position:entity=>entity?{x:entity.x,y:entity.y}:null,
+        set_position:(entity,x,y)=>{if(entity){entity.x=Number(x)||0;entity.y=Number(y)||0;return entity;}},
+        get_size:entity=>entity?{w:entity.w,h:entity.h}:null,
+        set_size:(entity,w,h)=>{if(entity){entity.w=Math.max(1,Number(w)||1);entity.h=Math.max(1,Number(h)||1);entity.el.style.width=entity.w+'px';entity.el.style.height=entity.h+'px';return entity;}},
+        set_color:(entity,color)=>{if(entity&&entity.el)entity.el.style.background=String(color);},
+        set_visible:(entity,visible)=>{if(entity&&entity.el)entity.el.style.display=visible?'':'none';},
+        move:(entity,dx,dy)=>{if(entity){entity.x+=Number(dx)||0;entity.y+=Number(dy)||0;return entity;}},
+        set_velocity:(entity,vx,vy)=>{if(entity){entity.vx=Number(vx)||0;entity.vy=Number(vy)||0;return entity;}},
+        apply_gravity:(entity,gravity=0.5,maxFall=18)=>{if(entity){entity.vy=Math.min(Number(maxFall)||18,entity.vy+(Number(gravity)||0.5));return entity.vy;}},
+        move_and_collide:(entity)=>{if(!entity)return;entity.x+=entity.vx;for(const b of inst.physicsData.blocks){if(checkCollision(entity,b)){if(entity.vx>0)entity.x=b.x-entity.w;else if(entity.vx<0)entity.x=b.x+b.w;entity.vx=0;}}entity.y+=entity.vy;for(const b of inst.physicsData.blocks){if(checkCollision(entity,b)){if(entity.vy>0)entity.y=b.y-entity.h;else if(entity.vy<0)entity.y=b.y+b.h;entity.vy=0;}}return entity;},
+        create_text:(id,text,x,y,color)=>{const el=document.createElement('div');Object.assign(el.style,{position:'absolute',left:(Number(x)||0)+'px',top:(Number(y)||0)+'px',color:color||'#fff',fontFamily:'monospace',fontSize:'1rem',fontWeight:'bold',textShadow:'0 0 4px #000'});el.innerText=text;inst.uiLayerEl.appendChild(el);inst.uiElements[id]={el,type:'text'};return el;},
+        create_button:(id,text,x,y,onClick)=>{const btn=document.createElement('button');btn.innerText=text;btn.className='btn btn-sm btn-primary';Object.assign(btn.style,{position:'absolute',left:(Number(x)||0)+'px',top:(Number(y)||0)+'px',pointerEvents:'auto'});btn.onclick=()=>{if(typeof onClick==='function')try{onClick();}catch(e){inst.log(e.message,true)}};inst.uiLayerEl.appendChild(btn);inst.uiElements[id]={el:btn,type:'button'};return btn;},
+        set_text:(id,text)=>{if(inst.uiElements[id])inst.uiElements[id].el.innerText=text;},
+        remove_ui:id=>{if(inst.uiElements[id]){inst.uiElements[id].el.remove();delete inst.uiElements[id];}},
+        get_mouse:()=>({x:inst.mouse.x+inst.camera.x,y:inst.mouse.y+inst.camera.y,down:inst.mouse.down}),
     };
 }
 
@@ -1193,6 +986,7 @@ function createVortexGameInstance(containerEl, mapData, scriptCode, opts = {}) {
         physicsData: { player: null, blocks: [], coins: [] },
         uiElements: {},
         camera: { x: 0, y: 0 },
+        mouse: {x:0,y:0,down:false},
         coinCount: 0,
         handlers: null,
         loopHandle: null,
@@ -1232,6 +1026,10 @@ function createVortexGameInstance(containerEl, mapData, scriptCode, opts = {}) {
         }
     });
 
+    containerEl.addEventListener('mousemove', e=>{const r=containerEl.getBoundingClientRect();inst.mouse.x=e.clientX-r.left;inst.mouse.y=e.clientY-r.top;});
+    containerEl.addEventListener('mousedown', e=>{if(e.button===0)inst.mouse.down=true;});
+    containerEl.addEventListener('mouseup', e=>{if(e.button===0)inst.mouse.down=false;});
+
     inst.api = buildVortexAPI(inst);
 
     try {
@@ -1268,7 +1066,7 @@ function toggleEngineTestMode() {
 
     if (screen.style.display === 'none') {
         if (!currentSceneGrid.includes('player')) {
-            alert('⚠️ Coloque um Player (👾) no mapa antes de testar!');
+            vortexNotify('Coloque um Player na cena antes de testar.','error');
             return;
         }
         if (consoleBox) { consoleBox.innerHTML = ''; consoleBox.style.display = 'none'; }
@@ -1316,13 +1114,13 @@ function closePublishModal() {
 }
 
 function compileAndPublishEngineGame() {
-    if (!currentUser) return alert('Faça login primeiro.');
+    if (!currentUser) return vortexNotify('Faça login primeiro.');
 
     const title = document.getElementById('app-title-input').value.trim();
     const price = Number(document.getElementById('app-price-input').value) || 0;
 
-    if (!title) return alert('⚠️ Dê um nome ao seu jogo antes de publicar.');
-    if (!currentSceneGrid.includes('player')) return alert('⚠️ Coloque um Player (👾) na cena antes de publicar.');
+    if (!title) return vortexNotify('⚠️ Dê um nome ao seu jogo antes de publicar.');
+    if (!currentSceneGrid.includes('player')) return vortexNotify('Coloque um Player na cena antes de publicar.','error');
 
     const activeScript = vortexScripts.find(s => s.id === activeScriptId);
     const scriptCode = activeScript ? activeScript.code : '';
@@ -1331,7 +1129,7 @@ function compileAndPublishEngineGame() {
     try {
         compileVortexScript(scriptCode);
     } catch (err) {
-        return alert('❌ Erro ao compilar o script: ' + err.message + '\nCorrija o código antes de publicar.');
+        return vortexNotify('❌ Erro ao compilar o script: ' + err.message + '\nCorrija o código antes de publicar.');
     }
 
     const appId = 'app_' + Date.now();
@@ -1350,12 +1148,12 @@ function compileAndPublishEngineGame() {
     database.ref('publishedApps/' + appId).set(appData)
         .then(() => database.ref('users/' + currentUser.key + '/files/' + appId).set(true))
         .then(() => {
-            alert(`🚀 "${title}" foi compilado e publicado com sucesso!`);
+            vortexNotify(`🚀 "${title}" foi compilado e publicado com sucesso!`);
             closePublishModal();
             loadGlobalStore();
             loadUserFiles();
         })
-        .catch(err => alert('Erro ao publicar: ' + err.message));
+        .catch(err => vortexNotify('Erro ao publicar: ' + err.message));
 }
 
 function loadGlobalStore() {
@@ -1388,17 +1186,17 @@ function loadGlobalStore() {
 }
 
 function buyApp(appId, app) {
-    if (!currentUser) return alert('Faça login primeiro.');
+    if (!currentUser) return vortexNotify('Faça login primeiro.');
     if (Number(currentUser.balance || 0) < Number(app.price || 0)) {
-        return alert('❌ Saldo insuficiente para comprar este jogo.');
+        return vortexNotify('❌ Saldo insuficiente para comprar este jogo.');
     }
 
     addBalance(-Number(app.price || 0)).then(() => {
         return database.ref('users/' + currentUser.key + '/files/' + appId).set(true);
     }).then(() => {
-        alert(`✅ "${app.title}" adicionado aos seus arquivos!`);
+        vortexNotify(`✅ "${app.title}" adicionado aos seus arquivos!`);
         loadUserFiles();
-    }).catch(err => alert('Erro na compra: ' + err.message));
+    }).catch(err => vortexNotify('Erro na compra: ' + err.message));
 }
 
 function loadUserFiles() {
@@ -1460,78 +1258,134 @@ function stopRunnerInstance() {
 // VORTEX 10.5 - ADMIN PANEL
 // ==========================================
 const VORTEX_ADMINS = ['rip_fallenhero', 'king'];
-function isVortexAdmin(){ return !!currentUser && VORTEX_ADMINS.includes(String(currentUser.key).toLowerCase()); }
-function openAdminPanel(){ if(!isVortexAdmin()) return alert('⛔ Acesso negado.'); openWindow('win-admin'); loadAdminUsers(); loadAdminState(); }
+function isVortexAdmin(){
+  const k=(currentUser?.key||'').toLowerCase();
+  return k==='rip_fallenhero' || k==='king';
+}
+function openAdminPanel(){
+  if(!isVortexAdmin()) return vortexNotify('Acesso negado ao painel administrativo.','error');
+  openWindow('win-admin'); loadAdminUsers(); loadAdminState();
+}
 function adminSetBalance(){
   if(!isVortexAdmin()) return;
   const key=(document.getElementById('admin-user-key')?.value||'').trim().toLowerCase().replace(/[.#$/\[\]]/g,'_');
   const amount=Number(document.getElementById('admin-balance-value')?.value);
-  if(!key || !Number.isFinite(amount) || amount<0) return alert('Informe usuário e saldo válidos.');
-  database.ref('users/'+key+'/balance').set(amount).then(()=>alert('💰 Saldo atualizado.')).catch(e=>alert('Erro: '+e.message));
+  if(!key || !Number.isFinite(amount) || amount<0) return vortexNotify('Informe usuário e saldo válidos.','error');
+  database.ref('users/'+key).once('value').then(s=>{
+    if(!s.exists()) throw new Error('Usuário não encontrado.');
+    return database.ref('users/'+key+'/balance').set(Number(amount));
+  }).then(()=>vortexNotify('Saldo atualizado em tempo real.','success')).catch(e=>vortexNotify(e.message,'error'));
 }
 function adminToggleMaintenance(){
   if(!isVortexAdmin()) return;
   const enabled=document.getElementById('admin-maintenance')?.checked;
-  database.ref('system/maintenance').set(!!enabled).then(()=>alert(enabled?'🛠️ Manutenção ativada.':'✅ Manutenção desativada.'));
+  database.ref('system/maintenance').set(!!enabled).then(()=>vortexNotify(enabled?'Modo manutenção ativado.':'Modo manutenção desativado.','success')).catch(e=>vortexNotify(e.message,'error'));
 }
 function adminResetGlobal(){
   if(!isVortexAdmin()) return;
-  if(!confirm('Resetar a sessão de todos os usuários conectados?')) return;
-  database.ref('system/globalResetAt').set(Date.now()).then(()=>alert('🔄 Sinal de reset global enviado.'));
+  if(!vortexConfirm('Resetar a sessão de todos os usuários conectados?')) return;
+  database.ref('system/globalResetAt').set(Date.now()).then(()=>vortexNotify('Sinal de reset global enviado.','success')).catch(e=>vortexNotify(e.message,'error'));
 }
 function adminBanUser(){
   if(!isVortexAdmin()) return;
   const key=(document.getElementById('admin-ban-user')?.value||'').trim().toLowerCase().replace(/[.#$/\[\]]/g,'_');
-  if(!key) return;
-  database.ref('users/'+key+'/messengerBanned').set(true).then(()=>alert('🚫 Usuário banido do Messenger.'));
+  if(!key) return vortexNotify('Informe um nick.','error');
+  database.ref('users/'+key+'/messengerBanned').set(true).then(()=>vortexNotify('Usuário banido do Messenger.','success')).catch(e=>vortexNotify(e.message,'error'));
 }
 function adminUnbanUser(){
   if(!isVortexAdmin()) return;
   const key=(document.getElementById('admin-ban-user')?.value||'').trim().toLowerCase().replace(/[.#$/\[\]]/g,'_');
-  if(!key) return;
-  database.ref('users/'+key+'/messengerBanned').set(false).then(()=>alert('✅ Banimento removido.'));
+  if(!key) return vortexNotify('Informe um nick.','error');
+  database.ref('users/'+key+'/messengerBanned').set(false).then(()=>vortexNotify('Banimento removido.','success')).catch(e=>vortexNotify(e.message,'error'));
+}
+function adminDeleteAccount(){
+  if(!isVortexAdmin()) return;
+  const key=(document.getElementById('admin-delete-user')?.value||'').trim().toLowerCase().replace(/[.#$/\[\]]/g,'_');
+  if(!key) return vortexNotify('Informe o nick da conta.','error');
+  if(key===currentUser.key) return vortexNotify('Não é permitido excluir a própria conta pelo painel.','error');
+  if(!vortexConfirm('Excluir permanentemente os dados desta conta da Realtime Database?')) return;
+  database.ref('users/'+key).remove().then(()=>{
+    // Remove dados do perfil. Mensagens/grupos podem conter referências e não são apagados automaticamente.
+    return Promise.all([
+      database.ref('userFiles/'+key).remove().catch(()=>null),
+      database.ref('userSites/'+key).remove().catch(()=>null)
+    ]);
+  }).then(()=>{ vortexNotify('Conta removida da Realtime Database.','success'); loadAdminUsers(); }).catch(e=>vortexNotify(e.message,'error'));
 }
 function loadAdminState(){
   database.ref('system/maintenance').once('value').then(s=>{const e=document.getElementById('admin-maintenance');if(e)e.checked=!!s.val();});
 }
 function loadAdminUsers(){
   const list=document.getElementById('admin-users-list'); if(!list)return; list.innerHTML='Carregando...';
-  database.ref('users').once('value').then(s=>{list.innerHTML='';s.forEach(c=>{const u=c.val()||{};const d=document.createElement('div');d.style.cssText='padding:6px;border-bottom:1px solid rgba(255,255,255,.08);';d.innerHTML=`<strong>${c.key}</strong> — R$ ${Number(u.balance||0).toFixed(2)} ${u.messengerBanned?'🚫':''}`;list.appendChild(d);});});
+  database.ref('users').on('value',s=>{
+    list.innerHTML='';
+    s.forEach(c=>{const u=c.val()||{};const d=document.createElement('div');d.className='admin-user-row';d.innerHTML=`<strong>${escapeHTML(c.key)}</strong><span>R$ ${Number(u.balance||0).toFixed(2)}</span><span>${u.messengerBanned?'Banido':''}</span>`;list.appendChild(d);});
+  });
 }
 function watchGlobalSystem(){
-  database.ref('system/maintenance').on('value',s=>{ if(!s.val()) return; if(isVortexAdmin()) return; const o=document.getElementById('maintenance-screen'); if(o)o.style.display='flex'; });
+  database.ref('system/maintenance').on('value',s=>{ if(!s.val()) { const o=document.getElementById('maintenance-screen'); if(o)o.style.display='none'; return; } if(isVortexAdmin()) return; const o=document.getElementById('maintenance-screen'); if(o)o.style.display='flex'; });
   database.ref('system/globalResetAt').on('value',s=>{ const t=Number(s.val()||0); if(t && t>Number(localStorage.getItem('vortex_last_global_reset')||0)){ localStorage.setItem('vortex_last_global_reset',String(t)); shutdownPC(); } });
 }
 
 // ==========================================
-// VORTEX BROWSER
+// VORTEX BROWSER + HISTÓRICO
 // ==========================================
-function openVortexBrowser(){ openWindow('win-browser'); const input=document.getElementById('vortex-browser-address'); if(input) input.focus(); }
+let vortexBrowserHistory = JSON.parse(localStorage.getItem('vortex_browser_history') || '[]');
+function saveBrowserHistory(query){
+  const q=String(query||'').trim(); if(!q) return;
+  vortexBrowserHistory=[q,...vortexBrowserHistory.filter(x=>x!==q)].slice(0,50);
+  localStorage.setItem('vortex_browser_history',JSON.stringify(vortexBrowserHistory));
+}
+function openVortexBrowser(){ openWindow('win-browser'); const input=document.getElementById('vortex-browser-address'); if(input) input.focus(); renderBrowserHistory(); }
 function browserNavigate(){
   const input=document.getElementById('vortex-browser-address'); const frame=document.getElementById('vortex-browser-page'); if(!input||!frame)return;
   let q=input.value.trim(); if(!q) return;
+  saveBrowserHistory(q);
   if(!/^https?:\/\//i.test(q) && /^[a-z0-9-]+\.vort$/i.test(q)) q='vort://'+q;
   if(/^vort:\/\//i.test(q)){ loadVortSite(q.slice(7).toLowerCase(),frame); return; }
+  if(q.toLowerCase()==='vortex.api.vort'){ loadVortexApiSite(frame); return; }
   frame.innerHTML=`<div class="vortex-browser-home"><div class="vortex-browser-logo">Vortex</div><p>Pesquisa interna: <strong>${escapeHTML(q)}</strong></p><small>Digite um endereço .vort para abrir um site Vortex.</small></div>`;
+  renderBrowserHistory();
 }
+function renderBrowserHistory(){
+  const box=document.getElementById('vortex-browser-history'); if(!box)return;
+  box.innerHTML=vortexBrowserHistory.length?vortexBrowserHistory.map(q=>`<button class="history-item" onclick="document.getElementById('vortex-browser-address').value=${JSON.stringify(q)};browserNavigate()">${escapeHTML(q)}</button>`).join(''):'<span class="muted">Nenhuma pesquisa ainda.</span>';
+}
+function clearBrowserHistory(){ vortexBrowserHistory=[]; localStorage.setItem('vortex_browser_history','[]'); renderBrowserHistory(); vortexNotify('Histórico limpo.','success'); }
 function loadVortSite(domain,frame){
   const slug=domain.replace(/\.vort$/i,'').replace(/[^a-z0-9-]/g,'').toLowerCase();
+  if(slug==='vortex-api') return loadVortexApiSite(frame);
   database.ref('vortSites/'+slug).once('value').then(s=>{if(!s.exists()){frame.innerHTML='<div class="vortex-browser-home"><h2>404</h2><p>Este domínio .vort não existe.</p></div>';return;}const site=s.val();frame.innerHTML=site.html||'';const st=document.createElement('style');st.textContent=site.css||'';frame.appendChild(st);if(site.js){const sc=document.createElement('script');sc.textContent=site.js;frame.appendChild(sc);}}).catch(e=>frame.innerHTML='<p>Erro ao abrir site: '+escapeHTML(e.message)+'</p>');
 }
-function escapeHTML(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
+function loadVortexApiSite(frame){
+  frame.innerHTML=`<div class="api-site"><div class="api-site-hero"><div class="api-site-mark">V</div><div><h1>Vortex API</h1><p>Documentação da linguagem Vortex e da Engine 2D.</p></div></div><div class="api-site-grid"><aside class="api-site-nav"><button onclick="apiSiteJump('comece')">Começando</button><button onclick="apiSiteJump('ciclo')">Ciclo do jogo</button><button onclick="apiSiteJump('input')">Input</button><button onclick="apiSiteJump('movimento')">Movimento</button><button onclick="apiSiteJump('colisao')">Colisão</button><button onclick="apiSiteJump('objetos')">Objetos</button><button onclick="apiSiteJump('camera')">Câmera</button><button onclick="apiSiteJump('ui')">UI</button><button onclick="apiSiteJump('listas')">Listas</button><button onclick="apiSiteJump('exemplo')">Exemplo</button></aside><main class="api-site-content"><section id="comece"><h2>Começando</h2><p>Crie um script .vortex e use <code>_ready()</code> para inicialização e <code>_update()</code> para a lógica por frame.</p><pre>def _ready():\n    print("Jogo iniciado")\n\ndef _update():\n    p = vortex.get_player()\n    if p != None:\n        p.x = p.x + 2</pre></section><section id="ciclo"><h2>Ciclo do jogo</h2><p><code>_ready()</code> roda uma vez. <code>_update()</code> roda continuamente.</p></section><section id="input"><h2>Input</h2><pre>vortex.is_key_down("a")\nvortex.is_key_down("d")\nvortex.is_key_down("space")</pre></section><section id="movimento"><h2>Movimento</h2><pre>vortex.move(player, dx, dy)\nvortex.set_velocity(player, vx, vy)\nvortex.apply_gravity(player, 0.5)\nvortex.move_and_collide(player)</pre></section><section id="colisao"><h2>Colisão</h2><pre>vortex.check_collision(a, b)\nvortex.is_on_floor(player)\nfor bloco in vortex.get_blocks():\n    if vortex.check_collision(player, bloco):\n        pass</pre></section><section id="objetos"><h2>Objetos</h2><pre>vortex.spawn("square", 100, 100)\nvortex.spawn("circle", 200, 100)\nvortex.spawn("triangle", 300, 100)\nvortex.spawn("coin", 400, 100)\nvortex.set_size(obj, 64, 64)\nvortex.set_color(obj, "#a855f7")\nvortex.destroy(obj)</pre></section><section id="camera"><h2>Câmera</h2><pre>vortex.set_camera(x, y)\nvortex.follow_camera(player, 320, 180)</pre></section><section id="ui"><h2>Interface</h2><pre>vortex.create_text("score", "0", 20, 20)\nvortex.set_text("score", "100")\nvortex.create_button("play", "Jogar", 20, 60, iniciar)</pre></section><section id="listas"><h2>Dados</h2><pre>for i in range(10):\n    print(i)\n\nmoedas = [1, 2, 3]\nmoedas.append(4)\nprint(len(moedas))</pre></section><section id="exemplo"><h2>Exemplo: coletar moedas</h2><pre>def _update():\n    p = vortex.get_player()\n    if p == None:\n        return\n    if vortex.is_key_down("d"):\n        p.x = p.x + 4\n    for moeda in vortex.get_coins():\n        if not moeda.collected and vortex.check_collision(p, moeda):\n            vortex.collect_coin(moeda)\n            vortex.add_coins(1)</pre></section></main></div></div>`;
+}
+function apiSiteJump(id){document.getElementById(id)?.scrollIntoView({behavior:'smooth'});}
 
 // ==========================================
-// VORTEX SITE STUDIO (.VORT)
+// VORTEX SITE STUDIO (.VORT) — SAVE LOCAL + CLOUD
 // ==========================================
-function openSiteStudio(){openWindow('win-site-studio');}
+function openSiteStudio(){openWindow('win-site-studio'); loadSavedVortSites();}
 function vortexSiteSlug(){return (document.getElementById('site-domain')?.value||'').trim().toLowerCase().replace(/[^a-z0-9-]/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'');}
+function siteDraftKey(){return 'vortex_site_draft_'+(currentUser?.key||'guest');}
+function saveVortDraft(){
+  const data={domain:document.getElementById('site-domain')?.value||'',title:document.getElementById('site-title')?.value||'',html:document.getElementById('site-html')?.value||'',css:document.getElementById('site-css')?.value||'',js:document.getElementById('site-js')?.value||''};
+  localStorage.setItem(siteDraftKey(),JSON.stringify(data)); vortexNotify('Rascunho salvo neste computador.','success');
+}
+function loadVortDraft(){
+  try{const d=JSON.parse(localStorage.getItem(siteDraftKey())||'null');if(!d)return;for(const [id,key] of [['site-domain','domain'],['site-title','title'],['site-html','html'],['site-css','css'],['site-js','js']]){const e=document.getElementById(id);if(e&&d[key]!=null)e.value=d[key];}}catch(e){}
+}
 function saveVortSite(){
-  if(!currentUser)return alert('Faça login primeiro.');
-  const slug=vortexSiteSlug(); if(!slug)return alert('Escolha um domínio.');
+  if(!currentUser)return vortexNotify('Faça login primeiro.','error');
+  const slug=vortexSiteSlug(); if(!slug)return vortexNotify('Escolha um domínio.','error');
   const title=(document.getElementById('site-title')?.value||slug).trim();
   const html=document.getElementById('site-html')?.value||''; const css=document.getElementById('site-css')?.value||''; const js=document.getElementById('site-js')?.value||'';
   const data={domain:slug+'.vort',title,html,css,js,authorKey:currentUser.key,author:currentUser.displayName||currentUser.key,updatedAt:Date.now()};
-  database.ref('vortSites/'+slug).transaction(old=>{if(old && old.authorKey!==currentUser.key)return;return data;}).then(r=>{if(!r.committed)return alert('⛔ Você não é o dono deste domínio.');alert('🌐 Site publicado/atualizado em '+slug+'.vort');}).catch(e=>alert('Erro: '+e.message));
+  database.ref('vortSites/'+slug).transaction(old=>{if(old && old.authorKey!==currentUser.key)return;return data;}).then(r=>{if(!r.committed)return vortexNotify('Você não é o dono deste domínio.','error'); localStorage.removeItem(siteDraftKey()); vortexNotify('Site publicado/atualizado em '+slug+'.vort','success'); loadSavedVortSites();}).catch(e=>vortexNotify('Erro: '+e.message,'error'));
+}
+function loadSavedVortSites(){
+  const box=document.getElementById('saved-sites-list'); if(!box||!currentUser)return;
+  database.ref('vortSites').orderByChild('authorKey').equalTo(currentUser.key).once('value').then(s=>{box.innerHTML='';s.forEach(c=>{const site=c.val();const b=document.createElement('button');b.className='saved-site-item';b.innerHTML=`<strong>${escapeHTML(site.domain||c.key+'.vort')}</strong><span>${escapeHTML(site.title||'Sem título')}</span>`;b.onclick=()=>{document.getElementById('site-domain').value=c.key;document.getElementById('site-title').value=site.title||'';document.getElementById('site-html').value=site.html||'';document.getElementById('site-css').value=site.css||'';document.getElementById('site-js').value=site.js||'';};box.appendChild(b);});if(!box.children.length)box.innerHTML='<span class="muted">Nenhum site publicado.</span>';}).catch(()=>{});
 }
 function previewVortSite(){const f=document.getElementById('site-preview');if(!f)return;f.innerHTML=document.getElementById('site-html').value||'';const st=document.createElement('style');st.textContent=document.getElementById('site-css').value||'';f.appendChild(st);const sc=document.createElement('script');sc.textContent=document.getElementById('site-js').value||'';f.appendChild(sc);}
 
