@@ -778,11 +778,35 @@ function duplicateVortexScript(id){
   const copy={ id:"script_"+Date.now(), name:s.name+"_copia", code:s.code };
   vortexScripts.push(copy); activeScriptId=copy.id; saveEngineLocal(); renderHierarchy(); renderScriptsSidebarList();
 }
-function deleteVortexScript(id){
-  if(!confirm("Deseja remover este script?")) return;
-  vortexScripts=vortexScripts.filter(x=>x.id!==id);
-  if(activeScriptId===id) activeScriptId=vortexScripts[0]?.id||null;
-  saveEngineLocal(); renderHierarchy(); renderScriptsSidebarList();
+
+function deleteVortexScript(id) {
+  const scriptToDelete = vortexScripts.find(x => x.id === id);
+  if (!scriptToDelete) return;
+
+  if (!confirm(`Deseja excluir o script "${scriptToDelete.name}.vortex"?`)) return;
+
+  // Remove o script da lista
+  vortexScripts = vortexScripts.filter(x => x.id !== id);
+
+  // Se o script deletado era o ativo, escolhe o primeiro da lista restante
+  if (activeScriptId === id) {
+    activeScriptId = vortexScripts[0]?.id || null;
+  }
+
+  saveEngineLocal();
+  renderHierarchy();
+  renderScriptsSidebarList();
+
+  // Atualiza a tela do editor de código
+  if (activeScriptId) {
+    openVortexScriptEditor(activeScriptId);
+  } else {
+    // Se não restou nenhum script
+    const fileNameEl = document.getElementById("vortex-filename");
+    const codeEditorEl = document.getElementById("vortex-code-editor");
+    if (fileNameEl) fileNameEl.value = "";
+    if (codeEditorEl) codeEditorEl.value = "# Nenhum script aberto. Crie um novo script!";
+  }
 }
 
 function openVortexScriptEditor(id){activeScriptId=id;const s=vortexScripts.find(x=>x.id===id);if(!s)return;openWindow("win-vscode");document.getElementById("vortex-filename").value=s.name;document.getElementById("vortex-code-editor").value=s.code;renderScriptsSidebarList();}
