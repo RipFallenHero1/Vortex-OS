@@ -810,15 +810,31 @@ function deleteVortexScript(id) {
 }
 
 function openVortexScriptEditor(id){activeScriptId=id;const s=vortexScripts.find(x=>x.id===id);if(!s)return;openWindow("win-vscode");document.getElementById("vortex-filename").value=s.name;document.getElementById("vortex-code-editor").value=s.code;renderScriptsSidebarList();}
-function renderScriptsSidebarList(){
-  const l=document.getElementById("vscode-scripts-list");if(!l)return;l.innerHTML="";
-  vortexScripts.forEach(s=>{
-    const li=document.createElement("li");
-    li.innerText=(s.id===activeScriptId?"➤ ":"")+"▣ "+s.name+".vortex";
-    li.onclick=()=>openVortexScriptEditor(s.id);
-    l.appendChild(li);
+function renderScriptsSidebarList() {
+  const list = document.getElementById("vscode-scripts-list");
+  if (!list) return;
+  list.innerHTML = "";
+
+  vortexScripts.forEach(s => {
+    const li = document.createElement("li");
+    li.style.cssText = "display:flex; justify-content:space-between; align-items:center; padding:6px; cursor:pointer; gap:6px; overflow:hidden;";
+    if (s.id === activeScriptId) li.classList.add("active");
+
+    li.innerHTML = `
+      <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0;" title="${escapeHtml(s.name)}.vortex">
+        ${s.id === activeScriptId ? "➤ " : ""}▣ ${escapeHtml(s.name)}.vortex
+      </span>
+      <div style="display:flex; gap:4px; flex-shrink:0;">
+        <button style="background:none;border:none;color:#8b5cf6;cursor:pointer;font-size:12px;padding:2px;" onclick="event.stopPropagation(); duplicateVortexScript('${s.id}')" title="Duplicar">📋</button>
+        <button style="background:none;border:none;color:#f38ba8;cursor:pointer;font-size:12px;padding:2px;" onclick="event.stopPropagation(); deleteVortexScript('${s.id}')" title="Excluir">🗑</button>
+      </div>
+    `;
+
+    li.onclick = () => openVortexScriptEditor(s.id);
+    list.appendChild(li);
   });
 }
+
 function saveVortexScript(){
   const name=document.getElementById("vortex-filename").value.trim()||"main",code=document.getElementById("vortex-code-editor").value;
   let s=vortexScripts.find(x=>x.id===activeScriptId);
