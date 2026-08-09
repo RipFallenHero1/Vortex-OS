@@ -19,7 +19,7 @@
 //   `len()`.
 //
 // ==========================================
-const OS_VERSION = "11.00";
+const OS_VERSION = "11.02";
 
 // ---- FIREBASE CONFIG ----
 const firebaseConfig = {
@@ -549,430 +549,183 @@ function calcEval() {
 }
 
 // ==========================================
-// 10. VORTEX ENGINE 2D — SCENE EDITOR 11.00
-// ==========================================
+// 10. VORTEX ENGINE 2D — SCENE EDITOR 11.02
+// Editor inspirado em workflows de engines 2D profissionais:
+// Hierarchy | Scene/Game | Inspector | Project/Console
+// -----------------------------------------------------------------------------
 let mapCanvasInitialized=false;
 let editorCamera={x:0,y:0,zoom:1};
 let editorPan={active:false,startX:0,startY:0,camX:0,camY:0};
-const EDITOR_W=1200, EDITOR_H=800;
-const SHAPES=['square','circle','triangle','player','coin','text','button'];
+let editorDrag={active:false,index:-1,startX:0,startY:0,ox:0,oy:0};
+let editorResize={active:false,index:-1,corner:'se',startX:0,startY:0,ox:0,oy:0,ow:0,oh:0};
+let editorTool='select';
+let editorView='scene';
+const EDITOR_WORLD_W=5000, EDITOR_WORLD_H=3000;
+const SHAPES=['square','circle','triangle','player','coin'];
 
 function initMapCanvasOnce(){
   if(mapCanvasInitialized)return;
   const canvas=document.getElementById('canvas-2d'); if(!canvas)return;
   canvas.innerHTML=''; canvas.classList.add('vortex-scene-viewport');
   canvas.oncontextmenu=e=>{e.preventDefault();return false;};
-  canvas.onmousedown=e=>{
-    if(e.button===2){
-      editorPan.active=true;editorPan.startX=e.clientX;editorPan.startY=e.clientY;
-      editorPan.camX=editorCamera.x;editorPan.camY=editorCamera.y;
-      canvas.classList.add('panning');
-      return;
-    }
-    if(e.button!==0)return;
-    const object=e.target.closest?.('.scene-object');
-    const handle=e.target.closest?.('.resize-handle');
-    if(handle)return;
-    if(object){
-      selectSceneObject(Number(object.dataset.index));
-      return;
-    }
-    if(currentTileMode==='select' || currentTileMode==='resize') { selectedSceneIndex=-1; renderScene(); return; }
-    createSceneObjectAtEvent(e);
-  };
-  canvas.onmousemove=e=>{
-    if(editorPan.active){
-      editorCamera.x=editorPan.camX-(e.clientX-editorPan.startX)/editorCamera.zoom;
-      editorCamera.y=editorPan.camY-(e.clientY-editorPan.startY)/editorCamera.zoom;
-      applyEditorCamera();
-    }
-  };
-  window.addEventListener('mouseup',()=>{editorPan.active=false;canvas.classList.remove('panning');});
-  canvas.addEventListener('wheel',e=>{
-    e.preventDefault();
-    const rect=canvas.getBoundingClientRect();
-    const before={x:(e.clientX-rect.left)/editorCamera.zoom+editorCamera.x,y:(e.clientY-rect.top)/editorCamera.zoom+editorCamera.y};
-    editorCamera.zoom=Math.max(.25,Math.min(3,editorCamera.zoom*(e.deltaY<0?1.1:.9)));
-    const after={x:(e.clientX-rect.left)/editorCamera.zoom+editorCamera.x,y:(e.clientY-rect.top)/editorCamera.zoom+editorCamera.y};
-    editorCamera.x+=before.x-after.x; editorCamera.y+=before.y-after.y;
-    applyEditorCamera();
-  },{passive:false});
-  const world=document.createElement('div'); world.id='vortex-scene-world'; world.className='vortex-scene-world'; canvas.appendChild(world);
-  mapCanvasInitialized=true; renderScene(); applyEditorCamera();
+  canvas.addEventListener('mousedown',vortexScenePointerDown);
+  canvas.addEventListener('mousemove',vortexScenePointerMove);
+  canvas.addEventListener('mouseup',vortexScenePointerUp);
+  canvas.addEventListener('mouseleave',vortexScenePointerUp);
+  canvas.addEventListener('wheel',vortexSceneWheel,{passive:false});
+  const world=document.createElement('div'); world.id='vortex-scene-world'; world.className='vortex-scene-world';
+  canvas.appendChild(world);
+  mapCanvasInitialized=true;
+  renderScene(); applyEditorCamera(); vortexEditorTool('select');
 }
-function applyEditorCamera(){const world=document.getElementById('vortex-scene-world');if(world)world.style.transform=`translate(${-editorCamera.x*editorCamera.zoom}px,${-editorCamera.y*editorCamera.zoom}px) scale(${editorCamera.zoom})`;const label=document.getElementById('engine-viewport-label');if(label)label.innerText=`CENA 2D  •  Câmera ${Math.round(editorCamera.x)}, ${Math.round(editorCamera.y)}  •  Zoom ${Math.round(editorCamera.zoom*100)}%  •  Botão direito: mover câmera`}
-function sceneFreeIndex(){let i=0;while(currentSceneGrid[i])i++;if(i>=1000)currentSceneGrid.length=1100;return i;}
-function defaultTransform(i){return currentSceneTransforms[i]||{x:80+(i%10)*64,y:80+Math.floor(i/10)*64,w:56,h:56,rotation:0};}
-function setTileMode(mode){currentTileMode=mode;['square','circle','triangle','player','coin','text','button','select','resize','erase'].forEach(m=>{const b=document.getElementById('btn-t-'+m);if(b)b.classList.toggle('active',m===mode);});const ins=document.getElementById('inspector-content');if(ins)ins.innerHTML=mode==='resize'?'<strong>Tamanho</strong><p>Selecione um objeto e arraste qualquer alça. O redimensionamento funciona direto na cena.</p>':mode==='select'?'<strong>Seleção</strong><p>Clique em um objeto para selecionar. Arraste para mover.</p>':`<strong>Ferramenta</strong><p>${escapeHTML(mode)}</p>`;renderScene();}
-function createSceneObjectAtEvent(e){
-  const canvas=document.getElementById('canvas-2d'); if(!canvas)return;
-  const rect=canvas.getBoundingClientRect();
-  const x=(e.clientX-rect.left)/editorCamera.zoom+editorCamera.x;
-  const y=(e.clientY-rect.top)/editorCamera.zoom+editorCamera.y;
-  if(currentTileMode==='erase'){
-    const hit=e.target.closest?.('.scene-object');
-    if(hit){selectedSceneIndex=Number(hit.dataset.index);deleteSelectedSceneObject();}
+
+function screenToWorld(e){
+  const canvas=document.getElementById('canvas-2d'),r=canvas.getBoundingClientRect();
+  return {x:(e.clientX-r.left)/editorCamera.zoom+editorCamera.x,y:(e.clientY-r.top)/editorCamera.zoom+editorCamera.y};
+}
+function applyEditorCamera(){
+  const world=document.getElementById('vortex-scene-world');
+  if(world)world.style.transform=`translate(${-editorCamera.x*editorCamera.zoom}px,${-editorCamera.y*editorCamera.zoom}px) scale(${editorCamera.zoom})`;
+  const label=document.getElementById('engine-viewport-label');
+  if(label)label.textContent=`Scene 2D  •  ${Math.round(editorCamera.zoom*100)}%  •  RMB pan  •  Wheel zoom`;
+}
+function vortexEditorTool(tool){
+  editorTool=tool;
+  document.querySelectorAll('.scene-tool').forEach(b=>b.classList.toggle('active',b.dataset.tool===tool));
+  const canvas=document.getElementById('canvas-2d');
+  if(canvas)canvas.dataset.tool=tool;
+}
+function vortexEditorView(view){
+  editorView=view;
+  document.querySelectorAll('.scene-tab').forEach(b=>b.classList.remove('active'));
+  const tab=document.getElementById('scene-tab-'+view);if(tab)tab.classList.add('active');
+  const canvas=document.getElementById('canvas-2d');if(!canvas)return;
+  canvas.classList.toggle('game-view',view==='game');
+  if(view==='game'){
+    if(typeof toggleEngineTestMode==='function') toggleEngineTestMode(true);
+  }else{
+    const test=document.getElementById('engine-test-screen');if(test)test.style.display='none';
+  }
+}
+function vortexScenePointerDown(e){
+  if(e.button===2){
+    editorPan={active:true,startX:e.clientX,startY:e.clientY,camX:editorCamera.x,camY:editorCamera.y};
+    this.classList.add('panning'); return;
+  }
+  if(e.button!==0)return;
+  const obj=e.target.closest?.('.scene-object');
+  const handle=e.target.closest?.('.resize-handle');
+  if(handle)return;
+  if(obj){
+    const i=Number(obj.dataset.index);selectSceneObject(i);
+    if(editorTool==='move' || editorTool==='select'){
+      const tr=currentSceneTransforms[i]||defaultTransform(i),p=screenToWorld(e);
+      editorDrag={active:true,index:i,startX:p.x,startY:p.y,ox:tr.x,oy:tr.y};
+      e.preventDefault();
+    }
     return;
   }
-  let type=SHAPES.includes(currentTileMode)?currentTileMode:'square';
+  if(editorTool==='rect'){
+    const p=screenToWorld(e);vortexAddObject('square',p.x,p.y);return;
+  }
+  selectedSceneIndex=-1;renderScene();
+}
+function vortexScenePointerMove(e){
+  if(editorPan.active){
+    editorCamera.x=editorPan.camX-(e.clientX-editorPan.startX)/editorCamera.zoom;
+    editorCamera.y=editorPan.camY-(e.clientY-editorPan.startY)/editorCamera.zoom;
+    applyEditorCamera(); return;
+  }
+  const p=screenToWorld(e);const coords=document.getElementById('scene-coordinates');if(coords)coords.textContent=`X ${Math.round(p.x)}  Y ${Math.round(p.y)}`;
+  if(editorDrag.active){
+    const tr=currentSceneTransforms[editorDrag.index];tr.x=editorDrag.ox+p.x-editorDrag.startX;tr.y=editorDrag.oy+p.y-editorDrag.startY;renderScene();}
+  if(editorResize.active){vortexResizeMove(e);}
+}
+function vortexScenePointerUp(){
+  editorPan.active=false;editorDrag.active=false;
+  document.getElementById('canvas-2d')?.classList.remove('panning');
+  if(editorResize.active){editorResize.active=false;renderScene();}
+}
+function vortexSceneWheel(e){
+  e.preventDefault();
+  const before=screenToWorld(e),factor=e.deltaY<0?1.12:0.89;
+  editorCamera.zoom=Math.max(.2,Math.min(4,editorCamera.zoom*factor));
+  const after=screenToWorld(e);editorCamera.x+=before.x-after.x;editorCamera.y+=before.y-after.y;applyEditorCamera();
+}
+function sceneFreeIndex(){let i=0;while(currentSceneGrid[i])i++;if(i>=currentSceneGrid.length)currentSceneGrid.length=i+1;return i;}
+function defaultTransform(i){return currentSceneTransforms[i]||{x:120+(i%8)*100,y:120+Math.floor(i/8)*100,w:64,h:64,rotation:0};}
+function vortexCreateObjectMenu(){
+  vortexNotify('Escolha um tipo na barra da Scene.','info');
+}
+function vortexAddObject(type,x,y){
+  const canvas=document.getElementById('canvas-2d');if(!canvas)return;
+  if(x===undefined||y===undefined){const r=canvas.getBoundingClientRect();x=editorCamera.x+r.width/(2*editorCamera.zoom);y=editorCamera.y+r.height/(2*editorCamera.zoom);}
   const i=sceneFreeIndex();
   if(type==='player'){
     const old=currentSceneGrid.indexOf('player');
-    if(old>=0){currentSceneGrid[old]='';delete currentSceneTransforms[old];}
+    if(old>=0){currentSceneGrid[old]='';delete currentSceneTransforms[old];delete currentSceneMeta[old];}
   }
   currentSceneGrid[i]=type;
-  currentSceneTransforms[i]={x:x-28,y:y-28,w:56,h:56,rotation:0};
-  if(type==='coin') currentSceneMeta[i]=Object.assign({},currentSceneMeta[i],{color:'#facc15'});
-  if(type==='player') currentSceneMeta[i]=Object.assign({},currentSceneMeta[i],{color:'#22c55e'});
-  selectedSceneIndex=i;
+  currentSceneTransforms[i]={x:x-32,y:y-32,w:64,h:64,rotation:0};
+  const defaults={square:'#8b5cf6',circle:'#a78bfa',triangle:'#c084fc',player:'#22c55e',coin:'#facc15'};
+  currentSceneMeta[i]=Object.assign({},currentSceneMeta[i],{color:defaults[type]||'#8b5cf6',name:type.charAt(0).toUpperCase()+type.slice(1)});
+  selectedSceneIndex=i;renderScene();selectSceneObject(i);
+}
+function renderScene(){
+  const world=document.getElementById('vortex-scene-world');if(!world)return;
+  world.innerHTML='';
+  const grid=document.createElement('div');grid.className='vortex-scene-grid';grid.style.width=EDITOR_WORLD_W+'px';grid.style.height=EDITOR_WORLD_H+'px';world.appendChild(grid);
+  currentSceneGrid.forEach((type,i)=>{
+    if(!type)return;const tr=defaultTransform(i),meta=currentSceneMeta[i]||{};
+    const o=document.createElement('div');o.className='scene-object scene-'+type+(i===selectedSceneIndex?' selected':'');o.dataset.index=i;
+    o.title=meta.name||`${type} #${i+1}`;
+    Object.assign(o.style,{left:tr.x+'px',top:tr.y+'px',width:tr.w+'px',height:tr.h+'px',transform:`rotate(${tr.rotation||0}deg)`});
+    if(meta.color)o.style.background=meta.color;
+    const label=document.createElement('span');label.className='scene-object-label';label.textContent=meta.name||type; o.appendChild(label);
+    world.appendChild(o);
+  });
+  renderSceneSelectionHandles();renderHierarchy();
+}
+function renderHierarchy(){
+  const tree=document.getElementById('hierarchy-tree');if(!tree)return;tree.innerHTML='';
+  const q=(document.getElementById('hierarchy-search')?.value||'').toLowerCase();
+  currentSceneGrid.forEach((type,i)=>{if(!type)return;const meta=currentSceneMeta[i]||{},name=meta.name||`${type} #${i+1}`;if(q&&!name.toLowerCase().includes(q))return;
+    const li=document.createElement('li');li.className='tree-item '+(i===selectedSceneIndex?'selected':'');li.innerHTML=`<span class="shape-mini shape-${type}"></span><span>${escapeHTML(name)}</span>`;li.onclick=()=>selectSceneObject(i);tree.appendChild(li);
+  });
+}
+function selectSceneObject(index){
+  selectedSceneIndex=index;const type=currentSceneGrid[index];if(!type){renderScene();return;}
+  const tr=currentSceneTransforms[index]||defaultTransform(index),meta=currentSceneMeta[index]||{};currentSceneTransforms[index]=tr;
+  const color=meta.color||'#8b5cf6';
+  const ins=document.getElementById('inspector-content');if(ins)ins.innerHTML=`<div class="unity-inspector-header"><span class="inspector-shape shape-${type}"></span><div><strong>${escapeHTML(meta.name||type)}</strong><small>${type}</small></div></div><div class="inspector-section"><div class="inspector-section-title">Transform</div><label>Position X<input id="insp-x" type="number" value="${Math.round(tr.x)}"></label><label>Position Y<input id="insp-y" type="number" value="${Math.round(tr.y)}"></label><label>Width<input id="insp-w" type="number" min="4" value="${Math.round(tr.w)}"></label><label>Height<input id="insp-h" type="number" min="4" value="${Math.round(tr.h)}"></label><label>Rotation<input id="insp-r" type="number" value="${Math.round(tr.rotation||0)}"></label></div><div class="inspector-section"><div class="inspector-section-title">Appearance</div><label>Name<input id="insp-name" type="text" value="${escapeHTML(meta.name||type)}"></label><label>Color<input id="insp-color" type="color" value="${color}"></label></div><div class="inspector-actions"><button class="btn btn-primary" onclick="applyInspectorTransform()">Apply</button><button class="btn danger-btn" onclick="deleteSelectedSceneObject()">Delete</button></div>`;
   renderScene();
-  selectSceneObject(i);
 }
-function applyTool(index){selectSceneObject(index);}
-function renderScene(){const world=document.getElementById('vortex-scene-world');if(!world)return;world.innerHTML='';const grid=document.createElement('div');grid.className='vortex-scene-grid';grid.style.width='2400px';grid.style.height='1600px';world.appendChild(grid);currentSceneGrid.forEach((type,i)=>{if(!type)return;const tr=defaultTransform(i),meta=currentSceneMeta[i]||{};const o=document.createElement('div');o.className='scene-object scene-'+type+(i===selectedSceneIndex?' selected':'');o.dataset.index=i;Object.assign(o.style,{left:tr.x+'px',top:tr.y+'px',width:tr.w+'px',height:tr.h+'px',transform:`rotate(${tr.rotation||0}deg)`});if(meta.color)o.style.background=meta.color;o.onmousedown=e=>{if(e.button!==0)return;e.stopPropagation();if(currentTileMode==='erase'){deleteSelectedSceneObject();return;}selectSceneObject(i);if(currentTileMode==='select'){const sx=e.clientX,sy=e.clientY,ox=tr.x,oy=tr.y;const move=ev=>{tr.x=ox+(ev.clientX-sx)/editorCamera.zoom;tr.y=oy+(ev.clientY-sy)/editorCamera.zoom;renderScene();};const up=()=>{window.removeEventListener('mousemove',move);window.removeEventListener('mouseup',up);};window.addEventListener('mousemove',move);window.addEventListener('mouseup',up);}};world.appendChild(o);});renderSceneSelectionHandles();renderHierarchy();}
-function renderHierarchy(){const tree=document.getElementById('hierarchy-tree');if(!tree)return;tree.innerHTML='';currentSceneGrid.forEach((type,i)=>{if(!type)return;const li=document.createElement('li');li.className='tree-item '+(i===selectedSceneIndex?'selected':'');li.innerHTML=`<span class="shape-mini shape-${type}"></span><span>${type} #${i+1}</span>`;li.onclick=()=>selectSceneObject(i);tree.appendChild(li);});vortexScripts.forEach(s=>{const li=document.createElement('li');li.className='tree-script';li.innerHTML=`<span>V</span>${escapeHTML(s.name)}.vortex`;li.onclick=()=>openVortexScriptEditor(s.id);tree.appendChild(li);});}
-function selectSceneObject(index){selectedSceneIndex=index;const type=currentSceneGrid[index];if(!type)return;const tr=defaultTransform(index),meta=currentSceneMeta[index]||{};currentSceneTransforms[index]=tr;const color=meta.color||(type==='coin'?'#facc15':type==='player'?'#22c55e':'#8b5cf6');const ins=document.getElementById('inspector-content');if(ins)ins.innerHTML=`<div class="inspector-form"><strong>${type.toUpperCase()}</strong><label>X<input id="insp-x" type="number" value="${Math.round(tr.x)}"></label><label>Y<input id="insp-y" type="number" value="${Math.round(tr.y)}"></label><label>Largura<input id="insp-w" type="number" min="4" value="${Math.round(tr.w)}"></label><label>Altura<input id="insp-h" type="number" min="4" value="${Math.round(tr.h)}"></label><label>Cor<input id="insp-color" type="color" value="${color}"></label><button class="btn btn-primary" onclick="applyInspectorTransform()">Aplicar</button><button class="btn danger-btn" onclick="deleteSelectedSceneObject()">Excluir objeto</button></div>`;renderScene();}
-function applyInspectorTransform(){if(selectedSceneIndex<0)return;const i=selectedSceneIndex,tr=currentSceneTransforms[i]||defaultTransform(i);tr.x=Number(document.getElementById('insp-x').value)||0;tr.y=Number(document.getElementById('insp-y').value)||0;tr.w=Math.max(4,Number(document.getElementById('insp-w').value)||4);tr.h=Math.max(4,Number(document.getElementById('insp-h').value)||4);currentSceneTransforms[i]=tr;currentSceneMeta[i]=Object.assign({},currentSceneMeta[i],{color:document.getElementById('insp-color').value});renderScene();}
-function deleteSelectedSceneObject(){if(selectedSceneIndex<0)return;currentSceneGrid[selectedSceneIndex]='';delete currentSceneMeta[selectedSceneIndex];delete currentSceneTransforms[selectedSceneIndex];selectedSceneIndex=-1;renderScene();}
-function renderSceneSelectionHandles(){const old=document.getElementById('vortex-resize-overlay');if(old)old.remove();if(selectedSceneIndex<0)return;const world=document.getElementById('vortex-scene-world');const tr=defaultTransform(selectedSceneIndex);const o=document.querySelector(`.scene-object[data-index="${selectedSceneIndex}"]`);if(!world||!o)return;const overlay=document.createElement('div');overlay.id='vortex-resize-overlay';overlay.className='resize-selection-box';Object.assign(overlay.style,{left:tr.x+'px',top:tr.y+'px',width:tr.w+'px',height:tr.h+'px'});['nw','ne','sw','se'].forEach(c=>{const h=document.createElement('div');h.className='resize-handle '+c;h.onmousedown=e=>{e.stopPropagation();e.preventDefault();const sx=e.clientX,sy=e.clientY,ox=tr.x,oy=tr.y,ow=tr.w,oh=tr.h;const move=ev=>{let dx=(ev.clientX-sx)/editorCamera.zoom,dy=(ev.clientY-sy)/editorCamera.zoom;if(c.includes('e'))tr.w=Math.max(8,ow+dx);if(c.includes('s'))tr.h=Math.max(8,oh+dy);if(c.includes('w')){tr.x=ox+dx;tr.w=Math.max(8,ow-dx);}if(c.includes('n')){tr.y=oy+dy;tr.h=Math.max(8,oh-dy);}renderScene();};const up=()=>{window.removeEventListener('mousemove',move);window.removeEventListener('mouseup',up);};window.addEventListener('mousemove',move);window.addEventListener('mouseup',up);};overlay.appendChild(h);});world.appendChild(overlay);}
-function addHierarchyItem(type){
-  const canvas=document.getElementById('canvas-2d');
-  if(!canvas)return;
-  currentTileMode=type;
-  const rect=canvas.getBoundingClientRect();
-  createSceneObjectAtEvent({clientX:rect.left+Math.min(220,rect.width/2),clientY:rect.top+Math.min(180,rect.height/2),target:canvas});
+function applyInspectorTransform(){
+  if(selectedSceneIndex<0)return;const i=selectedSceneIndex,tr=currentSceneTransforms[i]||defaultTransform(i),meta=currentSceneMeta[i]||{};
+  tr.x=Number(document.getElementById('insp-x')?.value)||0;tr.y=Number(document.getElementById('insp-y')?.value)||0;tr.w=Math.max(4,Number(document.getElementById('insp-w')?.value)||4);tr.h=Math.max(4,Number(document.getElementById('insp-h')?.value)||4);tr.rotation=Number(document.getElementById('insp-r')?.value)||0;
+  meta.name=document.getElementById('insp-name')?.value||meta.name||currentSceneGrid[i];meta.color=document.getElementById('insp-color')?.value||meta.color;currentSceneTransforms[i]=tr;currentSceneMeta[i]=meta;renderScene();selectSceneObject(i);
 }
-
-// ==========================================
-// 11. LINGUAGEM VORTEX (PYTHON-LIKE) — CRIAÇÃO DE SCRIPTS
-// ==========================================
-//
-// API disponível dentro de _ready() e _update() via objeto global `vortex`:
-//
-//   vortex.print(...)                     -> loga no console da engine
-//   vortex.get_player()                   -> {x,y,vx,vy,w,h,el} ou null
-//   vortex.get_blocks()                   -> lista de blocos {x,y,w,h}
-//   vortex.get_coins()                    -> lista de moedas {x,y,w,h,collected}
-//   vortex.is_key_down("a"/"arrowleft"/" "/etc)
-//   vortex.check_collision(a, b)          -> bool (colisão de retângulos)
-//   vortex.spawn(tipo, gridX, gridY)      -> cria entidade na grade (32x35)
-//   vortex.spawn_at(tipo, x, y)           -> cria entidade em pixel
-//   vortex.destroy(entidade)
-//   vortex.collect_coin(moeda)            -> some com a moeda (você decide quando chamar)
-//   vortex.add_coins(n) / vortex.set_coins(n) / vortex.get_coins_count()
-//   vortex.set_camera(x, y)               -> desloca a câmera (mundo) manualmente
-//   vortex.create_text(id, texto, x, y, cor?)
-//   vortex.create_button(id, texto, x, y, funcaoDeCallback)
-//   vortex.set_text(id, texto)
-//   vortex.remove_ui(id)
-//
-// Funções nativas da linguagem: str(x), int(x), float(x), len(x)
-//
-// Nada de física, movimento ou colisão é automático: o script precisa
-// implementar isso chamando as funções acima dentro de _update().
-
-function saveVortexScriptsLocal(){if(currentUser)localStorage.setItem('vortex_scripts_'+currentUser.key,JSON.stringify(vortexScripts));}
-function loadVortexScriptsLocal(){if(!currentUser)return;try{vortexScripts=JSON.parse(localStorage.getItem('vortex_scripts_'+currentUser.key)||'[]')||[];activeScriptId=vortexScripts[0]?.id||null;}catch(e){vortexScripts=[];activeScriptId=null;}}
-
-function createVortexScript() {
-    const name = 'novo_script_' + (vortexScripts.length + 1);
-    const id = 'script_' + Date.now();
-    const defaultCode =
-`# Script Vortex - ${name}.vortex
-# Nada aqui é automático: você programa o movimento, a gravidade,
-# a colisão, a coleta de moedas e a câmera.
-
-def _ready():
-    print("Script ${name} carregado!")
-    vortex.create_text("hud_moedas", "Moedas: 0", 10, 10)
-
-def _update():
-    player = vortex.get_player()
-    if player == None:
-        return
-
-    # --- Movimento horizontal ---
-    if vortex.is_key_down("a") or vortex.is_key_down("arrowleft"):
-        player.x = player.x - 4
-    if vortex.is_key_down("d") or vortex.is_key_down("arrowright"):
-        player.x = player.x + 4
-
-    # --- Gravidade simples ---
-    player.vy = player.vy + 0.6
-    player.y = player.y + player.vy
-
-    # --- Colisão com blocos (pouso e pulo) ---
-    for bloco in vortex.get_blocks():
-        if vortex.check_collision(player, bloco):
-            player.y = bloco.y - player.h
-            player.vy = 0
-            if vortex.is_key_down(" "):
-                player.vy = -12
-
-    # --- Coleta de moedas ---
-    for moeda in vortex.get_coins():
-        if not moeda.collected and vortex.check_collision(player, moeda):
-            vortex.collect_coin(moeda)
-            vortex.add_coins(1)
-            vortex.set_text("hud_moedas", "Moedas: " + str(vortex.get_coins_count()))
-
-    # --- Câmera seguindo o jogador ---
-    vortex.set_camera(player.x - 300, player.y - 200)
-
-# Qualquer função como esta pode ser chamada por um botão colocado
-# no mapa (ferramenta "🔘 Botão" na Engine), digitando "abrir_bau" no
-# campo de ação do botão.
-def abrir_bau():
-    print("O baú foi aberto!")
-    vortex.add_coins(5)`;
-
-    vortexScripts.push({ id, name, code: defaultCode });
-    saveVortexScriptsLocal();
-
-    // Adiciona na hierarquia da engine
-    const tree = document.getElementById('hierarchy-tree');
-    if (tree) {
-        const li = document.createElement('li');
-        li.innerText = `📜 ${name}.vortex`;
-        li.style.cursor = 'pointer';
-        li.dataset.scriptId = id;
-        li.onclick = () => openVortexScriptEditor(id);
-        tree.appendChild(li);
-    }
-
-    openVortexScriptEditor(id);
+function deleteSelectedSceneObject(){if(selectedSceneIndex<0)return;currentSceneGrid[selectedSceneIndex]='';delete currentSceneMeta[selectedSceneIndex];delete currentSceneTransforms[selectedSceneIndex];selectedSceneIndex=-1;renderScene();vortexNotify('GameObject excluído.','info');}
+function renderSceneSelectionHandles(){
+  const old=document.getElementById('vortex-resize-overlay');if(old)old.remove();if(selectedSceneIndex<0)return;
+  const world=document.getElementById('vortex-scene-world'),tr=currentSceneTransforms[selectedSceneIndex]||defaultTransform(selectedSceneIndex);if(!world)return;
+  const overlay=document.createElement('div');overlay.id='vortex-resize-overlay';overlay.className='resize-selection-box';Object.assign(overlay.style,{left:tr.x+'px',top:tr.y+'px',width:tr.w+'px',height:tr.h+'px'});
+  ['nw','n','ne','e','se','s','sw','w'].forEach(c=>{const h=document.createElement('div');h.className='resize-handle '+c;h.onmousedown=e=>{e.stopPropagation();e.preventDefault();editorResize={active:true,index:selectedSceneIndex,corner:c,startX:e.clientX,startY:e.clientY,ox:tr.x,oy:tr.y,ow:tr.w,oh:tr.h};};overlay.appendChild(h);});world.appendChild(overlay);
 }
-
-function openVortexScriptEditor(scriptId) {
-    activeScriptId = scriptId;
-    const script = vortexScripts.find(s => s.id === scriptId);
-    if (!script) return;
-
-    openWindow('win-vscode');
-    document.getElementById('vortex-filename').value = script.name;
-    document.getElementById('vortex-code-editor').value = script.code;
-    renderScriptsSidebarList();
+function vortexResizeMove(e){
+  const r=editorResize;if(!r.active)return;const tr=currentSceneTransforms[r.index];const dx=(e.clientX-r.startX)/editorCamera.zoom,dy=(e.clientY-r.startY)/editorCamera.zoom;let x=r.ox,y=r.oy,w=r.ow,h=r.oh;
+  if(r.corner.includes('e'))w=Math.max(8,r.ow+dx);if(r.corner.includes('s'))h=Math.max(8,r.oh+dy);if(r.corner.includes('w')){w=Math.max(8,r.ow-dx);x=r.ox+(r.ow-w);}if(r.corner.includes('n')){h=Math.max(8,r.oh-dy);y=r.oy+(r.oh-h);}
+  Object.assign(tr,{x,y,w,h});renderScene();
 }
-
-function renderScriptsSidebarList() {
-    const list = document.getElementById('vscode-scripts-list');
-    if (!list) return;
-    list.innerHTML = '';
-
-    if (vortexScripts.length === 0) {
-        list.innerHTML = '<li style="color:#666;">Nenhum script ainda</li>';
-        return;
-    }
-
-    vortexScripts.forEach(s => {
-        const li = document.createElement('li');
-        li.style.cssText = 'display:flex;align-items:center;gap:6px;padding:4px 0;';
-        const openBtn = document.createElement('button');
-        openBtn.className = 'btn';
-        openBtn.style.cssText = 'flex:1;text-align:left;padding:4px 6px;';
-        openBtn.innerText = (s.id === activeScriptId ? '➤ ' : '📜 ') + s.name + '.vortex';
-        openBtn.onclick = () => openVortexScriptEditor(s.id);
-        const delBtn = document.createElement('button');
-        delBtn.className = 'btn';
-        delBtn.style.cssText = 'padding:4px 7px;color:#ff6b81;';
-        delBtn.innerText = '🗑️';
-        delBtn.title = 'Excluir script';
-        delBtn.onclick = (e) => { e.stopPropagation(); deleteVortexScript(s.id); };
-        li.append(openBtn, delBtn);
-        list.appendChild(li);
-    });
+function vortexFrameSelected(){
+  const tr=selectedSceneIndex>=0?(currentSceneTransforms[selectedSceneIndex]||defaultTransform(selectedSceneIndex)):null;if(!tr)return vortexCenterScene();
+  const c=document.getElementById('canvas-2d');editorCamera.zoom=Math.min(2,Math.max(.5,Math.min(c.clientWidth/(tr.w*3),c.clientHeight/(tr.h*3))));editorCamera.x=tr.x+tr.w/2-c.clientWidth/(2*editorCamera.zoom);editorCamera.y=tr.y+tr.h/2-c.clientHeight/(2*editorCamera.zoom);applyEditorCamera();
 }
+function vortexCenterScene(){const c=document.getElementById('canvas-2d');editorCamera.zoom=1;editorCamera.x=Math.max(0,EDITOR_WORLD_W/2-c.clientWidth/2);editorCamera.y=Math.max(0,EDITOR_WORLD_H/2-c.clientHeight/2);applyEditorCamera();}
+function vortexToggleConsole(){const el=document.getElementById('engine-console');if(el)el.classList.toggle('open');}
+function addHierarchyItem(type){vortexAddObject(type);}
+function setTileMode(mode){if(mode==='select')vortexEditorTool('select');else if(mode==='resize')vortexEditorTool('scale');else vortexAddObject(mode);}
 
-function deleteVortexScript(scriptId) {
-    const script = vortexScripts.find(s => s.id === scriptId);
-    if (!script) return;
-    vortexNotify(`Excluindo \"${script.name}.vortex\"...`,'info');
-    vortexScripts = vortexScripts.filter(s => s.id !== scriptId);
-    saveVortexScriptsLocal();
-    if (activeScriptId === scriptId) {
-        activeScriptId = vortexScripts[0]?.id || null;
-        if (activeScriptId) openVortexScriptEditor(activeScriptId);
-        else {
-            const ed=document.getElementById('vortex-code-editor'); if(ed) ed.value='';
-            const fn=document.getElementById('vortex-filename'); if(fn) fn.value='';
-        }
-    }
-    renderScriptsSidebarList();
-    renderHierarchy();
-}
-
-function saveVortexScript() {
-    const filenameInput = document.getElementById('vortex-filename');
-    const codeEditor = document.getElementById('vortex-code-editor');
-    const name = filenameInput.value.trim() || 'sem_nome';
-    const code = codeEditor.value;
-
-    let script = vortexScripts.find(s => s.id === activeScriptId);
-    if (!script) {
-        script = { id: 'script_' + Date.now(), name, code };
-        vortexScripts.push(script);
-        activeScriptId = script.id;
-
-        const tree = document.getElementById('hierarchy-tree');
-        if (tree) {
-            const li = document.createElement('li');
-            li.innerText = `📜 ${name}.vortex`;
-            li.style.cursor = 'pointer';
-            li.dataset.scriptId = script.id;
-            li.onclick = () => openVortexScriptEditor(script.id);
-            tree.appendChild(li);
-        }
-    } else {
-        script.name = name;
-        script.code = code;
-    }
-
-    renderScriptsSidebarList();
-    vortexNotify(`💾 "${name}.vortex" foi salvo!`);
-}
-
-function runScriptFromStudio() {
-    saveVortexScript();
-    openWindow('win-engine');
-    bringToFront(document.getElementById('win-engine'));
-    const testScreen = document.getElementById('engine-test-screen');
-    if (testScreen.style.display === 'none') {
-        toggleEngineTestMode();
-    } else {
-        stopEngineTestLoop();
-        toggleEngineTestMode();
-    }
-}
-
-// ---- TRANSPILADOR: Vortex (Python-like) -> JavaScript ----
-function transpileVortexToJS(code) {
-    const lines = code.split('\n');
-    const output = [];
-    const indentStack = [0];
-
-    for (let raw of lines) {
-        let line = raw.split('#')[0];
-        if (line.trim() === '') continue;
-
-        const indent = raw.match(/^\s*/)[0].replace(/\t/g, '    ').length;
-        let trimmed = line.trim();
-
-        while (indent < indentStack[indentStack.length - 1]) {
-            output.push('}');
-            indentStack.pop();
-        }
-
-        trimmed = trimmed
-            .replace(/\bTrue\b/g, 'true')
-            .replace(/\bFalse\b/g, 'false')
-            .replace(/\bNone\b/g, 'null')
-            .replace(/\band\b/g, '&&')
-            .replace(/\bor\b/g, '||')
-            .replace(/\bnot\s+/g, '!')
-            .replace(/\.append\(/g, '.push(')
-            .replace(/\bpass\b/g, ';');
-
-        const isBlockOpener = /:$/.test(trimmed);
-
-        if (/^def\s+\w+\s*\(.*\)\s*:$/.test(trimmed)) {
-            trimmed = trimmed.replace(/^def\s+(\w+)\s*\((.*)\)\s*:$/, 'function $1($2) {');
-            output.push(trimmed);
-            indentStack.push(indent + 4);
-        } else if (/^for\s+\w+\s+in\s+range\(.+\)\s*:$/.test(trimmed)) {
-            // for i in range(n) / range(a, b) / range(a, b, passo)
-            trimmed = trimmed.replace(/^for\s+(\w+)\s+in\s+range\((.+)\)\s*:$/, (m, varName, args) => {
-                const parts = args.split(',').map(a => a.trim());
-                if (parts.length === 1) {
-                    return `for (let ${varName} = 0; ${varName} < ${parts[0]}; ${varName}++) {`;
-                }
-                const step = parts[2] || '1';
-                return `for (let ${varName} = ${parts[0]}; ${varName} < ${parts[1]}; ${varName} += ${step}) {`;
-            });
-            output.push(trimmed);
-            indentStack.push(indent + 4);
-        } else if (/^for\s+\w+\s+in\s+.+:$/.test(trimmed)) {
-            // for item in lista
-            trimmed = trimmed.replace(/^for\s+(\w+)\s+in\s+(.+):$/, 'for (let $1 of $2) {');
-            output.push(trimmed);
-            indentStack.push(indent + 4);
-        } else if (/^if\s+.+:$/.test(trimmed)) {
-            trimmed = trimmed.replace(/^if\s+(.+):$/, 'if ($1) {');
-            output.push(trimmed);
-            indentStack.push(indent + 4);
-        } else if (/^elif\s+.+:$/.test(trimmed)) {
-            trimmed = trimmed.replace(/^elif\s+(.+):$/, '} else if ($1) {');
-            output.push(trimmed);
-            indentStack.push(indent + 4);
-        } else if (/^else\s*:$/.test(trimmed)) {
-            trimmed = '} else {';
-            output.push(trimmed);
-            indentStack.push(indent + 4);
-        } else if (/^while\s+.+:$/.test(trimmed)) {
-            trimmed = trimmed.replace(/^while\s+(.+):$/, 'while ($1) {');
-            output.push(trimmed);
-            indentStack.push(indent + 4);
-        } else if (isBlockOpener) {
-            output.push(trimmed.slice(0, -1) + ' {');
-            indentStack.push(indent + 4);
-        } else {
-            trimmed = trimmed.replace(/\bprint\s*\(/g, 'vortex.print(');
-            if (!/[;{}]\s*$/.test(trimmed)) trimmed += ';';
-            output.push(trimmed);
-        }
-    }
-
-    while (indentStack.length > 1) {
-        output.push('}');
-        indentStack.pop();
-    }
-
-    return output.join('\n');
-}
-
-// Descobre os nomes de todas as funções definidas no nível raiz do script
-// (usado pra permitir que botões colocados no mapa chamem uma função por nome).
-function extractVortexTopLevelFunctions(code) {
-    const names = [];
-    const lines = code.split('\n');
-    for (let raw of lines) {
-        const line = raw.split('#')[0];
-        if (line.trim() === '') continue;
-        const indent = raw.match(/^\s*/)[0].replace(/\t/g, '    ').length;
-        if (indent !== 0) continue;
-        const m = line.trim().match(/^def\s+(\w+)\s*\(.*\)\s*:$/);
-        if (m) names.push(m[1]);
-    }
-    return names;
-}
-
-// Compila o código Vortex e devolve uma função (vortexAPI) => { _ready, _update, functions }
-function compileVortexScript(code) {
-    code = code || '';
-    const jsCode = transpileVortexToJS(code);
-    const functionNames = extractVortexTopLevelFunctions(code);
-    const exportEntries = functionNames
-        .map(n => `${JSON.stringify(n)}: (typeof ${n} === 'function' ? ${n} : null)`)
-        .join(', ');
-
-    const rawFactory = new Function('vortex', 'str', 'int', 'float', 'len', `
-        "use strict";
-        ${jsCode}
-        return {
-            _ready: typeof _ready === 'function' ? _ready : null,
-            _update: typeof _update === 'function' ? _update : null,
-            functions: { ${exportEntries} }
-        };
-    `);
-
-    const strFn = (v) => String(v);
-    const intFn = (v) => parseInt(v, 10);
-    const floatFn = (v) => parseFloat(v);
-    const lenFn = (v) => (v == null) ? 0 : (v.length !== undefined ? v.length : Object.keys(v).length);
-
-    return (vortexAPI) => rawFactory(vortexAPI, strFn, intFn, floatFn, lenFn);
-}
-
-// ==========================================
 // 12. VORTEX ENGINE - RUNTIME (usado pelo modo "Testar" E pelo executor de .vexe)
 // ==========================================
 // Nenhuma física/colisão acontece automaticamente aqui. O runtime só:
@@ -1219,46 +972,38 @@ function createVortexGameInstance(containerEl, mapData, scriptCode, opts = {}) {
 // ---- Ligação com a janela da Engine (modo "Testar") ----
 let currentGameInstance = null;
 
-function toggleEngineTestMode() {
-    const btn = document.getElementById('btn-engine-test');
-    const editor = document.getElementById('canvas-2d');
-    const screen = document.getElementById('engine-test-screen');
-    const consoleBox = document.getElementById('engine-console');
-
-    if (screen.style.display === 'none') {
-        if (!currentSceneGrid.includes('player')) {
-            vortexNotify('Coloque um Player na cena antes de testar.','error');
-            return;
-        }
-        if (consoleBox) { consoleBox.innerHTML = ''; consoleBox.style.display = 'none'; }
-
-        btn.innerText = '🛑 PARAR';
-        btn.style.background = '#ef4444';
-        editor.style.display = 'none';
-        screen.style.display = 'block';
-
-        const activeScript = vortexScripts.find(s => s.id === activeScriptId);
-        currentGameInstance = createVortexGameInstance(
-            screen,
-            currentSceneGrid,
-            activeScript ? activeScript.code : '',
-            { consoleEl: consoleBox, uiData: currentSceneMeta, transforms: currentSceneTransforms }
-        );
-        currentGameInstance.start();
-    } else {
-        stopEngineTestLoop();
-        btn.innerText = '▶️ TESTAR';
-        btn.style.background = '#22c55e';
-        editor.style.display = 'grid';
-        screen.style.display = 'none';
-    }
+function toggleEngineTestMode(forceStart=false) {
+  const editor=document.getElementById('canvas-2d');
+  const viewport=document.getElementById('canvas-2d');
+  if(!editor||!viewport)return;
+  let screen=document.getElementById('engine-test-screen');
+  if(!screen){screen=document.createElement('div');screen.id='engine-test-screen';screen.className='engine-runtime-screen';viewport.appendChild(screen);}
+  const running=!!currentGameInstance?.running;
+  if(running && !forceStart){
+    stopEngineTestLoop();
+    screen.innerHTML='';screen.style.display='none';
+    document.getElementById('vortex-scene-world')?.style.removeProperty('display');
+    vortexNotify('Play Mode parado.','info');
+    return;
+  }
+  if(running)return;
+  if(!currentSceneGrid.includes('player')){vortexNotify('Coloque um Player na Scene antes de testar.','error');return;}
+  const activeScript=vortexScripts.find(s=>s.id===activeScriptId);
+  const world=document.getElementById('vortex-scene-world');if(world)world.style.display='none';
+  screen.style.display='block';screen.innerHTML='';
+  const consoleBox=document.getElementById('engine-console');if(consoleBox)consoleBox.innerHTML='';
+  currentGameInstance=createVortexGameInstance(screen,currentSceneGrid,activeScript?activeScript.code:'',{consoleEl:consoleBox,uiData:currentSceneMeta,transforms:currentSceneTransforms});
+  currentGameInstance.start();
+  document.querySelector('.engine-test-top')?.classList.add('playing');
+  document.querySelector('.engine-test-top')?.replaceChildren(document.createTextNode('■ Stop'));
+  vortexNotify('Play Mode iniciado.','success');
 }
 
 function stopEngineTestLoop() {
-    if (currentGameInstance) {
-        currentGameInstance.stop();
-        currentGameInstance = null;
-    }
+    if (currentGameInstance) { currentGameInstance.stop(); currentGameInstance = null; }
+    const world=document.getElementById('vortex-scene-world'); if(world) world.style.display='';
+    const screen=document.getElementById('engine-test-screen'); if(screen){screen.style.display='none';screen.innerHTML='';}
+    const btn=document.querySelector('.engine-test-top'); if(btn){btn.classList.remove('playing');btn.textContent='▶ Play';}
 }
 
 // ==========================================
