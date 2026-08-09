@@ -784,40 +784,20 @@ function deleteVortexScript(id) {
   if (!scriptToDelete) return;
 
   if (!confirm(`Deseja excluir o script "${scriptToDelete.name}.vortex"?`)) return;
-/**
- * Deleta o script que está selecionado atualmente na Engine/Code
- */
-function deleteActiveVortexScript() {
-  if (!activeScriptId) {
-    return alert("Nenhum script selecionado para excluir!");
-  }
 
   // Remove o script da lista
   vortexScripts = vortexScripts.filter(x => x.id !== id);
-  const scriptToDelete = vortexScripts.find(x => x.id === activeScriptId);
-  if (!scriptToDelete) {
-    return alert("Nenhum script encontrado!");
-  }
 
   // Se o script deletado era o ativo, escolhe o primeiro da lista restante
   if (activeScriptId === id) {
     activeScriptId = vortexScripts[0]?.id || null;
-  if (!confirm(`Deseja realmente apagar o script "${scriptToDelete.name}.vortex"?`)) {
-    return;
   }
-
-  // Remove o script ativo da lista
-  vortexScripts = vortexScripts.filter(x => x.id !== activeScriptId);
-
-  // Define o próximo script ativo (se existir)
-  activeScriptId = vortexScripts[0]?.id || null;
 
   saveEngineLocal();
   renderHierarchy();
   renderScriptsSidebarList();
 
   // Atualiza a tela do editor de código
-  // Atualiza a tela do editor
   if (activeScriptId) {
     openVortexScriptEditor(activeScriptId);
   } else {
@@ -826,11 +806,21 @@ function deleteActiveVortexScript() {
     const codeEditorEl = document.getElementById("vortex-code-editor");
     if (fileNameEl) fileNameEl.value = "";
     if (codeEditorEl) codeEditorEl.value = "# Nenhum script aberto. Crie um novo script!";
-    if (codeEditorEl) codeEditorEl.value = "# Nenhum script aberto.";
   }
 }
 
-@@ -817,474 +825,466 @@
+function openVortexScriptEditor(id){activeScriptId=id;const s=vortexScripts.find(x=>x.id===id);if(!s)return;openWindow("win-vscode");document.getElementById("vortex-filename").value=s.name;document.getElementById("vortex-code-editor").value=s.code;renderScriptsSidebarList();}
+function renderScriptsSidebarList(){
+  const l=document.getElementById("vscode-scripts-list");if(!l)return;l.innerHTML="";
+  vortexScripts.forEach(s=>{
+    const li=document.createElement("li");
+    li.innerText=(s.id===activeScriptId?"➤ ":"")+"▣ "+s.name+".vortex";
+    li.onclick=()=>openVortexScriptEditor(s.id);
+    l.appendChild(li);
+function renderScriptsSidebarList() {
+  const list = document.getElementById("vscode-scripts-list");
+  if (!list) return;
+  list.innerHTML = "";
 
   vortexScripts.forEach(s => {
     const li = document.createElement("li");
@@ -846,9 +836,6 @@ function deleteActiveVortexScript() {
         <button style="background:none;border:none;color:#f38ba8;cursor:pointer;font-size:12px;padding:2px;" onclick="event.stopPropagation(); deleteVortexScript('${s.id}')" title="Excluir">🗑</button>
       </div>
     `;
-    li.style.cssText = "padding:6px 10px; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;";
-    li.title = `${escapeHtml(s.name)}.vortex`;
-    li.innerText = `${s.id === activeScriptId ? "➤ " : ""}▣ ${s.name}.vortex`;
 
     li.onclick = () => openVortexScriptEditor(s.id);
     list.appendChild(li);
