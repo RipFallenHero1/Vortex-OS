@@ -11,9 +11,8 @@ let currentSceneObjects = [];
 let selectedObj = null;
 let currentTool = 'select';
 let isTestingEngine = false;
-let testEngineInterval = null;
 
-// --- HISTÓRICO DA ENGINE (UNDO / REDO) ---
+// --- SISTEMA DE HISTÓRICO (DESFAZER / REFAZER) ---
 let sceneHistory = [];
 let historyIndex = -1;
 const MAX_HISTORY = 50;
@@ -22,7 +21,7 @@ const MAX_HISTORY = 50;
 window.addEventListener("DOMContentLoaded", () => {
   initOSClock();
   loadSession();
-  setupGlobalEvents();
+  setupGlobalShortcuts();
 });
 
 function initOSClock() {
@@ -45,7 +44,7 @@ function escapeHtml(str) {
 }
 
 /* ==========================================================================
-   SISTEMA DE AUTENTICAÇÃO E SESSÃO
+   AUTENTICAÇÃO E SESSÃO
    ========================================================================== */
 function loginUser() {
   const usernameInput = document.getElementById("auth-username")?.value.trim();
@@ -53,7 +52,7 @@ function loginUser() {
   const emailInput = document.getElementById("auth-email")?.value.trim();
 
   if (!usernameInput || !pinInput) {
-    return alert("Por favor, preencha o Nome de Usuário e o PIN de 4 dígitos.");
+    return alert("Preencha o Nome de Usuário e o PIN de 4 dígitos.");
   }
 
   currentUser = {
@@ -64,13 +63,11 @@ function loginUser() {
 
   localStorage.setItem("vortex_user", JSON.stringify(currentUser));
   
-  // Carrega saldo salvo ou define R$ 100 padrão para novos testes
   const savedBalance = localStorage.getItem(`vortex_bal_${currentUser.username}`);
   userBalance = savedBalance ? parseFloat(savedBalance) : 100.00;
 
   updateUIUser();
   document.getElementById("login-screen").style.display = "none";
-  
   loadEngineLocal();
 }
 
@@ -98,21 +95,20 @@ function logoutUser() {
 function updateUIUser() {
   if (!currentUser) return;
   
-  const startUser = document.getElementById("start-username");
-  const startEmail = document.getElementById("start-email");
-  const messengerMe = document.getElementById("messenger-me");
-  const settingsUser = document.getElementById("settings-user");
-  const settingsEmail = document.getElementById("settings-email");
-  const payBalance = document.getElementById("pay-balance");
-  const userBalanceEl = document.getElementById("user-balance");
+  const elements = {
+    "start-username": currentUser.username,
+    "start-email": currentUser.email,
+    "messenger-me": `@${currentUser.username}`,
+    "settings-user": currentUser.username,
+    "settings-email": currentUser.email,
+    "pay-balance": userBalance.toFixed(2),
+    "user-balance": userBalance.toFixed(2)
+  };
 
-  if (startUser) startUser.innerText = currentUser.username;
-  if (startEmail) startEmail.innerText = currentUser.email;
-  if (messengerMe) messengerMe.innerText = `@${currentUser.username}`;
-  if (settingsUser) settingsUser.innerText = currentUser.username;
-  if (settingsEmail) settingsEmail.innerText = currentUser.email;
-  if (payBalance) payBalance.innerText = userBalance.toFixed(2);
-  if (userBalanceEl) userBalanceEl.innerText = userBalance.toFixed(2);
+  for (const [id, val] of Object.entries(elements)) {
+    const el = document.getElementById(id);
+    if (el) el.innerText = val;
+  }
 }
 
 function powerOn() {
@@ -135,6 +131,9 @@ function openWindow(id) {
       renderEngineScene();
       renderHierarchy();
       updateInspector();
+    }
+    if (id === 'win-store') {
+      loadStoreApps();
     }
   }
 }
@@ -163,7 +162,6 @@ function toggleStartMenu() {
   }
 }
 
-// Drag & Drop Janelas
 let activeDragWin = null;
 let dragOffsetX = 0;
 let dragOffsetY = 0;
@@ -196,10 +194,6 @@ function onWindowUp() {
 /* ==========================================================================
    VORTEX ENGINE 2D — HISTÓRICO, FERRAMENTAS E CENA
    ========================================================================== */
-
-/**
- * Grava o estado atual da cena no histórico (para Undo/Redo)
- */
 function recordEngineState() {
   if (historyIndex < sceneHistory.length - 1) {
     sceneHistory = sceneHistory.slice(0, historyIndex + 1);
@@ -215,9 +209,6 @@ function recordEngineState() {
   }
 }
 
-/**
- * Desfaz a última ação (Ctrl + Z)
- */
 function undoEngineAction() {
   if (historyIndex > 0) {
     historyIndex--;
@@ -228,9 +219,6 @@ function undoEngineAction() {
   }
 }
 
-/**
- * Refaz a ação desfeita (Ctrl + Y)
- */
 function redoEngineAction() {
   if (historyIndex < sceneHistory.length - 1) {
     historyIndex++;
@@ -241,8 +229,7 @@ function redoEngineAction() {
   }
 }
 
-// Atalhos Globais de Teclado (Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z)
-function setupGlobalEvents() {
+function setupGlobalShortcuts() {
   window.addEventListener("keydown", (e) => {
     const winEngine = document.getElementById("win-engine");
     const isEditingText = ["INPUT", "TEXTAREA"].includes(document.activeElement.tagName);
@@ -284,10 +271,10 @@ function addEngineObject(type) {
     id: "obj_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
     name: type.charAt(0).toUpperCase() + type.slice(1) + "_" + (currentSceneObjects.length + 1),
     type: type,
-    x: 100 + (currentSceneObjects.length * 15) % 300,
-    y: 100 + (currentSceneObjects.length * 15) % 200,
-    w: type === 'player' ? 32 : (type === 'coin' ? 20 : 40),
-    h: type === 'player' ? 48 : (type === 'coin' ? 20 : 40),
+    x: 80 + (currentSceneObjects.length * 20) % 300,
+    y: 80 + (currentSceneObjects.length * 20) % 200,
+    w: type === 'player' ? 32 : (type === 'coin' ? 24 : 40),
+    h: type === 'player' ? 48 : (type === 'coin' ? 24 : 40),
     color: type === 'player' ? '#e74c3c' : (type === 'coin' ? '#f1c40f' : '#3b82f6')
   };
 
@@ -319,7 +306,7 @@ function renderEngineScene() {
 
   currentSceneObjects.forEach(obj => {
     const el = document.createElement("div");
-    el.className = `engine-obj obj-${obj.type} ${selectedObj && selectedObj.id === obj.id ? 'selected' : ''}`;
+    el.className = `engine-obj ${selectedObj && selectedObj.id === obj.id ? 'selected' : ''}`;
     el.style.left = `${obj.x}px`;
     el.style.top = `${obj.y}px`;
     el.style.width = `${obj.w}px`;
@@ -327,6 +314,9 @@ function renderEngineScene() {
     el.style.backgroundColor = obj.color || '#3b82f6';
     el.style.position = 'absolute';
     el.style.boxSizing = 'border-box';
+    if (selectedObj && selectedObj.id === obj.id) {
+      el.style.outline = '2px dashed #fff';
+    }
     if (obj.type === 'circle' || obj.type === 'coin') el.style.borderRadius = '50%';
 
     el.onclick = (e) => {
@@ -356,10 +346,10 @@ function renderHierarchy() {
 
   tree.innerHTML = "";
 
-  // Renderiza Objetos da Cena
   currentSceneObjects.forEach(obj => {
     const li = document.createElement("li");
     li.className = `tree-item ${selectedObj && selectedObj.id === obj.id ? 'active' : ''}`;
+    li.style.cssText = "padding:4px 8px; cursor:pointer; font-size:13px;";
     li.innerText = `📦 ${obj.name}`;
     li.onclick = () => {
       selectedObj = obj;
@@ -369,74 +359,56 @@ function renderHierarchy() {
     };
     tree.appendChild(li);
   });
-
-  // Renderiza Scripts
-  if (vortexScripts.length > 0) {
-    const label = document.createElement("div");
-    label.className = "section-label";
-    label.style.marginTop = "12px";
-    label.innerText = "SCRIPTS";
-    tree.appendChild(label);
-
-    vortexScripts.forEach(s => {
-      const li = document.createElement("li");
-      li.className = "script-item";
-      li.style.cssText = "padding:4px 6px; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;";
-      li.title = `${escapeHtml(s.name)}.vortex`;
-      li.innerText = `▣ ${s.name}.vortex`;
-      li.onclick = () => openVortexScriptEditor(s.id);
-      tree.appendChild(li);
-    });
-  }
 }
 
 /**
- * Atualiza o Inspetor do objeto selecionado com Seletor de Cor nativo (Color Picker)
+ * INSPETOR COM COLOR PICKER / PALETA DA UNITY
  */
 function updateInspector() {
   const container = document.getElementById("inspector-content");
   if (!container) return;
 
   if (!selectedObj) {
-    container.innerHTML = `<div class="inspector-empty">Selecione um objeto.</div>`;
+    container.innerHTML = `<div class="inspector-empty" style="padding:15px;color:#888;">Selecione um objeto para editar.</div>`;
     return;
   }
 
   const hexColor = selectedObj.color || "#3b82f6";
 
   container.innerHTML = `
-    <div class="inspector-prop">
-      <label>Nome</label>
-      <input type="text" id="insp-name" value="${escapeHtml(selectedObj.name || '')}">
-    </div>
-
-    <div class="inspector-prop">
-      <label>Cor do Objeto</label>
-      <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
-        <input type="color" id="insp-color" value="${hexColor}" 
-               style="border:none; width:42px; height:32px; cursor:pointer; background:transparent; padding:0; border-radius:4px;">
-        <span id="insp-color-hex" style="font-size:12px; opacity:0.8; font-family:monospace;">${hexColor}</span>
+    <div style="padding:10px; display:flex; flex-direction:column; gap:12px;">
+      <div>
+        <label style="font-size:12px; opacity:0.8;">Nome</label>
+        <input type="text" id="insp-name" value="${escapeHtml(selectedObj.name || '')}" style="width:100%; padding:6px; background:#111; border:1px solid #333; color:#fff; border-radius:4px; margin-top:2px;">
       </div>
-    </div>
 
-    <div class="inspector-prop">
-      <label>Posição X / Y</label>
-      <div style="display:flex; gap:6px;">
-        <input type="number" id="insp-x" value="${Math.round(selectedObj.x || 0)}">
-        <input type="number" id="insp-y" value="${Math.round(selectedObj.y || 0)}">
+      <div>
+        <label style="font-size:12px; opacity:0.8;">Cor do Objeto (Paleta)</label>
+        <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+          <input type="color" id="insp-color" value="${hexColor}" 
+                 style="border:none; width:44px; height:32px; cursor:pointer; background:transparent; padding:0; border-radius:4px;">
+          <span id="insp-color-hex" style="font-size:12px; opacity:0.8; font-family:monospace;">${hexColor}</span>
+        </div>
       </div>
-    </div>
 
-    <div class="inspector-prop">
-      <label>Tamanho W / H</label>
-      <div style="display:flex; gap:6px;">
-        <input type="number" id="insp-w" value="${Math.round(selectedObj.w || 30)}">
-        <input type="number" id="insp-h" value="${Math.round(selectedObj.h || 30)}">
+      <div>
+        <label style="font-size:12px; opacity:0.8;">Posição X / Y</label>
+        <div style="display:flex; gap:6px; margin-top:2px;">
+          <input type="number" id="insp-x" value="${Math.round(selectedObj.x || 0)}" style="width:50%; padding:6px; background:#111; border:1px solid #333; color:#fff; border-radius:4px;">
+          <input type="number" id="insp-y" value="${Math.round(selectedObj.y || 0)}" style="width:50%; padding:6px; background:#111; border:1px solid #333; color:#fff; border-radius:4px;">
+        </div>
+      </div>
+
+      <div>
+        <label style="font-size:12px; opacity:0.8;">Largura / Altura</label>
+        <div style="display:flex; gap:6px; margin-top:2px;">
+          <input type="number" id="insp-w" value="${Math.round(selectedObj.w || 30)}" style="width:50%; padding:6px; background:#111; border:1px solid #333; color:#fff; border-radius:4px;">
+          <input type="number" id="insp-h" value="${Math.round(selectedObj.h || 30)}" style="width:50%; padding:6px; background:#111; border:1px solid #333; color:#fff; border-radius:4px;">
+        </div>
       </div>
     </div>
   `;
 
-  // Color Picker com atualização instantânea e gravação no histórico ao confirmar
   const colorInput = document.getElementById("insp-color");
   const hexDisplay = document.getElementById("insp-color-hex");
 
@@ -449,14 +421,12 @@ function updateInspector() {
     };
   }
 
-  // Nome do Objeto
   document.getElementById("insp-name")?.addEventListener("change", (e) => {
     selectedObj.name = e.target.value;
     renderHierarchy();
     recordEngineState();
   });
 
-  // Posição X / Y
   document.getElementById("insp-x")?.addEventListener("change", (e) => {
     selectedObj.x = parseFloat(e.target.value) || 0;
     renderEngineScene();
@@ -468,7 +438,6 @@ function updateInspector() {
     recordEngineState();
   });
 
-  // Dimensões W / H
   document.getElementById("insp-w")?.addEventListener("change", (e) => {
     selectedObj.w = parseFloat(e.target.value) || 10;
     renderEngineScene();
@@ -482,10 +451,10 @@ function updateInspector() {
 }
 
 /* ==========================================================================
-   VORTEX CODE — EDITAR, CRIAR E DELETAR SCRIPTS .VORTEX
+   VORTEX CODE — CRIAR, EDITAR E EXCLUIR SCRIPTS .VORTEX
    ========================================================================== */
 function createVortexScript() {
-  const name = prompt("Nome do script .vortex:", "main");
+  const name = prompt("Nome do novo script .vortex:", "main");
   if (!name) return;
 
   const newScript = {
@@ -501,7 +470,6 @@ function createVortexScript() {
   renderHierarchy();
   renderScriptsSidebarList();
   openVortexScriptEditor(newScript.id);
-  openWindow('win-vscode');
 }
 
 function deleteActiveVortexScript() {
@@ -511,10 +479,10 @@ function deleteActiveVortexScript() {
 
   const scriptToDelete = vortexScripts.find(x => x.id === activeScriptId);
   if (!scriptToDelete) {
-    return alert("Nenhum script encontrado!");
+    return alert("Script não encontrado!");
   }
 
-  if (!confirm(`Deseja realmente apagar o script "${scriptToDelete.name}.vortex"?`)) {
+  if (!confirm(`Tem certeza que deseja apagar o script "${scriptToDelete.name}.vortex"?`)) {
     return;
   }
 
@@ -552,7 +520,7 @@ function openVortexScriptEditor(scriptId) {
 }
 
 function saveVortexScript() {
-  if (!activeScriptId) return alert("Crie um script antes de salvar.");
+  if (!activeScriptId) return alert("Crie ou selecione um script para salvar.");
   
   const sc = vortexScripts.find(x => x.id === activeScriptId);
   if (!sc) return;
@@ -566,7 +534,7 @@ function saveVortexScript() {
   saveEngineLocal();
   renderHierarchy();
   renderScriptsSidebarList();
-  alert("Script salvo com sucesso!");
+  alert("Script salvo!");
 }
 
 function renderScriptsSidebarList() {
@@ -576,11 +544,9 @@ function renderScriptsSidebarList() {
 
   vortexScripts.forEach(s => {
     const li = document.createElement("li");
-    if (s.id === activeScriptId) li.classList.add("active");
+    if (s.id === activeScriptId) li.style.fontWeight = "bold";
     li.style.cssText = "padding:6px 10px; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;";
-    li.title = `${escapeHtml(s.name)}.vortex`;
     li.innerText = `${s.id === activeScriptId ? "➤ " : ""}▣ ${s.name}.vortex`;
-
     li.onclick = () => openVortexScriptEditor(s.id);
     list.appendChild(li);
   });
@@ -605,7 +571,7 @@ function loadEngineLocal() {
       vortexScripts = parsed.scripts || [];
       if (vortexScripts.length > 0) activeScriptId = vortexScripts[0].id;
     } catch (e) {
-      console.error("Erro ao carregar dados da Engine", e);
+      console.error("Erro ao carregar Engine local", e);
     }
   }
   recordEngineState();
@@ -615,7 +581,7 @@ function loadEngineLocal() {
 }
 
 /* ==========================================================================
-   MODO DE TESTE DA ENGINE
+   SIMULAÇÃO / TESTE DA ENGINE
    ========================================================================== */
 function toggleEngineTestMode() {
   const testScreen = document.getElementById("engine-test-screen");
@@ -630,7 +596,6 @@ function toggleEngineTestMode() {
     isTestingEngine = false;
     if (testBtn) testBtn.innerText = "▶ TESTAR";
     if (testScreen) testScreen.style.display = "none";
-    if (testEngineInterval) clearInterval(testEngineInterval);
   }
 }
 
@@ -639,13 +604,10 @@ function runEngineSimulation() {
   if (!testScreen) return;
 
   testScreen.innerHTML = "";
-  
-  // Clona os objetos para o teste
   const simObjects = JSON.parse(JSON.stringify(currentSceneObjects));
 
   simObjects.forEach(obj => {
     const el = document.createElement("div");
-    el.id = `sim_${obj.id}`;
     el.style.left = `${obj.x}px`;
     el.style.top = `${obj.y}px`;
     el.style.width = `${obj.w}px`;
@@ -664,7 +626,7 @@ function runScriptFromStudio() {
 }
 
 /* ==========================================================================
-   LOJA, PUBLICAÇÃO E MEUS ARQUIVOS
+   PUBLICAÇÃO E LOJA DE JOGOS (.VEXE)
    ========================================================================== */
 function openPublishModalFromEngine() {
   document.getElementById("publish-modal").style.display = "flex";
@@ -675,7 +637,7 @@ function closePublishModal() {
 }
 
 function compileAndPublishEngineGame() {
-  const title = document.getElementById("app-title-input")?.value.trim() || "Meu Jogo Vortex";
+  const title = document.getElementById("app-title-input")?.value.trim() || "Jogo Vortex";
   const price = parseFloat(document.getElementById("app-price-input")?.value) || 0;
 
   const newApp = {
@@ -702,19 +664,18 @@ function loadStoreApps() {
 
   const globalApps = JSON.parse(localStorage.getItem("vortex_global_apps") || "[]");
   if (globalApps.length === 0) {
-    grid.innerHTML = "<p class='muted'>Nenhum jogo publicado ainda.</p>";
+    grid.innerHTML = "<p class='muted'>Nenhum jogo publicado na loja ainda.</p>";
     return;
   }
 
   grid.innerHTML = "";
   globalApps.forEach(app => {
     const card = document.createElement("div");
-    card.className = "app-card";
+    card.style.cssText = "background:#1e1e2e; padding:15px; border-radius:8px; border:1px solid #333;";
     card.innerHTML = `
-      <div class="app-icon vortex">V</div>
-      <b>${escapeHtml(app.title)}</b>
-      <small>por @${escapeHtml(app.author)}</small>
-      <button class="btn primary" onclick="playStoreApp('${app.id}')">
+      <b style="display:block;font-size:16px;">${escapeHtml(app.title)}</b>
+      <small style="opacity:0.7;">por @${escapeHtml(app.author)}</small>
+      <button class="btn primary" style="width:100%;margin-top:10px;" onclick="playStoreApp('${app.id}')">
         ${app.price > 0 ? `Comprar (R$ ${app.price.toFixed(2)})` : 'Jogar Grátis'}
       </button>
     `;
@@ -750,7 +711,7 @@ function playStoreApp(appId) {
 }
 
 /* ==========================================================================
-   VORTEX PAY & SISTEMA FINANCEIRO
+   VORTEX PAY (PIX)
    ========================================================================== */
 function openPix() {
   openWindow('win-pix');
@@ -761,7 +722,7 @@ function sendPix() {
   const amount = parseFloat(document.getElementById("pix-amount")?.value);
 
   if (!recipient || isNaN(amount) || amount <= 0) {
-    return alert("Preencha um destinatário e valor válidos!");
+    return alert("Preencha o destinatário e um valor válido!");
   }
 
   if (amount > userBalance) {
@@ -771,18 +732,18 @@ function sendPix() {
   userBalance -= amount;
   localStorage.setItem(`vortex_bal_${currentUser.username}`, userBalance);
   updateUIUser();
-  alert(`Transferência de R$ ${amount.toFixed(2)} enviada com sucesso para ${recipient}!`);
+  alert(`Pix de R$ ${amount.toFixed(2)} enviado para ${recipient}!`);
 }
 
 function claimDailyReward() {
   userBalance += 10.00;
   localStorage.setItem(`vortex_bal_${currentUser.username}`, userBalance);
   updateUIUser();
-  alert("Você recebeu sua recompensa diária de R$ 10,00!");
+  alert("Você resgatou sua diária de R$ 10,00!");
 }
 
 /* ==========================================================================
-   NAVEGADOR VORTEX WEB
+   NAVEGADOR E CHAT MESSENGER
    ========================================================================== */
 function navigateBrowser() {
   const urlInput = document.getElementById("browser-url")?.value.trim();
@@ -809,9 +770,6 @@ function browserNav(action) {
   if (action === 'home') iframe.src = 'https://www.bing.com';
 }
 
-/* ==========================================================================
-   MESSENGER & CHAT
-   ========================================================================== */
 function sendEmoji(emoji) {
   const input = document.getElementById("message-input");
   if (input) input.value += emoji;
@@ -832,6 +790,29 @@ function sendMessage() {
   messagesContainer.appendChild(msgEl);
   input.value = "";
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+function triggerImageUpload() {
+  document.getElementById("image-input")?.click();
+}
+
+function handleImageSelected(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const messagesContainer = document.getElementById("messages");
+    if (!messagesContainer) return;
+
+    const msgEl = document.createElement("div");
+    msgEl.style.cssText = "margin-bottom:8px; text-align:right;";
+    msgEl.innerHTML = `<img src="${event.target.result}" style="max-width:200px; border-radius:8px; border:1px solid #444;">`;
+
+    messagesContainer.appendChild(msgEl);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  };
+  reader.readAsDataURL(file);
 }
 
 function addFriend() {
@@ -884,9 +865,9 @@ function handleTerminal(e) {
     } else if (cmd === 'clear') {
       output.innerHTML = "";
     } else if (cmd === 'balance') {
-      output.innerHTML += `<div>Saldo atual: R$ ${userBalance.toFixed(2)}</div>`;
+      output.innerHTML += `<div>Saldo: R$ ${userBalance.toFixed(2)}</div>`;
     } else if (cmd === 'user') {
-      output.innerHTML += `<div>Usuário logado: ${currentUser ? currentUser.username : 'Nenhum'}</div>`;
+      output.innerHTML += `<div>Usuário: ${currentUser ? currentUser.username : 'Offline'}</div>`;
     } else if (cmd === 'date') {
       output.innerHTML += `<div>${new Date().toLocaleString()}</div>`;
     } else {
