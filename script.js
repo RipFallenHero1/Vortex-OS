@@ -995,31 +995,92 @@ function createVortexGameInstance(container,mapData,scriptCode,opts={}){
   return inst;
 }
 
-function toggleEngineTestMode(){
-  const screen=document.getElementById("engine-test-screen"), editor=document.getElementById("canvas-2d"), btn=document.getElementById("btn-engine-test"), consoleEl=document.getElementById("engine-console");
-  if(screen.style.display==="none" || !screen.style.display){
-    if(!currentSceneObjects.some(o=>o.type==="player")) return alert("Adicione um Player à cena.");
-    saveVortexScript();
-    const s=vortexScripts.find(x=>x.id===activeScriptId);
-    if(consoleEl){ consoleEl.innerHTML=""; consoleEl.style.display="none"; }
-    editor.style.display="none"; screen.style.cssText="display:block;position:relative;overflow:hidden;background:#090512;height:calc(100% - 42px);";
-    btn.innerText="■ PARAR"; btn.classList.add("stop");
-    
-    if(currentGameInstance) currentGameInstance.stop();
+/* ================= GERENCIADOR DE CENAS DA VORTEX ENGINE ================= */
+let currentEngineScene = "Editor"; // Estado atual da cena: "Editor" ou "Game"
 
-    currentGameInstance=createVortexGameInstance(screen, currentSceneObjects, s?.code||"", {consoleEl});
+/**
+ * Alterna explicitamente entre as cenas 'Editor' e 'Game' na Vortex Engine
+ */
+function switchEngineScene(targetScene) {
+  const editorCanvas = document.getElementById("canvas-2d");
+  const gameCanvas = document.getElementById("engine-test-screen");
+  const btnPlay = document.getElementById("btn-engine-test");
+  const consoleEl = document.getElementById("engine-console");
+
+  if (targetScene === "Game") {
+    // Validação de segurança antes de ir para a cena Game
+    if (!currentSceneObjects.some(o => o.type === "player")) {
+      return alert("Adicione um Player à cena antes de ir para a cena Game.");
+    }
+
+    saveVortexScript();
+    const s = vortexScripts.find(x => x.id === activeScriptId);
+
+    if (consoleEl) {
+      consoleEl.innerHTML = "";
+      consoleEl.style.display = "none";
+    }
+
+    // Oculta a cena Editor e exibe a cena Game
+    if (editorCanvas) editorCanvas.style.display = "none";
+    if (gameCanvas) {
+      gameCanvas.style.cssText = "display:block;position:relative;overflow:hidden;background:#090512;height:calc(100% - 42px);";
+    }
+
+    if (btnPlay) {
+      btnPlay.innerText = "■ PARAR (Voltar ao Editor)";
+      btnPlay.classList.add("stop");
+    }
+
+    // Limpa qualquer execução anterior antes de iniciar a nova
+    if (currentGameInstance) currentGameInstance.stop();
+
+    // Instancia e roda a cena Game
+    currentGameInstance = createVortexGameInstance(gameCanvas, currentSceneObjects, s?.code || "", { consoleEl });
     currentGameInstance.start();
-  }else{ stopEngineTestLoop(); }
+    currentEngineScene = "Game";
+
+  } else if (targetScene === "Editor") {
+    // Interrompe e destrói o loop do jogo
+    if (currentGameInstance) {
+      currentGameInstance.stop();
+      currentGameInstance = null;
+    }
+
+    // Oculta a cena Game e exibe a cena Editor
+    if (gameCanvas) gameCanvas.style.display = "none";
+    if (editorCanvas) editorCanvas.style.display = "block";
+
+    if (btnPlay) {
+      btnPlay.innerText = "▶ PLAY (Ir para Game)";
+      btnPlay.classList.remove("stop");
+    }
+
+    currentEngineScene = "Editor";
+
+    // Recarrega e renderiza a cena do Editor limpa
+    renderEngineScene();
+    renderHierarchy();
+    updateInspector();
+  }
 }
 
-function stopEngineTestLoop(){
-  if(currentGameInstance){
-    currentGameInstance.stop();
-    currentGameInstance=null;
+/**
+ * Função chamada ao clicar no botão Play/Parar no topo da Engine
+ */
+function toggleEngineTestMode() {
+  if (currentEngineScene === "Editor") {
+    switchEngineScene("Game");
+  } else {
+    switchEngineScene("Editor");
   }
-  const s=document.getElementById("engine-test-screen"), c=document.getElementById("canvas-2d"), b=document.getElementById("btn-engine-test");
-  if(s)s.style.display="none"; if(c)c.style.display="block";
-  if(b){b.innerText="▶ TESTAR";b.classList.remove("stop");}
+}
+
+/**
+ * Para o loop do jogo e força o retorno para a cena Editor
+ */
+function stopEngineTestLoop() {
+  switchEngineScene("Editor");
 }
 
 function openPublishModalFromEngine(){document.getElementById("publish-modal").style.display="flex";}
