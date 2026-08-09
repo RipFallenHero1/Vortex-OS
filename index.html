@@ -82,7 +82,6 @@
       <div class="engine-bottom">
         <button class="btn" onclick="createVortexScript()">+ Script .vortex</button>
         <button class="btn danger" onclick="clearScene()">Limpar cena</button>
-        <!-- BOTÃO ADICIONADO ABAIXO DE LIMPAR CENA -->
         <button class="btn danger" onclick="deleteActiveVortexScript()">Excluir script</button>
         <button class="btn primary" onclick="openPublishModalFromEngine()">Publicar .vexe</button>
       </div>
@@ -90,6 +89,8 @@
     <section class="panel viewport-panel">
       <div class="viewport-header"><b>EDITOR 2D</b><span id="engine-tool-label">Selecionar / Mover</span>
         <div class="toolbar">
+          <button onclick="undoEngineAction()" title="Desfazer (Ctrl+Z)">↩</button>
+          <button onclick="redoEngineAction()" title="Refazer (Ctrl+Y)">↪</button>
           <button data-tool="select" onclick="setEngineTool('select')">Mover</button>
           <button data-tool="scale" onclick="setEngineTool('scale')">Tamanho</button>
           <button data-tool="square" onclick="setEngineTool('square')">□</button>
@@ -172,4 +173,5 @@
 
 <footer class="taskbar"><button class="start-btn" onclick="toggleStartMenu()">V</button><div id="taskbar-apps"></div><div class="system-tray"><button onclick="openWindow('win-messenger')">Messenger</button><button onclick="openPix()">Pay</button><span>R$ <b id="user-balance">0.00</b></span><span id="os-clock">00:00</span></div></footer>
 <script src="script.js"></script>
-</body></html>
+</body>
+</html>
