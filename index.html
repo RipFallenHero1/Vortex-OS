@@ -17,7 +17,7 @@
             <div class="auth-header">
                 <h2>🌀 Vortex OS</h2>
                 <p>Identifique-se para acessar o sistema</p>
-                <small style="opacity:0.5;">v10.5</small>
+                <small style="opacity:0.5;">v11.00</small>
             </div>
             <div class="auth-form">
                 <input type="text" id="auth-username" placeholder="Nome de Usuário *" required>
@@ -368,7 +368,7 @@
             <div class="window-controls"><button onclick="closeWindow('win-terminal')">❌</button></div>
         </div>
         <div class="window-body" style="background: #000; color: #0f0; font-family: monospace;">
-            <div id="terminal-output">Vortex OS Kernel v10.5 Online.<br>Digite 'help' para comandos.<br></div>
+            <div id="terminal-output">Vortex OS Kernel v11.00 Online.<br>Digite 'help' para comandos.<br></div>
             <div style="display: flex;"><input type="text" id="terminal-input" onkeypress="handleTerminal(event)" style="background: transparent; border: none; color: #0f0; outline: none; flex: 1; font-family: monospace;"></div>
         </div>
     </div>
@@ -390,6 +390,24 @@
         </div>
     </div>
 
+    <!-- JANELA PIX -->
+    <div id="pix-modal" class="modal" style="display:none;">
+        <div class="modal-content pix-window">
+            <div class="pix-header">
+                <div><span class="pix-mark">P</span><div><strong>Vortex Pix</strong><small>Transferência entre contas Vortex</small></div></div>
+                <button class="modal-close" onclick="closePixWindow()">×</button>
+            </div>
+            <div class="pix-balance">Saldo disponível <strong>R$ <span id="pix-current-balance">0,00</span></strong></div>
+            <label>Nick do destinatário
+                <input id="pix-recipient" class="wide-input" placeholder="Ex.: King" autocomplete="off">
+            </label>
+            <label>Valor
+                <input id="pix-amount" class="wide-input" type="number" min="0.01" step="0.01" placeholder="0,00">
+            </label>
+            <div class="modal-actions"><button class="btn" onclick="closePixWindow()">Cancelar</button><button id="pix-send-btn" class="btn btn-primary" onclick="sendPix()">Enviar Pix</button></div>
+        </div>
+    </div>
+
     <!-- BARRA DE TAREFAS -->
     <footer class="taskbar">
         <button class="start-btn" onclick="toggleStartMenu()">🌀 Iniciar</button>
@@ -397,7 +415,7 @@
         <div class="system-tray">
             <span class="wallet">💰 R$ <strong id="user-balance">0.00</strong></span>
             <button class="btn-sm" onclick="claimDailyReward()">🎁 Diária</button>
-            <button class="btn-sm" onclick="simulateIncomingPix()">💸 Pix</button>
+            <button class="btn-sm" onclick="openPixWindow()">Pix</button>
             <span id="os-clock">00:00</span>
         </div>
     </footer>
