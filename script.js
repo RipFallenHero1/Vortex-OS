@@ -26,6 +26,78 @@ let enginePan = { x: 0, y: 0 };
 let isPanning = false, panStart = { x: 0, y: 0 };
 let activeResizeHandle = null, resizeStart = { x: 0, y: 0, ox: 0, oy: 0, ow: 0, oh: 0 };
 
+/* ================= VORTEX ENGINE - HISTÓRICO (UNDO / REDO) ================= */
+let sceneHistory = [];
+let historyIndex = -1;
+const MAX_HISTORY = 50; // Limite de 50 ações salvas
+
+/**
+ * Salva o estado atual da cena no histórico
+ */
+function recordEngineState() {
+  // Corta o histórico se estivermos no meio dele e fizer uma nova ação
+  if (historyIndex < sceneHistory.length - 1) {
+    sceneHistory = sceneHistory.slice(0, historyIndex + 1);
+  }
+
+  // Clona o estado dos objetos
+  const stateCopy = JSON.parse(JSON.stringify(currentSceneObjects));
+  sceneHistory.push(stateCopy);
+
+  if (sceneHistory.length > MAX_HISTORY) {
+    sceneHistory.shift();
+  } else {
+    historyIndex++;
+  }
+}
+
+/**
+ * Desfaz a última ação (Ctrl + Z)
+ */
+function undoEngineAction() {
+  if (historyIndex > 0) {
+    historyIndex--;
+    currentSceneObjects = JSON.parse(JSON.stringify(sceneHistory[historyIndex]));
+    renderEngineScene();
+    renderHierarchy();
+    updateInspector();
+  }
+}
+
+/**
+ * Refaz a ação desfeita (Ctrl + Y)
+ */
+function redoEngineAction() {
+  if (historyIndex < sceneHistory.length - 1) {
+    historyIndex++;
+    currentSceneObjects = JSON.parse(JSON.stringify(sceneHistory[historyIndex]));
+    renderEngineScene();
+    renderHierarchy();
+    updateInspector();
+  }
+}
+
+// Atalhos de Teclado Globais (Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z)
+window.addEventListener("keydown", (e) => {
+  // Só executa se a janela da Engine estiver aberta e não estiver digitando em um campo de texto
+  const winEngine = document.getElementById("win-engine");
+  const isEditingText = ["INPUT", "TEXTAREA"].includes(document.activeElement.tagName);
+
+  if (winEngine && winEngine.style.display !== "none" && !isEditingText) {
+    if (e.ctrlKey && e.key.toLowerCase() === "z") {
+      if (e.shiftKey) {
+        redoEngineAction(); // Ctrl + Shift + Z
+      } else {
+        undoEngineAction(); // Ctrl + Z
+      }
+      e.preventDefault();
+    } else if (e.ctrlKey && e.key.toLowerCase() === "y") {
+      redoEngineAction(); // Ctrl + Y
+      e.preventDefault();
+    }
+  }
+});
+
 /* ================= VORTEX CHROMIUM DATA ================= */
 let browserHistory = [];
 let browserHistoryIndex = -1;
@@ -656,39 +728,57 @@ function renderHierarchy(){
   });
 }
 
-function updateInspector(){
-  const box=document.getElementById("inspector-content");if(!box)return;
-  const o=getSelected();
-  if(!o){
-    box.innerHTML="<div class='inspector-empty'>Selecione um objeto na cena ou na hierarquia.</div>";
+/**
+ * Atualiza o Inspetor do objeto selecionado com Seletor de Cor nativo
+ */
+function updateInspector() {
+  const container = document.getElementById("inspector-content");
+  if (!container) return;
+
+  if (!selectedObj) {
+    container.innerHTML = `<div class="inspector-empty">Selecione um objeto.</div>`;
     return;
   }
 
-  let extraUiFields = "";
-  if(o.shape.startsWith("ui_")){
-    if(o.shape==="ui_text" || o.shape==="ui_button"){
-      extraUiFields += `<label>Texto<input id="ins-text" value="${escapeHtml(o.text||"")}"></label>
-                        <label>Tamanho da Fonte<input id="ins-fontSize" type="number" value="${o.fontSize||16}"></label>`;
-    }
-    if(o.shape==="ui_button"){
-      extraUiFields += `<label>Cor do Texto<input id="ins-textColor" type="color" value="${o.textColor||"#ffffff"}"></label>`;
-    }
+  container.innerHTML = `
+    <div class="inspector-prop">
+      <label>Nome</label>
+      <input type="text" id="insp-name" value="${escapeHtml(selectedObj.name || '')}">
+    </div>
+
+    <div class="inspector-prop">
+      <label>Cor do Objeto</label>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <input type="color" id="insp-color" value="${selectedObj.color || '#3b82f6'}" 
+               style="border:none; width:40px; height:30px; cursor:pointer; background:transparent; padding:0;">
+        <span style="font-size:12px; opacity:0.7;">${selectedObj.color || '#3b82f6'}</span>
+      </div>
+    </div>
+
+    <div class="inspector-prop">
+      <label>Posição X / Y</label>
+      <div style="display:flex; gap:4px;">
+        <input type="number" id="insp-x" value="${Math.round(selectedObj.x)}">
+        <input type="number" id="insp-y" value="${Math.round(selectedObj.y)}">
+      </div>
+    </div>
+  `;
+
+  // Evento de troca de cor em tempo real
+  const colorInput = document.getElementById("insp-color");
+  if (colorInput) {
+    colorInput.onchange = () => recordEngineState(); // Grava no histórico ao fechar a paleta
+    colorInput.oninput = (e) => {
+      selectedObj.color = e.target.value;
+      renderEngineScene(); // Atualiza a cor visualmente no canvas na hora
+    };
   }
 
-  box.innerHTML=`<label>Nome<input id="ins-name" value="${escapeHtml(o.name)}"></label>
-  <label>Forma / Tipo<select id="ins-shape"><option value="square">Quadrado</option><option value="circle">Círculo</option><option value="triangle">Triângulo</option><option value="ui_text">Texto UI</option><option value="ui_button">Botão UI</option><option value="ui_panel">Painel UI</option></select></label>
-  <label>Cor<input id="ins-color" value="${o.color}"></label>
-  ${extraUiFields}
-  <div class="ins-grid"><label>X<input id="ins-x" type="number" value="${o.x}"></label><label>Y<input id="ins-y" type="number" value="${o.y}"></label><label>Largura<input id="ins-w" type="number" min="4" value="${o.w}"></label><label>Altura<input id="ins-h" type="number" min="4" value="${o.h}"></label></div>
-  <div style="display:flex; gap:6px; margin-top:10px;">
-    <button class="btn" style="flex:1;" onclick="duplicateSelectedObject()">Duplicar</button>
-    <button class="btn danger" style="flex:1;" onclick="deleteSelectedObject()">Excluir</button>
-  </div>`;
-
-  document.getElementById("ins-shape").value=o.shape;
-  ["name","shape","color","text","fontSize","textColor","x","y","w","h"].forEach(f=>{
-    const el = document.getElementById("ins-"+f);
-    if(el) el.addEventListener("input",e=>updateObjFromInspector(f,e.target.value));
+  // Evento de alteração de nome e posição
+  document.getElementById("insp-name")?.addEventListener("change", (e) => {
+    selectedObj.name = e.target.value;
+    renderHierarchy();
+    recordEngineState();
   });
 }
 
