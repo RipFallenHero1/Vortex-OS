@@ -21,7 +21,6 @@
 <div id="shutdown-screen" class="full-overlay dark" style="display:none"><div class="power-card"><div class="brand-mark">V</div><h1>Vortex OS</h1><p>O sistema está desligado.</p><button class="btn primary" onclick="powerOn()">Ligar PC</button></div></div>
 
 <div id="desktop" class="desktop">
-  <div class="desktop-icon" onclick="openWindow('win-browser')"><div class="app-icon browser">🌐</div><span>Vortex Web</span></div>
   <div class="desktop-icon" onclick="openWindow('win-engine')"><div class="app-icon vortex">V</div><span>Vortex Engine</span></div>
   <div class="desktop-icon" onclick="openWindow('win-vscode')"><div class="app-icon code">&lt;/&gt;</div><span>Vortex Code</span></div>
   <div class="desktop-icon" onclick="openWindow('win-messenger')"><div class="app-icon msg">M</div><span>Vortex Messenger</span></div>
@@ -31,12 +30,12 @@
   <div class="desktop-icon" onclick="openWindow('win-settings')"><div class="app-icon settings">⚙</div><span>Configurações</span></div>
   <div class="desktop-icon" onclick="openWindow('win-terminal')"><div class="app-icon terminal">&gt;_</div><span>Terminal</span></div>
   <div class="desktop-icon" onclick="openWindow('win-calc')"><div class="app-icon calc">+</div><span>Calculadora</span></div>
+  <div id="admin-desktop-icon" class="desktop-icon" style="display:none" onclick="openAdminPanel()"><div class="app-icon admin">A</div><span>Painel Admin</span></div>
 </div>
 
 <div id="start-menu" class="start-menu">
   <div class="start-user"><div class="avatar big">V</div><div><b id="start-username">Usuário</b><small id="start-email">online</small></div></div>
   <div class="start-grid">
-    <button onclick="openWindow('win-browser');toggleStartMenu()">Vortex Web</button>
     <button onclick="openWindow('win-engine');toggleStartMenu()">Vortex Engine</button>
     <button onclick="openWindow('win-vscode');toggleStartMenu()">Vortex Code</button>
     <button onclick="openWindow('win-messenger');toggleStartMenu()">Messenger</button>
@@ -45,26 +44,9 @@
     <button onclick="openWindow('win-files');toggleStartMenu()">Arquivos</button>
     <button onclick="openWindow('win-settings');toggleStartMenu()">Configurações</button>
     <button onclick="openWindow('win-terminal');toggleStartMenu()">Terminal</button>
+    <button id="admin-start-btn" style="display:none" onclick="openAdminPanel();toggleStartMenu()">Painel Admin</button>
   </div>
   <button class="shutdown-link" onclick="shutdownPC()">Desligar</button>
-</div>
-
-<!-- BROWSER -->
-<div id="win-browser" class="window" style="top:60px;left:200px;width:940px;height:620px;display:none;">
-  <div class="window-header" onmousedown="dragWindow(event,'win-browser')"><span>Vortex Web — Navegador</span><div class="window-controls"><button onclick="closeWindow('win-browser')">×</button></div></div>
-  <div class="browser-layout" style="display:flex;flex-direction:column;height:calc(100% - 35px);width:100%;background:#1e1e2e;">
-    <div class="browser-bar" style="display:flex;gap:8px;padding:8px;background:#11111b;align-items:center;border-bottom:1px solid rgba(255,255,255,0.1);">
-      <button class="btn" onclick="browserNav('back')" title="Voltar">←</button>
-      <button class="btn" onclick="browserNav('forward')" title="Avançar">→</button>
-      <button class="btn" onclick="browserNav('reload')" title="Recarregar">↻</button>
-      <button class="btn" onclick="browserNav('home')" title="Página Inicial">🏠</button>
-      <input id="browser-url" type="text" placeholder="Digite uma URL (ex: https://bing.com) ou pesquise..." style="flex:1;padding:6px 12px;border-radius:6px;border:1px solid #444;background:#181825;color:#fff;outline:none;" onkeydown="if(event.key==='Enter')navigateBrowser()">
-      <button class="btn primary" onclick="navigateBrowser()">Ir</button>
-    </div>
-    <div style="flex:1;position:relative;width:100%;height:100%;overflow:hidden;background:#fff;">
-      <iframe id="browser-iframe" src="https://www.bing.com" style="width:100%;height:100%;border:none;"></iframe>
-    </div>
-  </div>
 </div>
 
 <!-- ENGINE -->
@@ -82,16 +64,12 @@
       <div class="engine-bottom">
         <button class="btn" onclick="createVortexScript()">+ Script .vortex</button>
         <button class="btn danger" onclick="clearScene()">Limpar cena</button>
-        <!-- BOTÃO ADICIONADO ABAIXO DE LIMPAR CENA -->
-        <button class="btn danger" onclick="deleteActiveVortexScript()">Excluir script</button>
         <button class="btn primary" onclick="openPublishModalFromEngine()">Publicar .vexe</button>
       </div>
     </aside>
     <section class="panel viewport-panel">
       <div class="viewport-header"><b>EDITOR 2D</b><span id="engine-tool-label">Selecionar / Mover</span>
         <div class="toolbar">
-          <button onclick="undoEngineAction()" title="Desfazer (Ctrl+Z)">↩</button>
-          <button onclick="redoEngineAction()" title="Refazer (Ctrl+Y)">↪</button>
           <button data-tool="select" onclick="setEngineTool('select')">Mover</button>
           <button data-tool="scale" onclick="setEngineTool('scale')">Tamanho</button>
           <button data-tool="square" onclick="setEngineTool('square')">□</button>
@@ -162,6 +140,35 @@
  <div class="pay-card"><div class="balance-big">R$ <span id="pay-balance">0.00</span></div><p class="muted">Envie Vortex Coins para outro usuário.</p><label>Nick do destinatário<input id="pix-recipient" placeholder="@nick"></label><label>Valor<input id="pix-amount" type="number" min="0.01" step="0.01" placeholder="0,00"></label><button class="btn primary wide" onclick="sendPix()">Enviar Pix</button><button class="btn wide" onclick="claimDailyReward()">Receber diária R$ 10</button></div>
 </div>
 
+<!-- ADMIN -->
+<div id="win-admin" class="window" style="top:60px;left:210px;width:850px;height:610px">
+  <div class="window-header" onmousedown="dragWindow(event,'win-admin')"><span>Vortex OS — Painel Admin</span><div class="window-controls"><button onclick="closeWindow('win-admin')">×</button></div></div>
+  <div class="window-body admin-panel-body">
+    <div class="admin-grid">
+      <section class="admin-card">
+        <h3>Economia</h3><p class="muted">Defina o saldo de qualquer usuário.</p>
+        <input id="admin-money-user" placeholder="@nick">
+        <input id="admin-money-value" type="number" min="0" step="0.01" placeholder="Novo saldo">
+        <button class="btn primary wide" onclick="adminSetMoney()">Definir dinheiro</button>
+      </section>
+      <section class="admin-card">
+        <h3>Messenger</h3><p class="muted">Bloqueie ou desbloqueie um usuário.</p>
+        <input id="admin-ban-user" placeholder="@nick">
+        <div class="admin-actions"><button class="btn danger" onclick="adminBanUser()">Banir</button><button class="btn" onclick="adminUnbanUser()">Desbanir</button></div>
+      </section>
+      <section class="admin-card">
+        <h3>Sistema</h3>
+        <label class="admin-toggle"><input id="admin-maintenance" type="checkbox" onchange="setMaintenanceMode(this.checked)"> Modo manutenção global</label>
+        <button class="btn danger wide" onclick="adminGlobalReset()">↻ Reiniciar PC de geral</button>
+      </section>
+    </div>
+    <div class="admin-columns">
+      <section class="admin-card"><h3>Usuários</h3><div id="admin-users-list" class="admin-list"></div></section>
+      <section class="admin-card"><h3>Jogos publicados</h3><div id="admin-apps-list" class="admin-list"></div></section>
+    </div>
+  </div>
+</div>
+
 <!-- STORE / FILES / SETTINGS / TERMINAL / CALC -->
 <div id="win-store" class="window" style="top:90px;left:180px;width:760px;height:520px"><div class="window-header" onmousedown="dragWindow(event,'win-store')"><span>Loja Vortex</span><div class="window-controls"><button onclick="closeWindow('win-store')">×</button></div></div><div class="window-body"><h2>Jogos .vexe</h2><div id="global-apps-list" class="apps-grid">Carregando...</div></div></div>
 <div id="win-files" class="window" style="top:120px;left:240px;width:650px;height:430px"><div class="window-header" onmousedown="dragWindow(event,'win-files')"><span>Meus arquivos</span><div class="window-controls"><button onclick="closeWindow('win-files')">×</button></div></div><div class="window-body"><div id="files-list" class="apps-grid"></div></div></div>
@@ -175,5 +182,3 @@
 <footer class="taskbar"><button class="start-btn" onclick="toggleStartMenu()">V</button><div id="taskbar-apps"></div><div class="system-tray"><button onclick="openWindow('win-messenger')">Messenger</button><button onclick="openPix()">Pay</button><span>R$ <b id="user-balance">0.00</b></span><span id="os-clock">00:00</span></div></footer>
 <script src="script.js"></script>
 </body></html>
-</body>
-</html>
