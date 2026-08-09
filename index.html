@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vortex OS v11.00 - NextGen</title>
+    <title>Vortex OS v11.02 - NextGen</title>
     <link rel="stylesheet" href="style.css">
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
@@ -17,7 +17,7 @@
             <div class="auth-header">
                 <h2>🌀 Vortex OS</h2>
                 <p>Identifique-se para acessar o sistema</p>
-                <small style="opacity:0.5;">v11.00</small>
+                <small style="opacity:0.5;">v11.02</small>
             </div>
             <div class="auth-form">
                 <input type="text" id="auth-username" placeholder="Nome de Usuário *" required>
@@ -105,52 +105,64 @@
     </div>
 
     <!-- JANELA: VORTEX ENGINE 2D -->
-    <div id="win-engine" class="window" style="top: 20px; left: 30px; width: 900px; height: 600px;">
+    <div id="win-engine" class="window vortex-engine-window" style="top:20px;left:30px;width:1100px;height:700px;">
         <div class="window-header" onmousedown="dragWindow(event, 'win-engine')">
-            <span>Vortex Engine 2D - Criador de Jogos (v11.00)</span>
+            <span>Vortex Engine 2D <small class="engine-version">v11.02</small></span>
             <div class="window-controls">
-                <button onclick="closeWindow('win-engine')">❌</button>
+                <button class="vortex-win-min" onclick="minimizeWindow('win-engine')">—</button>
+                <button class="vortex-win-max" onclick="toggleMaximizeWindow('win-engine')">□</button>
+                <button onclick="closeWindow('win-engine')">×</button>
             </div>
         </div>
-        <div class="window-body">
-            <div class="engine-layout">
-                <aside class="panel hierarchy-panel">
-                    <h3>📂 Hierarquia</h3>
-                    <div class="panel-actions">
-                        <button onclick="addHierarchyItem('square')">+ Quadrado</button>
-                        <button onclick="addHierarchyItem('circle')">+ Círculo</button>
-                        <button onclick="addHierarchyItem('triangle')">+ Triângulo</button>
-                        <button onclick="addHierarchyItem('player')">+ Player</button>
-                        <button onclick="addHierarchyItem('coin')">+ Moeda</button>
-                        <button onclick="createVortexScript()">📝 Criar Script .vortex</button>
-                    </div>
-                    <ul id="hierarchy-tree" class="tree-list"></ul>
-                    <hr style="border-color: rgba(255,255,255,0.1);">
-                    <button class="btn btn-primary" onclick="openPublishModalFromEngine()">🚀 Publicar Build (.vexe)</button>
+        <div class="vortex-editor-shell">
+            <div class="vortex-main-toolbar">
+                <div class="vortex-tool-group">
+                    <button class="scene-tool active" data-tool="select" onclick="vortexEditorTool('select')" title="Selecionar (Q)">↖</button>
+                    <button class="scene-tool" data-tool="move" onclick="vortexEditorTool('move')" title="Mover (W)">✥</button>
+                    <button class="scene-tool" data-tool="scale" onclick="vortexEditorTool('scale')" title="Tamanho (R)">↔</button>
+                    <button class="scene-tool" data-tool="rect" onclick="vortexEditorTool('rect')" title="Rect Tool">□</button>
+                </div>
+                <div class="vortex-tool-separator"></div>
+                <button class="scene-action" onclick="vortexFrameSelected()">⛶ Enquadrar</button>
+                <button class="scene-action" onclick="vortexCenterScene()">⌾ Centralizar</button>
+                <div class="scene-spacer"></div>
+                <div class="scene-tabs">
+                    <button id="scene-tab-scene" class="scene-tab active" onclick="vortexEditorView('scene')">Scene</button>
+                    <button id="scene-tab-game" class="scene-tab" onclick="vortexEditorView('game')">Game</button>
+                </div>
+                <button class="engine-test-top" onclick="toggleEngineTestMode()">▶ Play</button>
+            </div>
+
+            <div class="vortex-editor-workspace">
+                <aside class="vortex-dock hierarchy-dock">
+                    <div class="dock-title"><span>Hierarchy</span><button onclick="vortexCreateObjectMenu()">＋</button></div>
+                    <div class="scene-root-row"><span class="tree-caret">▾</span><span class="scene-icon">◈</span><strong>SampleScene</strong></div>
+                    <div class="hierarchy-search"><input id="hierarchy-search" placeholder="Search" oninput="renderHierarchy()"></div>
+                    <ul id="hierarchy-tree" class="tree-list vortex-tree"></ul>
                 </aside>
-                <section class="panel viewport-panel">
-                    <div class="viewport-header">
-                        <span id="engine-viewport-label">CENA 2D (Mover, selecionar e redimensionar objetos)</span>
-                        <div class="map-controls">
-                            <button id="btn-t-square" onclick="setTileMode('square')">Quadrado</button>
-                            <button id="btn-t-circle" onclick="setTileMode('circle')">Círculo</button>
-                            <button id="btn-t-triangle" onclick="setTileMode('triangle')">Triângulo</button>
-                            <button id="btn-t-player" onclick="setTileMode('player')">Player</button>
-                            <button id="btn-t-coin" onclick="setTileMode('coin')">Moeda</button>
-                            <button id="btn-t-select" onclick="setTileMode('select')">Selecionar</button>
-                            <button id="btn-t-resize" onclick="setTileMode('resize')">Tamanho</button>
-                            <button id="btn-t-erase" onclick="setTileMode('erase')">Apagar</button>
-                            <button id="btn-engine-test" class="engine-test-btn" onclick="toggleEngineTestMode()">TESTAR</button>
-                        </div>
+
+                <section class="vortex-scene-area">
+                    <div id="vortex-scene-toolbar" class="scene-object-toolbar">
+                        <button onclick="vortexAddObject('square')">□ Square</button>
+                        <button onclick="vortexAddObject('circle')">○ Circle</button>
+                        <button onclick="vortexAddObject('triangle')">△ Triangle</button>
+                        <button onclick="vortexAddObject('player')">● Player</button>
+                        <button onclick="vortexAddObject('coin')">● Coin</button>
+                        <span class="scene-help">LMB: selecionar/mover · RMB: pan · Wheel: zoom</span>
                     </div>
-                    <div id="canvas-2d" class="grid-canvas"></div>
-                    <div id="engine-test-screen" style="display:none; width:100%; height:100%; position:relative; background:#87CEEB; overflow:hidden;"></div>
+                    <div id="canvas-2d" class="vortex-scene-viewport"></div>
+                    <div class="scene-statusbar"><span id="engine-viewport-label">Scene 2D</span><span id="scene-coordinates">X 0  Y 0</span></div>
                 </section>
-                <aside class="panel inspector-panel">
-                    <h3>⚙️ Inspetor</h3>
-                    <div id="inspector-content">Selecione uma ferramenta e pinte na cena acima. "🔤 Texto" e "🔘 Botão" abrem um prompt para você definir o conteúdo — o botão pode chamar qualquer função do seu script .vortex pelo nome.</div>
-                    <div id="engine-console" style="margin-top:10px; font-family:monospace; font-size:0.75rem; background:#000; color:#0f0; padding:6px; border-radius:4px; max-height:150px; overflow-y:auto; display:none;"></div>
+
+                <aside class="vortex-dock inspector-dock">
+                    <div class="dock-title"><span>Inspector</span></div>
+                    <div id="inspector-content" class="unity-inspector">Selecione um GameObject para editar suas propriedades.</div>
                 </aside>
+            </div>
+
+            <div class="vortex-bottom-dock">
+                <div class="bottom-tabs"><button class="bottom-tab active">Project</button><button class="bottom-tab" onclick="vortexToggleConsole()">Console</button><button class="bottom-tab">Vortex API</button></div>
+                <div class="bottom-content"><div class="project-hint">Scripts, cenas e recursos do projeto aparecem aqui. Use o Vortex Code Studio para editar .vortex.</div><div id="engine-console" class="vortex-console"></div></div>
             </div>
         </div>
     </div>
@@ -368,7 +380,7 @@
             <div class="window-controls"><button onclick="closeWindow('win-terminal')">❌</button></div>
         </div>
         <div class="window-body" style="background: #000; color: #0f0; font-family: monospace;">
-            <div id="terminal-output">Vortex OS Kernel v11.00 Online.<br>Digite 'help' para comandos.<br></div>
+            <div id="terminal-output">Vortex OS Kernel v11.02 Online.<br>Digite 'help' para comandos.<br></div>
             <div style="display: flex;"><input type="text" id="terminal-input" onkeypress="handleTerminal(event)" style="background: transparent; border: none; color: #0f0; outline: none; flex: 1; font-family: monospace;"></div>
         </div>
     </div>
