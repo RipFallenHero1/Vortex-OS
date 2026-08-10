@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vortex OS v11.02 - NextGen</title>
+    <title>Vortex OS v11.03 - NextGen</title>
     <link rel="stylesheet" href="style.css">
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
@@ -17,7 +17,7 @@
             <div class="auth-header">
                 <h2>🌀 Vortex OS</h2>
                 <p>Identifique-se para acessar o sistema</p>
-                <small style="opacity:0.5;">v11.02</small>
+                <small style="opacity:0.5;">v11.03</small>
             </div>
             <div class="auth-form">
                 <input type="text" id="auth-username" placeholder="Nome de Usuário *" required>
@@ -39,17 +39,9 @@
 
     <!-- ÁREA DE TRABALHO (DESKTOP) -->
     <div id="desktop" class="desktop">
-        <div class="desktop-icon" onclick="openWindow('win-engine')">
-            <div class="icon-img app-symbol engine-symbol" aria-hidden="true"></div>
-            <span>Vortex Engine</span>
-        </div>
         <div class="desktop-icon" onclick="openWindow('win-vscode')">
             <div class="icon-img app-symbol code-symbol" aria-hidden="true"></div>
             <span>Vortex Code Studio</span>
-        </div>
-        <div class="desktop-icon" onclick="openWindow('win-store')">
-            <div class="icon-img app-symbol store-symbol" aria-hidden="true"></div>
-            <span>Loja Global</span>
         </div>
         <div class="desktop-icon" onclick="openWindow('win-files')">
             <div class="icon-img app-symbol files-symbol" aria-hidden="true"></div>
@@ -71,6 +63,10 @@
             <div class="icon-img app-symbol browser-symbol" aria-hidden="true"></div>
             <span>Vortex Browser</span>
         </div>
+        <div class="desktop-icon" onclick="openVortexFeatures()">
+            <div class="icon-img app-symbol features-symbol" aria-hidden="true"></div>
+            <span>Vortex Features</span>
+        </div>
         <div class="desktop-icon" onclick="openSiteStudio()">
             <div class="icon-img app-symbol studio-symbol" aria-hidden="true"></div>
             <span>Vortex Site Studio</span>
@@ -88,14 +84,13 @@
             <small id="start-email">online</small>
         </div>
         <div class="start-body">
-            <button onclick="openWindow('win-engine'); toggleStartMenu()">Vortex Engine 2D</button>
             <button onclick="openWindow('win-vscode'); toggleStartMenu()">Vortex Code Studio</button>
-            <button onclick="openWindow('win-store'); toggleStartMenu()">Loja Global (.vexe)</button>
             <button onclick="openWindow('win-files'); toggleStartMenu()">Meus Arquivos</button>
             <button onclick="openWindow('win-settings'); toggleStartMenu()">Configurações & Wallpaper</button>
             <button onclick="openWindow('win-terminal'); toggleStartMenu()">Terminal</button>
             <button onclick="openWindow('win-calc'); toggleStartMenu()">Calculadora</button>
             <button onclick="openVortexBrowser(); toggleStartMenu()">Vortex Browser</button>
+            <button onclick="openVortexFeatures(); toggleStartMenu()">Vortex Features</button>
             <button onclick="openSiteStudio(); toggleStartMenu()">Vortex Site Studio</button>
             <button onclick="openVortexBrowser(); document.getElementById('vortex-browser-address').value='vortex.api.vort'; browserNavigate(); toggleStartMenu()">Vortex API</button>
             <button id="start-admin-btn" style="display:none;color:#f0abfc" onclick="openAdminPanel(); toggleStartMenu()">Vortex Admin</button>
@@ -104,181 +99,33 @@
         </div>
     </div>
 
-    <!-- JANELA: VORTEX ENGINE 2D -->
-    <div id="win-engine" class="window vortex-engine-window" style="top:20px;left:30px;width:1100px;height:700px;">
-        <div class="window-header" onmousedown="dragWindow(event, 'win-engine')">
-            <span>Vortex Engine 2D <small class="engine-version">v11.02</small></span>
-            <div class="window-controls">
-                <button class="vortex-win-min" onclick="minimizeWindow('win-engine')">—</button>
-                <button class="vortex-win-max" onclick="toggleMaximizeWindow('win-engine')">□</button>
-                <button onclick="closeWindow('win-engine')">×</button>
-            </div>
+    <!-- ADEUS À VORTEX ENGINE / LOJA -->
+    <div id="win-vortex-goodbye" class="window" style="top:70px;left:120px;width:760px;height:520px;">
+        <div class="window-header" onmousedown="dragWindow(event, 'win-vortex-goodbye')">
+            <span>Vortex — Atualizações</span>
+            <div class="window-controls"><button onclick="minimizeWindow('win-vortex-goodbye')">—</button><button onclick="toggleMaximizeWindow('win-vortex-goodbye')">□</button><button onclick="closeWindow('win-vortex-goodbye')">×</button></div>
         </div>
-        <div class="vortex-editor-shell">
-            <div class="vortex-main-toolbar">
-                <div class="vortex-tool-group">
-                    <button class="scene-tool active" data-tool="select" onclick="vortexEditorTool('select')" title="Selecionar (Q)">↖</button>
-                    <button class="scene-tool" data-tool="move" onclick="vortexEditorTool('move')" title="Mover (W)">✥</button>
-                    <button class="scene-tool" data-tool="scale" onclick="vortexEditorTool('scale')" title="Tamanho (R)">↔</button>
-                    <button class="scene-tool" data-tool="rect" onclick="vortexEditorTool('rect')" title="Rect Tool">□</button>
-                </div>
-                <div class="vortex-tool-separator"></div>
-                <button class="scene-action" onclick="vortexFrameSelected()">⛶ Enquadrar</button>
-                <button class="scene-action" onclick="vortexCenterScene()">⌾ Centralizar</button>
-                <div class="scene-spacer"></div>
-                <div class="scene-tabs">
-                    <button id="scene-tab-scene" class="scene-tab active" onclick="vortexEditorView('scene')">Scene</button>
-                    <button id="scene-tab-game" class="scene-tab" onclick="vortexEditorView('game')">Game</button>
-                </div>
-                <button class="engine-test-top" onclick="toggleEngineTestMode()">▶ Play</button>
-            </div>
-
-            <div class="vortex-editor-workspace">
-                <aside class="vortex-dock hierarchy-dock">
-                    <div class="dock-title"><span>Hierarchy</span><button onclick="vortexCreateObjectMenu()">＋</button></div>
-                    <div class="scene-root-row"><span class="tree-caret">▾</span><span class="scene-icon">◈</span><strong>SampleScene</strong></div>
-                    <div class="hierarchy-search"><input id="hierarchy-search" placeholder="Search" oninput="renderHierarchy()"></div>
-                    <ul id="hierarchy-tree" class="tree-list vortex-tree"></ul>
-                </aside>
-
-                <section class="vortex-scene-area">
-                    <div id="vortex-scene-toolbar" class="scene-object-toolbar">
-                        <button onclick="vortexAddObject('square')">□ Square</button>
-                        <button onclick="vortexAddObject('circle')">○ Circle</button>
-                        <button onclick="vortexAddObject('triangle')">△ Triangle</button>
-                        <button onclick="vortexAddObject('player')">● Player</button>
-                        <button onclick="vortexAddObject('coin')">● Coin</button>
-                        <span class="scene-help">LMB: selecionar/mover · RMB: pan · Wheel: zoom</span>
-                    </div>
-                    <div id="canvas-2d" class="vortex-scene-viewport"></div>
-                    <div class="scene-statusbar"><span id="engine-viewport-label">Scene 2D</span><span id="scene-coordinates">X 0  Y 0</span></div>
-                </section>
-
-                <aside class="vortex-dock inspector-dock">
-                    <div class="dock-title"><span>Inspector</span></div>
-                    <div id="inspector-content" class="unity-inspector">Selecione um GameObject para editar suas propriedades.</div>
-                </aside>
-            </div>
-
-            <div class="vortex-bottom-dock">
-                <div class="bottom-tabs"><button class="bottom-tab active">Project</button><button class="bottom-tab" onclick="vortexToggleConsole()">Console</button><button class="bottom-tab">Vortex API</button></div>
-                <div class="bottom-content"><div class="project-hint">Scripts, cenas e recursos do projeto aparecem aqui. Use o Vortex Code Studio para editar .vortex.</div><div id="engine-console" class="vortex-console"></div></div>
-            </div>
+        <div class="window-body vortex-goodbye-panel">
+            <div class="feature-hero-mark">V</div>
+            <h1>Adeus... Vortex Engine.</h1>
+            <p>A Vortex Engine foi uma parte importante da história do Vortex OS. Ela começou como uma ideia para permitir que qualquer pessoa criasse jogos 2D dentro do sistema, mas com o tempo ficou grande, complexa, difícil de usar e difícil de manter. Em vez de continuar adicionando ferramentas, painéis, sistemas de cena e APIs a uma Engine que já não estava agradável para programar, decidimos encerrá-la.</p>
+            <p>A Loja Global de jogos também deixa de existir. Sem a Engine, manter uma loja baseada em executáveis e projetos de jogos não fazia mais sentido para o objetivo atual do Vortex OS.</p>
+            <p>O Vortex não acabou. Pelo contrário: estamos simplificando o sistema. O foco agora é o <strong>Vortex Browser</strong>, o <strong>Vortex Site Studio</strong>, os sites <strong>.vort</strong>, a linguagem para a Web e as ferramentas que tornam o sistema mais organizado e fácil de usar.</p>
+            <p class="feature-note">Obrigado por tudo que foi criado na Vortex Engine. Ela fica como parte da história do projeto — mas agora podemos construir algo mais simples, rápido e divertido.</p>
+            <button class="btn btn-primary" onclick="openVortexBrowser();document.getElementById('vortex-browser-address').value='vortex.features.vort';browserNavigate();closeWindow('win-vortex-goodbye')">Ver histórico de atualizações</button>
         </div>
     </div>
 
-    <!-- JANELA: VORTEX CODE STUDIO -->
-    <div id="win-vscode" class="window" style="top: 60px; left: 160px; width: 720px; height: 500px;">
-        <div class="window-header" onmousedown="dragWindow(event, 'win-vscode')">
-            <span>Vortex Code Studio - Linguagem Vortex (Python-Like)</span>
-            <div class="window-controls">
-                <button onclick="closeWindow('win-vscode')">❌</button>
-            </div>
-        </div>
-        <div class="window-body" style="display:flex; background:#1e1e1e; color:#d4d4d4; padding:0;">
-            <!-- SIDEBAR API DOCS -->
-            <div style="width:250px; background:#252526; border-right:1px solid #333; padding:10px; font-size:0.75rem; overflow-y:auto;">
-                <h4 style="color:#a78bfa; margin-bottom:8px;">🐍 API Vortex v2</h4>
-                <p style="color:#999; margin-bottom:10px;">Sintaxe inspirada em Python. Nada é automático: você programa tudo.</p>
-
-                <p><strong>Funções especiais:</strong></p>
-                <code style="color:#4ec9b0;">def _ready():</code><br>
-                <code style="color:#4ec9b0;">def _update():</code><br>
-                <code style="color:#4ec9b0;">print("texto")</code><br><br>
-
-                <p><strong>Controle:</strong></p>
-                <code style="color:#c586c0;">if x &gt; 5:</code><br>
-                <code style="color:#c586c0;">elif x == 0:</code><br>
-                <code style="color:#c586c0;">else:</code><br>
-                <code style="color:#c586c0;">while cond:</code><br>
-                <code style="color:#c586c0;">for i in range(10):</code><br>
-                <code style="color:#c586c0;">for x in lista:</code><br>
-                <code style="color:#c586c0;">and / or / not</code><br><br>
-
-                <p><strong>Nativas:</strong></p>
-                <code style="color:#dcdcaa;">str(x) int(x) float(x) len(x)</code><br>
-                <code style="color:#dcdcaa;">lista.append(x)</code><br><br>
-
-                <p><strong>Player / entidades:</strong></p>
-                <code style="color:#ce9178;">p = vortex.get_player()</code><br>
-                <code style="color:#ce9178;">p.x / p.y / p.vx / p.vy</code><br>
-                <code style="color:#ce9178;">vortex.get_blocks()</code><br>
-                <code style="color:#ce9178;">vortex.get_coins()</code><br>
-                <code style="color:#ce9178;">vortex.check_collision(a, b)</code><br>
-                <code style="color:#ce9178;">vortex.spawn('coin', gx, gy)</code><br>
-                <code style="color:#ce9178;">vortex.spawn_at('block', x, y)</code><br>
-                <code style="color:#ce9178;">vortex.destroy(entidade)</code><br><br>
-
-                <p><strong>Input:</strong></p>
-                <code style="color:#ce9178;">vortex.is_key_down("a")</code><br><br>
-
-                <p><strong>Moedas:</strong></p>
-                <code style="color:#ce9178;">vortex.collect_coin(moeda)</code><br>
-                <code style="color:#ce9178;">vortex.add_coins(1)</code><br>
-                <code style="color:#ce9178;">vortex.get_coins_count()</code><br><br>
-
-                <p><strong>Câmera:</strong></p>
-                <code style="color:#ce9178;">vortex.set_camera(x, y)</code><br><br>
-
-                <p><strong>UI (via script):</strong></p>
-                <code style="color:#ce9178;">vortex.create_text(id, txt, x, y)</code><br>
-                <code style="color:#ce9178;">vortex.create_button(id, txt, x, y, fn)</code><br>
-                <code style="color:#ce9178;">vortex.set_text(id, txt)</code><br>
-                <code style="color:#ce9178;">vortex.remove_ui(id)</code><br><br>
-
-                <p style="color:#999;">Dica: os botões "🔤 Texto"/"🔘 Botão" da Engine colocam objetos de UI direto no mapa — o botão do mapa chama uma função do seu script pelo nome.</p>
-
-                <hr style="border-color:#333; margin:10px 0;">
-                <p id="vscode-scripts-list-label"><strong>Meus Scripts:</strong></p>
-                <ul id="vscode-scripts-list" style="list-style:none; padding:0; color:#9cdcfe;"></ul>
-            </div>
-
-            <!-- EDITOR AREA -->
-            <div style="flex:1; display:flex; flex-direction:column; padding:10px; gap:8px;">
-                <div style="display:flex; gap:10px; align-items:center;">
-                    <input type="text" id="vortex-filename" placeholder="meu_jogo" style="padding:4px 8px; background:#2d2d2d; border:1px solid #444; color:#fff; border-radius:4px; flex:1;">
-                    <span style="color:#a78bfa; font-weight:bold;">.vortex</span>
-                    <button class="btn" onclick="saveVortexScript()">💾 Salvar</button>
-                    <button class="btn btn-primary" onclick="runScriptFromStudio()">▶️ Testar na Engine</button>
-                    <button class="btn" style="color:#ff6b81" onclick="deleteVortexScript(activeScriptId)">🗑️ Excluir Script</button>
-                </div>
-                <textarea id="vortex-code-editor" style="flex:1; background:#181818; color:#9cdcfe; font-family:monospace; padding:10px; border:1px solid #333; outline:none; resize:none; font-size:0.9rem;" placeholder="# Crie sua lógica em Vortex (Python-like)&#10;&#10;def _ready():&#10;    print('Jogo Carregado com Sucesso')&#10;&#10;def _update():&#10;    p = vortex.get_player()&#10;    if p == None:&#10;        return&#10;    if vortex.is_key_down('d'):&#10;        p.x = p.x + 4"></textarea>
-            </div>
-        </div>
-    </div>
-
-    <!-- JANELA: LOJA GLOBAL -->
-    <div id="win-store" class="window" style="top: 50px; left: 120px; width: 750px; height: 480px;">
-        <div class="window-header" onmousedown="dragWindow(event, 'win-store')">
-            <span>🛒 Loja Global Vortex (.vexe)</span>
-            <div class="window-controls">
-                <button onclick="closeWindow('win-store')">❌</button>
-            </div>
-        </div>
-        <div class="window-body store-layout">
-            <div class="store-header">
-                <h2>Catálogo de Jogos em Nuvem</h2>
-                <small>Para publicar um jogo, use o botão de exportar dentro da Vortex Engine!</small>
-            </div>
-            <div id="global-apps-list" class="apps-grid">
-                <p>Carregando nuvem Firebase...</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- JANELA: GERENCIADOR DE ARQUIVOS (.VEXE) -->
-    <div id="win-files" class="window" style="top: 80px; left: 180px; width: 600px; height: 400px;">
+    <!-- JANELA: MEUS ARQUIVOS -->
+    <div id="win-files" class="window" style="top:80px;left:180px;width:680px;height:460px;">
         <div class="window-header" onmousedown="dragWindow(event, 'win-files')">
-            <span>Meus Arquivos - (.vexe Executáveis)</span>
-            <div class="window-controls">
-                <button onclick="closeWindow('win-files')">❌</button>
-            </div>
+            <span>Meus Arquivos</span>
+            <div class="window-controls"><button onclick="minimizeWindow('win-files')">—</button><button onclick="toggleMaximizeWindow('win-files')">□</button><button onclick="closeWindow('win-files')">×</button></div>
         </div>
         <div class="window-body">
-            <h3>Jogos e Aplicativos Instalados:</h3>
-            <div id="files-list" class="files-grid" style="margin-top: 15px;">
-                <!-- Lista dinâmica de executáveis .vexe -->
-            </div>
+            <div class="files-toolbar"><strong>Sites Vortex</strong><button class="btn btn-primary" onclick="openSiteStudio()">Novo site</button></div>
+            <p class="muted">Sites salvos aparecem aqui. Clique em um arquivo para abrir e continuar editando no Vortex Site Studio.</p>
+            <div id="files-list" class="files-grid" style="margin-top:15px;"></div>
         </div>
     </div>
 
@@ -290,12 +137,12 @@
         </div>
         <div class="vortex-browser-shell">
             <div class="vortex-browser-toolbar">
-                <button class="browser-nav" onclick="history.back()">‹</button><button class="browser-nav" onclick="history.forward()">›</button><button class="browser-nav" onclick="browserNavigate()">↻</button>
+                <button class="browser-nav" onclick="browserBack()" title="Voltar">‹</button><button class="browser-nav" onclick="browserForward()" title="Avançar">›</button><button class="browser-nav" onclick="browserRefresh()" title="Atualizar">↻</button>
                 <input id="vortex-browser-address" class="browser-address" placeholder="Pesquisar ou digitar endereço .vort" onkeydown="if(event.key==='Enter')browserNavigate()">
             </div>
             <div class="vortex-browser-tab">Vortex Browser <span>＋</span></div>
             <div class="browser-history-bar"><span>Histórico</span><button onclick="clearBrowserHistory()">Limpar</button><div id="vortex-browser-history"></div></div><div id="vortex-browser-page" class="vortex-browser-page">
-                <div class="vortex-browser-home"><div class="vortex-browser-logo">Vortex</div><div class="vortex-browser-search"><input placeholder="Pesquisar ou visitar um site" onkeydown="if(event.key==='Enter'){document.getElementById('vortex-browser-address').value=this.value;browserNavigate();}"></div><small>Use endereços como <b>meusite.vort</b></small></div>
+                <div class="vortex-browser-home"><div class="vortex-browser-logo">Vortex</div><div class="vortex-browser-search"><input placeholder="Pesquisar ou visitar um site" onkeydown="if(event.key==='Enter'){document.getElementById('vortex-browser-address').value=this.value;browserNavigate();}"></div><small>Use endereços como <b>meusite.vort</b> ou <b>vortex.features.vort</b></small></div>
             </div>
         </div>
     </div>
@@ -309,7 +156,7 @@
             <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;">
                 <input id="site-domain" class="vortex-field" placeholder="meusite" style="flex:1;min-width:130px;"><b style="color:#c084fc">.vort</b>
                 <input id="site-title" class="vortex-field" placeholder="Nome do site" style="flex:1;min-width:160px;">
-                <button class="btn" onclick="saveVortDraft()">Salvar rascunho</button><button class="btn" onclick="previewVortSite()">Preview</button><button class="btn btn-primary" onclick="saveVortSite()">Publicar / Atualizar</button>
+                <button class="btn" onclick="saveVortDraft()">Salvar rascunho</button><button class="btn" onclick="previewVortSite()">Preview</button><button class="btn btn-primary" onclick="saveVortSite()">Salvar / Publicar</button>
             </div>
             <div class="site-studio-grid">
                 <div class="site-editor-pane"><div class="site-editor-title">HTML</div><textarea id="site-html" class="site-code" spellcheck="false"><main><h1>Meu site Vortex</h1><p>Olá, Vortex!</p></main></textarea></div>
@@ -380,7 +227,7 @@
             <div class="window-controls"><button onclick="closeWindow('win-terminal')">❌</button></div>
         </div>
         <div class="window-body" style="background: #000; color: #0f0; font-family: monospace;">
-            <div id="terminal-output">Vortex OS Kernel v11.02 Online.<br>Digite 'help' para comandos.<br></div>
+            <div id="terminal-output">Vortex OS Kernel v11.03 Online.<br>Digite 'help' para comandos.<br></div>
             <div style="display: flex;"><input type="text" id="terminal-input" onkeypress="handleTerminal(event)" style="background: transparent; border: none; color: #0f0; outline: none; flex: 1; font-family: monospace;"></div>
         </div>
     </div>
