@@ -19,7 +19,7 @@
 //   `len()`.
 //
 // ==========================================
-const OS_VERSION = "11.02";
+const OS_VERSION = "11.03";
 
 // ---- FIREBASE CONFIG ----
 const firebaseConfig = {
@@ -144,7 +144,6 @@ function startSession(userKey, data) {
     loadVortexScriptsLocal();
 
     startClock();
-    loadGlobalStore();
     loadUserFiles();
     watchGlobalSystem();
     if(isVortexAdmin()){ const a=document.getElementById('desktop-admin-icon'); if(a) a.style.display='flex'; const sb=document.getElementById('start-admin-btn'); if(sb) sb.style.display='block'; }
@@ -1056,8 +1055,7 @@ function compileAndPublishEngineGame() {
         .then(() => {
             vortexNotify(`🚀 "${title}" foi compilado e publicado com sucesso!`);
             closePublishModal();
-            loadGlobalStore();
-            loadUserFiles();
+                    loadUserFiles();
         })
         .catch(err => vortexNotify('Erro ao publicar: ' + err.message));
 }
@@ -1108,33 +1106,36 @@ function buyApp(appId, app) {
 function loadUserFiles() {
     const list = document.getElementById('files-list');
     if (!list || !currentUser) return;
-    list.innerHTML = '<p>Carregando seus arquivos...</p>';
-
-    database.ref('users/' + currentUser.key + '/files').once('value').then(async filesSnap => {
+    list.innerHTML = '<p>Carregando seus sites...</p>';
+    database.ref('vortSites').orderByChild('authorKey').equalTo(currentUser.key).once('value').then(snapshot => {
         list.innerHTML = '';
-        if (!filesSnap.exists()) {
-            list.innerHTML = '<p>Nenhum executável (.vexe) instalado ainda.</p>';
+        if (!snapshot.exists()) {
+            list.innerHTML = '<p>Nenhum site salvo ainda. Abra o Vortex Site Studio para criar um.</p>';
             return;
         }
-        const fileIds = Object.keys(filesSnap.val());
-        for (const appId of fileIds) {
-            const appSnap = await database.ref('publishedApps/' + appId).once('value');
-            if (!appSnap.exists()) continue;
-            const app = appSnap.val();
+        snapshot.forEach(child => {
+            const site = child.val() || {};
             const card = document.createElement('div');
-            card.className = 'app-card';
-            card.innerHTML = `<h4>🎮 ${app.title}.vexe</h4><p>Por: ${app.author}</p>`;
-            const btn = document.createElement('button');
-            btn.className = 'btn btn-primary';
-            btn.innerText = 'Executar';
-            btn.onclick = () => runVexeApp(app);
-            card.appendChild(btn);
+            card.className = 'file-card vortex-site-file';
+            card.innerHTML = `<div class="file-card-icon"><span class="site-file-shape"></span></div><div class="file-card-info"><strong>${escapeHTML(site.domain || child.key + '.vort')}</strong><span>${escapeHTML(site.title || 'Site Vortex')}</span><small>Atualizado ${new Date(Number(site.updatedAt || Date.now())).toLocaleString('pt-BR')}</small></div>`;
+            card.onclick = () => openSavedSiteInStudio(child.key, site);
             list.appendChild(card);
-        }
-    }).catch(err => {
-        list.innerHTML = '<p>Erro ao carregar arquivos: ' + err.message + '</p>';
-    });
+        });
+    }).catch(err => { list.innerHTML = '<p>Erro ao carregar arquivos: ' + escapeHTML(err.message) + '</p>'; });
 }
+function openSavedSiteInStudio(slug, site) {
+    openSiteStudio();
+    const values = {
+        'site-domain': slug,
+        'site-title': site.title || '',
+        'site-html': site.html || '',
+        'site-css': site.css || '',
+        'site-js': site.js || ''
+    };
+    Object.entries(values).forEach(([id, value]) => { const el=document.getElementById(id); if(el) el.value=value; });
+    vortexNotify('Arquivo aberto no Vortex Site Studio.','success');
+}
+
 
 // ---- Executor de .vexe: agora roda o jogo de verdade (física do script,
 // colisão, moedas, câmera e UI), não é mais um preview estático do mapa. ----
@@ -1237,41 +1238,54 @@ function watchGlobalSystem(){
 // VORTEX BROWSER + HISTÓRICO
 // ==========================================
 let vortexBrowserHistory = JSON.parse(localStorage.getItem('vortex_browser_history') || '[]');
+let vortexBrowserStack = [];
+let vortexBrowserIndex = -1;
+let vortexBrowserCurrent = '';
 function saveBrowserHistory(query){
-  const q=String(query||'').trim(); if(!q) return;
+  const q=(query||'').trim(); if(!q)return;
   vortexBrowserHistory=[q,...vortexBrowserHistory.filter(x=>x!==q)].slice(0,50);
   localStorage.setItem('vortex_browser_history',JSON.stringify(vortexBrowserHistory));
 }
 function openVortexBrowser(){ openWindow('win-browser'); const input=document.getElementById('vortex-browser-address'); if(input) input.focus(); renderBrowserHistory(); }
-function browserNavigate(){
-  const input=document.getElementById('vortex-browser-address'); const frame=document.getElementById('vortex-browser-page'); if(!input||!frame)return;
-  let q=input.value.trim(); if(!q) return;
-  saveBrowserHistory(q);
-  if(!/^https?:\/\//i.test(q) && /^[a-z0-9-]+\.vort$/i.test(q)) q='vort://'+q;
-  if(/^vort:\/\//i.test(q)){ loadVortSite(q.slice(7).toLowerCase(),frame); return; }
-  if(q.toLowerCase()==='vortex.api.vort'){ loadVortexApiSite(frame); return; }
+function browserLoadAddress(q, push=true){
+  const frame=document.getElementById('vortex-browser-page'); const input=document.getElementById('vortex-browser-address'); if(!frame)return;
+  q=(q||'').trim(); if(!q)return;
+  if(push){
+    vortexBrowserStack=vortexBrowserStack.slice(0,vortexBrowserIndex+1);
+    vortexBrowserStack.push(q); vortexBrowserIndex=vortexBrowserStack.length-1;
+  }
+  vortexBrowserCurrent=q; if(input) input.value=q; saveBrowserHistory(q);
+  const normalized=q.toLowerCase();
+  if(normalized==='vortex.features.vort' || normalized==='vortex.updates.vort'){ loadVortexFeaturesSite(frame); renderBrowserHistory(); return; }
+  if(normalized==='vortex.api.vort'){ loadVortexApiSite(frame); renderBrowserHistory(); return; }
+  if(/^https?:\/\//i.test(q)){ frame.innerHTML='<div class="vortex-browser-home"><h2>Navegação externa</h2><p>O Vortex Browser nesta versão trabalha principalmente com sites .vort.</p></div>'; renderBrowserHistory(); return; }
+  if(/^[a-z0-9-]+\.vort$/i.test(q)){ loadVortSite(q.toLowerCase(),frame); renderBrowserHistory(); return; }
   frame.innerHTML=`<div class="vortex-browser-home"><div class="vortex-browser-logo">Vortex</div><p>Pesquisa interna: <strong>${escapeHTML(q)}</strong></p><small>Digite um endereço .vort para abrir um site Vortex.</small></div>`;
   renderBrowserHistory();
 }
+function browserNavigate(){ const input=document.getElementById('vortex-browser-address'); if(input) browserLoadAddress(input.value,true); }
+function browserBack(){ if(vortexBrowserIndex<=0)return; vortexBrowserIndex--; browserLoadAddress(vortexBrowserStack[vortexBrowserIndex],false); }
+function browserForward(){ if(vortexBrowserIndex>=vortexBrowserStack.length-1)return; vortexBrowserIndex++; browserLoadAddress(vortexBrowserStack[vortexBrowserIndex],false); }
+function browserRefresh(){ if(vortexBrowserCurrent) browserLoadAddress(vortexBrowserCurrent,false); else browserLoadAddress('vortex.features.vort',true); }
 function renderBrowserHistory(){
   const box=document.getElementById('vortex-browser-history'); if(!box)return;
-  box.innerHTML=vortexBrowserHistory.length?vortexBrowserHistory.map(q=>`<button class="history-item" onclick="document.getElementById('vortex-browser-address').value=${JSON.stringify(q)};browserNavigate()">${escapeHTML(q)}</button>`).join(''):'<span class="muted">Nenhuma pesquisa ainda.</span>';
+  box.innerHTML=vortexBrowserHistory.length?vortexBrowserHistory.map(q=>`<button class="history-item" onclick="browserLoadAddress(${JSON.stringify(q)},true)">${escapeHTML(q)}</button>`).join(''):'<span class="muted">Nenhuma pesquisa ainda.</span>';
 }
 function clearBrowserHistory(){ vortexBrowserHistory=[]; localStorage.setItem('vortex_browser_history','[]'); renderBrowserHistory(); vortexNotify('Histórico limpo.','success'); }
 function loadVortSite(domain,frame){
   const slug=domain.replace(/\.vort$/i,'').replace(/[^a-z0-9-]/g,'').toLowerCase();
   if(slug==='vortex-api') return loadVortexApiSite(frame);
+  if(slug==='vortex-features' || slug==='vortex-updates') return loadVortexFeaturesSite(frame);
   database.ref('vortSites/'+slug).once('value').then(s=>{if(!s.exists()){frame.innerHTML='<div class="vortex-browser-home"><h2>404</h2><p>Este domínio .vort não existe.</p></div>';return;}const site=s.val();frame.innerHTML=site.html||'';const st=document.createElement('style');st.textContent=site.css||'';frame.appendChild(st);if(site.js){const sc=document.createElement('script');sc.textContent=site.js;frame.appendChild(sc);}}).catch(e=>frame.innerHTML='<p>Erro ao abrir site: '+escapeHTML(e.message)+'</p>');
 }
-function loadVortexApiSite(frame){
-  frame.innerHTML=`<div class="api-site"><div class="api-site-hero"><div class="api-site-mark">V</div><div><h1>Vortex API</h1><p>Documentação da linguagem Vortex e da Engine 2D.</p></div></div><div class="api-site-grid"><aside class="api-site-nav"><button onclick="apiSiteJump('comece')">Começando</button><button onclick="apiSiteJump('ciclo')">Ciclo do jogo</button><button onclick="apiSiteJump('input')">Input</button><button onclick="apiSiteJump('movimento')">Movimento</button><button onclick="apiSiteJump('colisao')">Colisão</button><button onclick="apiSiteJump('objetos')">Objetos</button><button onclick="apiSiteJump('camera')">Câmera</button><button onclick="apiSiteJump('ui')">UI</button><button onclick="apiSiteJump('listas')">Listas</button><button onclick="apiSiteJump('exemplo')">Exemplo</button></aside><main class="api-site-content"><section id="comece"><h2>Começando</h2><p>Crie um script .vortex e use <code>_ready()</code> para inicialização e <code>_update()</code> para a lógica por frame.</p><pre>def _ready():\n    print("Jogo iniciado")\n\ndef _update():\n    p = vortex.get_player()\n    if p != None:\n        p.x = p.x + 2</pre></section><section id="ciclo"><h2>Ciclo do jogo</h2><p><code>_ready()</code> roda uma vez. <code>_update()</code> roda continuamente.</p></section><section id="input"><h2>Input</h2><pre>vortex.is_key_down("a")\nvortex.is_key_down("d")\nvortex.is_key_down("space")</pre></section><section id="movimento"><h2>Movimento</h2><pre>vortex.move(player, dx, dy)\nvortex.set_velocity(player, vx, vy)\nvortex.apply_gravity(player, 0.5)\nvortex.move_and_collide(player)</pre></section><section id="colisao"><h2>Colisão</h2><pre>vortex.check_collision(a, b)\nvortex.is_on_floor(player)\nfor bloco in vortex.get_blocks():\n    if vortex.check_collision(player, bloco):\n        pass</pre></section><section id="objetos"><h2>Objetos</h2><pre>vortex.spawn("square", 100, 100)\nvortex.spawn("circle", 200, 100)\nvortex.spawn("triangle", 300, 100)\nvortex.spawn("coin", 400, 100)\nvortex.set_size(obj, 64, 64)\nvortex.set_color(obj, "#a855f7")\nvortex.destroy(obj)</pre></section><section id="camera"><h2>Câmera</h2><pre>vortex.set_camera(x, y)\nvortex.follow_camera(player, 320, 180)</pre></section><section id="ui"><h2>Interface</h2><pre>vortex.create_text("score", "0", 20, 20)\nvortex.set_text("score", "100")\nvortex.create_button("play", "Jogar", 20, 60, iniciar)</pre></section><section id="listas"><h2>Dados</h2><pre>for i in range(10):\n    print(i)\n\nmoedas = [1, 2, 3]\nmoedas.append(4)\nprint(len(moedas))</pre></section><section id="exemplo"><h2>Exemplo: coletar moedas</h2><pre>def _update():\n    p = vortex.get_player()\n    if p == None:\n        return\n    if vortex.is_key_down("d"):\n        p.x = p.x + 4\n    for moeda in vortex.get_coins():\n        if not moeda.collected and vortex.check_collision(p, moeda):\n            vortex.collect_coin(moeda)\n            vortex.add_coins(1)</pre></section></main></div></div>`;
+function loadVortexFeaturesSite(frame){
+  frame.innerHTML=`<div class="features-site"><div class="features-hero"><div class="features-mark">V</div><div><div class="features-kicker">Vortex OS</div><h1>Features & Atualizações</h1><p>Histórico das versões e das mudanças importantes do sistema.</p></div></div><section class="feature-release"><span class="release-tag">v11.03</span><h2>Uma nova fase: foco na Web</h2><p>O Vortex OS está deixando para trás sistemas que ficaram complexos demais para o objetivo do projeto. A partir desta versão, o foco passa a ser criar, salvar, publicar e navegar por experiências Web dentro do próprio Vortex.</p></section><section class="feature-release goodbye"><span class="release-tag">Encerrado</span><h2>Adeus... Vortex Engine.</h2><p>A Vortex Engine foi uma parte importante da nossa história. Ela nasceu para permitir que pessoas criassem jogos 2D dentro do Vortex, mas cresceu até ficar complexa, difícil de organizar, difícil de aprender e desnecessária para o rumo que queremos seguir. Por isso, a Engine está sendo encerrada.</p><p>Junto dela, a Loja Global de jogos também deixa de existir. Não faz sentido manter uma loja de executáveis quando o Vortex está se tornando uma plataforma centrada na Web.</p><p>Isso não é o fim do Vortex. É uma simplificação. O sistema agora concentra seus esforços no <strong>Vortex Browser</strong>, no <strong>Vortex Site Studio</strong>, nos domínios <strong>.vort</strong>, no salvamento de sites, no histórico do navegador e na documentação da linguagem e das ferramentas Web.</p><p>Obrigado por tudo que a Vortex Engine representou. Adeus, Engine. E obrigado por ter feito parte da história do Vortex.</p></section><section class="feature-release"><span class="release-tag">v11.02</span><h2>Scene Editor</h2><p>Foi a última grande tentativa de transformar a Engine em um editor 2D completo, com Scene, Hierarchy, Inspector e ferramentas de transformação.</p></section><section class="feature-release"><span class="release-tag">v11.00</span><h2>Vortex Browser e .vort</h2><p>Chegaram o navegador do sistema, o Vortex Site Studio, publicação de sites .vort, histórico de pesquisa e a documentação acessível pelo endereço <strong>vortex.api.vort</strong>.</p></section><section class="feature-release"><span class="release-tag">v10.x</span><h2>Vortex OS: a fase dos jogos</h2><p>As versões anteriores experimentaram Engine 2D, scripts Vortex, jogos publicados, economia, Messenger e ferramentas de criação.</p></section></div>`;
 }
-function apiSiteJump(id){document.getElementById(id)?.scrollIntoView({behavior:'smooth'});}
 
 // ==========================================
 // VORTEX SITE STUDIO (.VORT) — SAVE LOCAL + CLOUD
 // ==========================================
-function openSiteStudio(){openWindow('win-site-studio'); loadSavedVortSites();}
+function openSiteStudio(){openWindow('win-site-studio'); loadSavedVortSites(); loadVortDraft();}
 function vortexSiteSlug(){return (document.getElementById('site-domain')?.value||'').trim().toLowerCase().replace(/[^a-z0-9-]/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'');}
 function siteDraftKey(){return 'vortex_site_draft_'+(currentUser?.key||'guest');}
 function saveVortDraft(){
@@ -1287,7 +1301,7 @@ function saveVortSite(){
   const title=(document.getElementById('site-title')?.value||slug).trim();
   const html=document.getElementById('site-html')?.value||''; const css=document.getElementById('site-css')?.value||''; const js=document.getElementById('site-js')?.value||'';
   const data={domain:slug+'.vort',title,html,css,js,authorKey:currentUser.key,author:currentUser.displayName||currentUser.key,updatedAt:Date.now()};
-  database.ref('vortSites/'+slug).transaction(old=>{if(old && old.authorKey!==currentUser.key)return;return data;}).then(r=>{if(!r.committed)return vortexNotify('Você não é o dono deste domínio.','error'); localStorage.removeItem(siteDraftKey()); vortexNotify('Site publicado/atualizado em '+slug+'.vort','success'); loadSavedVortSites();}).catch(e=>vortexNotify('Erro: '+e.message,'error'));
+  database.ref('vortSites/'+slug).transaction(old=>{if(old && old.authorKey!==currentUser.key)return;return data;}).then(r=>{if(!r.committed)return vortexNotify('Você não é o dono deste domínio.','error'); localStorage.removeItem(siteDraftKey()); database.ref('users/'+currentUser.key+'/siteFiles/'+slug).set({domain:data.domain,title:data.title,updatedAt:data.updatedAt}); vortexNotify('Site salvo em Meus Arquivos: '+slug+'.vort','success'); loadSavedVortSites(); loadUserFiles();}).catch(e=>vortexNotify('Erro: '+e.message,'error'));
 }
 function loadSavedVortSites(){
   const box=document.getElementById('saved-sites-list'); if(!box||!currentUser)return;
