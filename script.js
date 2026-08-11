@@ -1,4 +1,4 @@
-// Configuração do Firebase
+// Configuração Firebase
 const firebaseConfig = {
     apiKey: "AIzaSyCdivWo9znhaRLQyK01ZXvOQMe1jUB98w4",
     authDomain: "vortex-os-3f1d8.firebaseapp.com",
@@ -10,7 +10,6 @@ const firebaseConfig = {
     measurementId: "G-317ZP7P907"
 };
 
-// Inicialização
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const database = firebase.database();
@@ -19,7 +18,14 @@ class VortexOS {
     constructor() {
         this.highestZIndex = 100;
         this.openWindows = {};
-        this.currentUser = null;
+        this.currentUserUid = null;
+        this.userData = {
+            displayName: "Usuário",
+            username: "usuario",
+            recoveryEmail: "",
+            photoUrl: "",
+            email: ""
+        };
 
         this.initUI();
         this.initAuth();
@@ -29,44 +35,22 @@ class VortexOS {
     initUI() {
         lucide.createIcons();
 
-        // Botão Ligar
+        // Ligar PC
         document.getElementById('power-btn').addEventListener('click', () => {
             this.switchScreen('auth-screen');
         });
 
-        // Troca de Abas no Login (E-mail vs PIN)
-        const tabEmail = document.getElementById('tab-email');
-        const tabPin = document.getElementById('tab-pin');
-        const loginForm = document.getElementById('login-form');
-        const pinForm = document.getElementById('pin-form');
-        const regForm = document.getElementById('register-form');
+        // Alternadores Cadastro/Login por PIN
+        const loginForm = document.getElementById('pin-login-form');
+        const regForm = document.getElementById('pin-register-form');
+        const subtitle = document.getElementById('auth-subtitle');
         const errorMsg = document.getElementById('auth-error');
 
-        tabEmail.addEventListener('click', () => {
-            tabEmail.classList.add('active');
-            tabPin.classList.remove('active');
-            loginForm.classList.remove('hidden');
-            pinForm.classList.add('hidden');
-            regForm.classList.add('hidden');
-            errorMsg.innerText = "";
-        });
-
-        tabPin.addEventListener('click', () => {
-            tabPin.classList.add('active');
-            tabEmail.classList.remove('active');
-            pinForm.classList.remove('hidden');
-            loginForm.classList.add('hidden');
-            regForm.classList.add('hidden');
-            errorMsg.innerText = "";
-        });
-
-        // Alternadores Cadastro/Login
         document.getElementById('to-register').addEventListener('click', (e) => {
             e.preventDefault();
             loginForm.classList.add('hidden');
-            pinForm.classList.add('hidden');
             regForm.classList.remove('hidden');
-            document.getElementById('auth-title').innerText = "Criar Conta - Vortex";
+            subtitle.innerText = "Cadastre seu perfil e PIN único";
             errorMsg.innerText = "";
         });
 
@@ -74,14 +58,24 @@ class VortexOS {
             e.preventDefault();
             regForm.classList.add('hidden');
             loginForm.classList.remove('hidden');
-            tabEmail.click();
-            document.getElementById('auth-title').innerText = "Vortex OS";
+            subtitle.innerText = "Digite seu PIN de acesso";
             errorMsg.innerText = "";
         });
 
-        // Menu Iniciar
-        document.getElementById('start-btn').addEventListener('click', () => {
-            document.getElementById('start-menu').classList.toggle('hidden');
+        // Menu Iniciar (ABRE APENAS AO CLICAR NO ÍCONE)
+        const startBtn = document.getElementById('start-btn');
+        const startMenu = document.getElementById('start-menu');
+
+        startBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Impede o clique de propagar pro documento
+            startMenu.classList.toggle('hidden');
+        });
+
+        // Fechar Menu Iniciar ao clicar fora dele
+        document.addEventListener('click', (e) => {
+            if (!startMenu.contains(e.target) && !startBtn.contains(e.target)) {
+                startMenu.classList.add('hidden');
+            }
         });
     }
 
@@ -102,130 +96,185 @@ class VortexOS {
             document.getElementById('clock').innerText = time;
         };
         update();
-        setInterval(update, 10000);
+        setInterval(update, 5000);
     }
 
-    // SISTEMA DE AUTENTICAÇÃO (Email, Google, PIN)
+    // AUTENTICAÇÃO
     initAuth() {
-        const loginForm = document.getElementById('login-form');
-        const regForm = document.getElementById('register-form');
-        const pinForm = document.getElementById('pin-form');
+        const loginForm = document.getElementById('pin-login-form');
+        const regForm = document.getElementById('pin-register-form');
         const googleBtn = document.getElementById('google-btn');
         const errorMsg = document.getElementById('auth-error');
 
-        // 1. Login por E-mail e Senha
+        // Login PIN
         loginForm.addEventListener('submit', (e) => {
             e.preventDefault();
-            const email = document.getElementById('login-email').value;
-            const pass = document.getElementById('login-password').value;
+            const email = document.getElementById('login-email').value.toLowerCase().trim();
+            const pin = document.getElementById('login-pin').value;
 
-            auth.signInWithEmailAndPassword(email, pass)
-                .then(userCred => this.onLoginSuccess(userCred.user))
-                .catch(err => errorMsg.innerText = "Erro ao entrar: " + err.message);
+            database.ref('users').orderByChild('email').equalTo(email).once('value')
+                .then(snapshot => {
+                    if (!snapshot.exists()) {
+                        errorMsg.innerText = "Usuário não encontrado!";
+                        return;
+                    }
+
+                    let uid = null;
+                    let data = null;
+                    snapshot.forEach(child => {
+                        uid = child.key;
+                        data = child.val();
+                    });
+
+                    if (data && data.pin === pin) {
+                        this.currentUserUid = uid;
+                        this.loadAndApplyUserData(data);
+                    } else {
+                        errorMsg.innerText = "PIN incorreto!";
+                    }
+                })
+                .catch(err => errorMsg.innerText = "Erro ao validar PIN: " + err.message);
         });
 
-        // 2. Login por Google
+        // Cadastro PIN
+        regForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = document.getElementById('reg-name').value;
+            const username = document.getElementById('reg-username').value.replace('@', '');
+            const email = document.getElementById('reg-email').value.toLowerCase().trim();
+            const pin = document.getElementById('reg-pin').value;
+
+            if (pin.length < 4) {
+                errorMsg.innerText = "O PIN precisa ter no mínimo 4 dígitos!";
+                return;
+            }
+
+            const newUserRef = database.ref('users').push();
+            const initialData = {
+                username: username,
+                displayName: name,
+                email: email,
+                recoveryEmail: "",
+                photoUrl: "",
+                pin: pin,
+                created_at: Date.now()
+            };
+
+            newUserRef.set(initialData).then(() => {
+                this.currentUserUid = newUserRef.key;
+                this.loadAndApplyUserData(initialData);
+            }).catch(err => errorMsg.innerText = "Erro ao cadastrar: " + err.message);
+        });
+
+        // Login Google
         googleBtn.addEventListener('click', () => {
             const provider = new firebase.auth.GoogleAuthProvider();
             auth.signInWithPopup(provider)
                 .then(result => {
-                    // Salvar usuário no banco se for primeiro acesso
-                    database.ref('users/' + result.user.uid).update({
-                        username: result.user.displayName,
-                        email: result.user.email,
-                        photo: result.user.photoURL
+                    this.currentUserUid = result.user.uid;
+                    const userRef = database.ref('users/' + result.user.uid);
+                    
+                    userRef.once('value').then(snapshot => {
+                        let data = snapshot.val();
+                        if (!data) {
+                            data = {
+                                username: result.user.email.split('@')[0],
+                                displayName: result.user.displayName,
+                                email: result.user.email,
+                                recoveryEmail: "",
+                                photoUrl: result.user.photoURL || ""
+                            };
+                            userRef.set(data);
+                        }
+                        this.loadAndApplyUserData(data);
                     });
-                    this.onLoginSuccess(result.user, result.user.displayName, result.user.photoURL);
                 })
-                .catch(err => errorMsg.innerText = "Erro no Google: " + err.message);
-        });
-
-        // 3. Login por PIN
-        pinForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const email = document.getElementById('pin-email').value;
-            const pinEntered = document.getElementById('pin-input').value;
-
-            // Busca no Realtime Database pelo usuário correspondente
-            database.ref('users').orderByChild('email').equalTo(email).once('value')
-                .then(snapshot => {
-                    if (!snapshot.exists()) {
-                        errorMsg.innerText = "E-mail não encontrado!";
-                        return;
-                    }
-
-                    let userData = null;
-                    let uid = null;
-                    snapshot.forEach(child => {
-                        uid = child.key;
-                        userData = child.val();
-                    });
-
-                    if (userData && userData.pin === pinEntered) {
-                        this.onLoginSuccess({ uid: uid, email: userData.email }, userData.username, userData.photo);
+                .catch(err => {
+                    if (err.code === 'auth/unauthorized-domain') {
+                        errorMsg.innerText = "Erro: Adicione seu domínio no Firebase Console (Authorized Domains).";
                     } else {
-                        errorMsg.innerText = "PIN incorreto ou não configurado!";
+                        errorMsg.innerText = "Erro Google: " + err.message;
                     }
-                })
-                .catch(err => errorMsg.innerText = "Erro de validação PIN: " + err.message);
-        });
-
-        // 4. Cadastro de E-mail
-        regForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const name = document.getElementById('reg-name').value;
-            const email = document.getElementById('reg-email').value;
-            const pass = document.getElementById('reg-password').value;
-
-            auth.createUserWithEmailAndPassword(email, pass)
-                .then(userCred => {
-                    database.ref('users/' + userCred.user.uid).set({
-                        username: name,
-                        email: email,
-                        created_at: Date.now()
-                    });
-                    this.onLoginSuccess(userCred.user, name);
-                })
-                .catch(err => errorMsg.innerText = "Erro ao cadastrar: " + err.message);
+                });
         });
     }
 
-    onLoginSuccess(user, fallbackName = "Usuário", photoUrl = null) {
-        this.currentUser = user;
-        database.ref('users/' + user.uid).once('value').then(snapshot => {
-            const val = snapshot.val();
-            const name = val ? val.username : fallbackName;
-            const photo = val && val.photo ? val.photo : photoUrl;
+    loadAndApplyUserData(data) {
+        this.userData = {
+            displayName: data.displayName || data.username || "Usuário",
+            username: data.username || "usuario",
+            recoveryEmail: data.recoveryEmail || "",
+            photoUrl: data.photoUrl || "",
+            email: data.email || ""
+        };
 
-            document.getElementById('system-user-name').innerText = name;
-
-            if (photo) {
-                document.getElementById('desktop-avatar').innerHTML = `<img src="${photo}">`;
-                document.getElementById('auth-avatar').innerHTML = `<img src="${photo}">`;
-            }
-        });
+        this.updateSystemUserUI();
         this.switchScreen('desktop-screen');
     }
 
-    // Configurar / Salvar PIN no Perfil do Usuário
-    saveUserPin(newPin) {
-        if (!this.currentUser) return;
-        if (newPin.length !== 4 || isNaN(newPin)) {
-            alert("O PIN deve ter exatamente 4 números!");
-            return;
-        }
+    updateSystemUserUI() {
+        document.getElementById('system-user-name').innerText = this.userData.displayName;
+        document.getElementById('system-user-handle').innerText = `@${this.userData.username}`;
 
-        database.ref('users/' + this.currentUser.uid).update({ pin: newPin })
-            .then(() => alert("PIN salvo com sucesso! Agora você pode usar o PIN na tela inicial."))
-            .catch(err => alert("Erro ao salvar PIN: " + err.message));
+        const avatarContainers = [
+            document.getElementById('desktop-avatar'),
+            document.getElementById('auth-avatar')
+        ];
+
+        avatarContainers.forEach(container => {
+            if (container) {
+                if (this.userData.photoUrl) {
+                    container.innerHTML = `<img src="${this.userData.photoUrl}" alt="Avatar">`;
+                } else {
+                    container.innerHTML = `<i data-lucide="user"></i>`;
+                }
+            }
+        });
+        lucide.createIcons();
     }
 
-    // JANELAS
+    // SALVAR CONFIGURAÇÕES DO PERFIL (V1.1)
+    saveUserSettings(e) {
+        e.preventDefault();
+        if (!this.currentUserUid) return;
+
+        const photoUrl = document.getElementById('set-photo').value.trim();
+        const displayName = document.getElementById('set-displayname').value.trim();
+        const username = document.getElementById('set-username').value.trim().replace('@', '');
+        const recoveryEmail = document.getElementById('set-rec-email').value.trim();
+        const statusMsg = document.getElementById('save-status-msg');
+
+        const updatedData = {
+            photoUrl: photoUrl,
+            displayName: displayName,
+            username: username,
+            recoveryEmail: recoveryEmail
+        };
+
+        database.ref('users/' + this.currentUserUid).update(updatedData)
+            .then(() => {
+                this.userData.photoUrl = photoUrl;
+                this.userData.displayName = displayName;
+                this.userData.username = username;
+                this.userData.recoveryEmail = recoveryEmail;
+
+                this.updateSystemUserUI();
+
+                statusMsg.style.display = 'block';
+                setTimeout(() => { statusMsg.style.display = 'none'; }, 3000);
+            })
+            .catch(err => alert("Erro ao salvar: " + err.message));
+    }
+
+    // GERENCIADOR DE JANELAS
     openApp(appId) {
         document.getElementById('start-menu').classList.add('hidden');
 
         if (this.openWindows[appId]) {
             this.bringToFront(this.openWindows[appId]);
+            if (this.openWindows[appId].style.display === 'none') {
+                this.openWindows[appId].style.display = 'flex';
+            }
             return;
         }
 
@@ -237,7 +286,44 @@ class VortexOS {
         let title = "Aplicativo";
         let content = "";
 
-        if (appId === 'calculator') {
+        if (appId === 'settings') {
+            title = "Configurações do Sistema";
+            content = `
+                <div class="settings-container">
+                    <form class="settings-card" onsubmit="vortexOS.saveUserSettings(event)">
+                        <h4><i data-lucide="user-check"></i> Perfil do Usuário</h4>
+                        <div class="form-grid">
+                            <div class="form-group full">
+                                <label>URL da Foto de Perfil</label>
+                                <input type="url" id="set-photo" value="${this.userData.photoUrl}" placeholder="https://exemplo.com/sua-foto.jpg">
+                            </div>
+                            <div class="form-group">
+                                <label>Nome de Exibição</label>
+                                <input type="text" id="set-displayname" value="${this.userData.displayName}" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Username (@)</label>
+                                <input type="text" id="set-username" value="${this.userData.username}" required>
+                            </div>
+                            <div class="form-group full">
+                                <label>E-mail de Recuperação</label>
+                                <input type="email" id="set-rec-email" value="${this.userData.recoveryEmail}" placeholder="seuemail@backup.com">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-primary" style="margin-top: 14px; width: 100%;">Salvar Alterações</button>
+                        <p id="save-status-msg" class="save-status">✓ Perfil atualizado com sucesso!</p>
+                    </form>
+
+                    <div class="settings-card">
+                        <h4><i data-lucide="palette"></i> Aparência</h4>
+                        <div class="wallpaper-options">
+                            <div class="wp-thumb" style="background: linear-gradient(135deg, #0e0720, #260e42);" onclick="vortexOS.setWallpaper('default')"></div>
+                            <div class="wp-thumb" style="background: linear-gradient(135deg, #09090b, #27272a);" onclick="vortexOS.setWallpaper('dark')"></div>
+                            <div class="wp-thumb" style="background: linear-gradient(135deg, #4c1d95, #c084fc);" onclick="vortexOS.setWallpaper('neon')"></div>
+                        </div>
+                    </div>
+                </div>`;
+        } else if (appId === 'calculator') {
             title = "Calculadora";
             content = `
                 <div class="calc-display" id="calc-screen">0</div>
@@ -261,37 +347,14 @@ class VortexOS {
                 </div>`;
         } else if (appId === 'notepad') {
             title = "Bloco de Notas";
-            content = `<textarea class="notepad-text" placeholder="Digite seu texto aqui..."></textarea>`;
+            content = `<textarea class="notepad-text" placeholder="Escreva suas anotações aqui..."></textarea>`;
         } else if (appId === 'files') {
             title = "Gerenciador de Arquivos";
             content = `
                 <div class="file-list">
                     <div class="file-item"><i data-lucide="folder"></i><span>Documentos</span></div>
                     <div class="file-item"><i data-lucide="folder"></i><span>Imagens</span></div>
-                    <div class="file-item"><i data-lucide="file"></i><span>notas.txt</span></div>
-                </div>`;
-        } else if (appId === 'settings') {
-            title = "Configurações";
-            content = `
-                <div class="settings-group">
-                    <h4>Segurança e PIN</h4>
-                    <p style="font-size:12px; color:#aaa;">Cadastre um PIN de 4 dígitos para login rápido:</p>
-                    <div class="pin-config-box">
-                        <input type="password" id="new-pin-input" maxlength="4" placeholder="Ex: 1234">
-                        <button class="btn-primary" onclick="vortexOS.saveUserPin(document.getElementById('new-pin-input').value)">Salvar PIN</button>
-                    </div>
-                </div>
-                <div class="settings-group">
-                    <h4>Plano de Fundo (Wallpaper)</h4>
-                    <div class="wallpaper-options">
-                        <div class="wp-thumb" style="background: linear-gradient(135deg, #1e112a, #3b136f);" onclick="vortexOS.setWallpaper('default')"></div>
-                        <div class="wp-thumb" style="background: linear-gradient(135deg, #09090b, #27272a);" onclick="vortexOS.setWallpaper('dark')"></div>
-                        <div class="wp-thumb" style="background: linear-gradient(135deg, #4c1d95, #c084fc);" onclick="vortexOS.setWallpaper('neon')"></div>
-                    </div>
-                </div>
-                <div class="settings-group">
-                    <h4>Sobre o Sistema</h4>
-                    <p style="font-size:12px; color:#aaa;">Vortex OS Version 1.0 (Build 2026)</p>
+                    <div class="file-item"><i data-lucide="file-text"></i><span>vortex_log.txt</span></div>
                 </div>`;
         }
 
@@ -318,21 +381,26 @@ class VortexOS {
 
     makeDraggable(win) {
         const header = win.querySelector('.window-header');
-        let isDragging = false, offsetXR = 0, offsetYR = 0;
+        let isDragging = false;
+        let startX, startY, initialX, initialY;
 
         header.addEventListener('mousedown', (e) => {
             isDragging = true;
-            offsetXR = e.clientX - win.offsetLeft;
-            offsetYR = e.clientY - win.offsetTop;
+            startX = e.clientX;
+            startY = e.clientY;
+            initialX = win.offsetLeft;
+            initialY = win.offsetTop;
         });
 
         document.addEventListener('mousemove', (e) => {
             if (!isDragging) return;
-            win.style.left = `${e.clientX - offsetXR}px`;
-            win.style.top = `${e.clientY - offsetYR}px`;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            win.style.left = `${initialX + dx}px`;
+            win.style.top = `${initialY + dy}px`;
         });
 
-        document.addEventListener('mouseup', () => isDragging = false);
+        document.addEventListener('mouseup', () => { isDragging = false; });
     }
 
     bringToFront(win) {
@@ -350,8 +418,8 @@ class VortexOS {
 
     minimizeWindow(appId) {
         if (this.openWindows[appId]) {
-            this.openWindows[appId].style.display = 
-                this.openWindows[appId].style.display === 'none' ? 'flex' : 'none';
+            const win = this.openWindows[appId];
+            win.style.display = win.style.display === 'none' ? 'flex' : 'none';
         }
     }
 
@@ -393,7 +461,7 @@ class VortexOS {
         } else if (theme === 'neon') {
             desktop.style.background = 'linear-gradient(135deg, #4c1d95 0%, #c084fc 100%)';
         } else {
-            desktop.style.background = 'linear-gradient(135deg, #1e112a 0%, #3b136f 50%, #110726 100%)';
+            desktop.style.background = 'linear-gradient(135deg, #0e0720 0%, #260e42 50%, #080314 100%)';
         }
     }
 
@@ -408,7 +476,7 @@ class VortexOS {
         this.shutdownSystem();
         setTimeout(() => {
             this.switchScreen('auth-screen');
-        }, 1200);
+        }, 1000);
     }
 }
 
