@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vortex OS 1.1</title>
+    <title>Vortex OS 1.2</title>
     <link rel="stylesheet" href="style.css">
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -16,12 +16,12 @@
             <button id="power-btn" class="power-button">
                 <i data-lucide="power"></i>
             </button>
-            <p class="power-text">VORTEX OS 1.1</p>
-            <span class="power-subtext">Clique para inicializar</span>
+            <p class="power-text">VORTEX OS 1.2</p>
+            <span class="power-subtext">Clique para iniciar o sistema</span>
         </div>
     </div>
 
-    <!-- 2. TELA DE LOGIN / PIN -->
+    <!-- 2. TELA DE AUTENTICAÇÃO -->
     <div id="auth-screen" class="screen hidden">
         <div class="auth-card">
             <div class="avatar-box" id="auth-avatar">
@@ -30,7 +30,6 @@
             <h2 id="auth-title">Vortex OS</h2>
             <p class="auth-subtitle" id="auth-subtitle">Digite seu PIN de acesso</p>
 
-            <!-- Botão do Google -->
             <button type="button" id="google-btn" class="btn-google">
                 <svg class="google-icon" viewBox="0 0 24 24">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -45,9 +44,13 @@
 
             <!-- Login PIN -->
             <form id="pin-login-form" class="auth-form">
-                <input type="email" id="login-email" placeholder="E-mail" required>
+                <input type="email" id="login-email" placeholder="E-mail registrado" required>
                 <div class="pin-wrapper">
-                    <input type="password" id="login-pin" placeholder="PIN (4 a 6 dígitos)" maxlength="6" pattern="[0-9]*" inputmode="numeric" required>
+                    <input type="password" id="login-pin" placeholder="PIN" maxlength="6" pattern="[0-9]*" inputmode="numeric" required>
+                </div>
+                <div class="remember-me">
+                    <input type="checkbox" id="remember-session" checked>
+                    <label for="remember-session">Lembrar da minha sessão</label>
                 </div>
                 <button type="submit" class="btn-primary">Entrar</button>
                 <p class="auth-switch">Não tem PIN? <a href="#" id="to-register">Criar Conta</a></p>
@@ -92,9 +95,34 @@
 
         <div id="window-container"></div>
 
-        <!-- Menu Iniciar exclusivo -->
+        <!-- Menu Iniciar Fiel ao Windows 11 -->
         <div id="start-menu" class="start-menu hidden">
-            <div class="start-header">
+            <div class="start-search">
+                <i data-lucide="search"></i>
+                <input type="text" placeholder="Digitar aqui para pesquisar...">
+            </div>
+            
+            <div class="start-section-title">Fixados</div>
+            <div class="start-grid">
+                <div class="start-grid-item" onclick="vortexOS.openApp('files')">
+                    <div class="app-icon-box"><i data-lucide="folder"></i></div>
+                    <span>Arquivos</span>
+                </div>
+                <div class="start-grid-item" onclick="vortexOS.openApp('notepad')">
+                    <div class="app-icon-box"><i data-lucide="file-text"></i></div>
+                    <span>Bloco de Notas</span>
+                </div>
+                <div class="start-grid-item" onclick="vortexOS.openApp('calculator')">
+                    <div class="app-icon-box"><i data-lucide="calculator"></i></div>
+                    <span>Calculadora</span>
+                </div>
+                <div class="start-grid-item" onclick="vortexOS.openApp('settings')">
+                    <div class="app-icon-box"><i data-lucide="settings"></i></div>
+                    <span>Configurações</span>
+                </div>
+            </div>
+
+            <div class="start-footer">
                 <div class="user-info">
                     <div class="user-avatar" id="desktop-avatar"><i data-lucide="user"></i></div>
                     <div class="user-text-details">
@@ -102,39 +130,28 @@
                         <small id="system-user-handle">@usuario</small>
                     </div>
                 </div>
-            </div>
-            <div class="start-apps">
-                <div class="start-app-item" onclick="vortexOS.openApp('files')">
-                    <i data-lucide="folder"></i> <span>Gerenciador de Arquivos</span>
+                <div class="start-power-actions">
+                    <button onclick="vortexOS.restartSystem()" title="Reiniciar">
+                        <i data-lucide="rotate-cw"></i>
+                    </button>
+                    <button onclick="vortexOS.shutdownSystem()" title="Desligar/Sair" class="danger">
+                        <i data-lucide="power"></i>
+                    </button>
                 </div>
-                <div class="start-app-item" onclick="vortexOS.openApp('notepad')">
-                    <i data-lucide="file-text"></i> <span>Bloco de Notas</span>
-                </div>
-                <div class="start-app-item" onclick="vortexOS.openApp('calculator')">
-                    <i data-lucide="calculator"></i> <span>Calculadora</span>
-                </div>
-                <div class="start-app-item" onclick="vortexOS.openApp('settings')">
-                    <i data-lucide="settings"></i> <span>Configurações do Sistema</span>
-                </div>
-            </div>
-            <div class="start-footer">
-                <button onclick="vortexOS.restartSystem()">
-                    <i data-lucide="rotate-cw"></i> Reiniciar
-                </button>
-                <button onclick="vortexOS.shutdownSystem()" class="danger">
-                    <i data-lucide="power"></i> Desligar
-                </button>
             </div>
         </div>
 
-        <!-- Barra de Tarefas -->
+        <!-- Barra de Tarefas Estilo Windows 11 -->
         <div class="taskbar">
-            <button id="start-btn" class="start-button" title="Menu Vortex">
-                <i data-lucide="command"></i>
-            </button>
-            <div id="taskbar-apps" class="taskbar-apps"></div>
+            <div class="taskbar-center">
+                <button id="start-btn" class="start-button" title="Menu Iniciar Vortex">
+                    <i data-lucide="command"></i>
+                </button>
+                <div id="taskbar-apps" class="taskbar-apps"></div>
+            </div>
             <div class="system-tray">
-                <div id="clock" class="clock">00:00</div>
+                <div id="clock-time" class="clock-time">00:00</div>
+                <div id="clock-date" class="clock-date">00/00/0000</div>
             </div>
         </div>
     </div>
