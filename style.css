@@ -81,7 +81,7 @@ body, html {
     height: 40px;
 }
 
-/* 2. TELA DE LOGIN */
+/* 2. TELA DE LOGIN & PIN */
 #auth-screen {
     background: radial-gradient(circle, #3b0764 0%, #0f0a1c 100%);
     justify-content: center;
@@ -92,9 +92,9 @@ body, html {
     background: var(--purple-glass);
     backdrop-filter: blur(20px);
     border: 1px solid var(--border-color);
-    padding: 40px;
+    padding: 35px 30px;
     border-radius: 16px;
-    width: 340px;
+    width: 360px;
     text-align: center;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
 }
@@ -108,6 +108,13 @@ body, html {
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
+}
+
+.avatar-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .avatar-box svg {
@@ -115,11 +122,44 @@ body, html {
     height: 35px;
 }
 
+/* Abas de Troca de Login */
+.login-tabs {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 15px;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 4px;
+    border-radius: 8px;
+}
+
+.tab-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #aaa;
+    padding: 6px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.tab-btn.active {
+    background: var(--purple-accent);
+    color: #fff;
+    font-weight: bold;
+}
+
 .auth-form {
     display: flex;
     flex-direction: column;
     gap: 12px;
     margin-top: 20px;
+}
+
+.auth-form.hidden {
+    display: none;
 }
 
 .auth-form input {
@@ -135,6 +175,21 @@ body, html {
     border-color: var(--purple-light);
 }
 
+/* Estilo do PIN */
+.pin-subtext {
+    font-size: 12px;
+    color: #bbb;
+    margin-bottom: 5px;
+}
+
+.pin-box input {
+    letter-spacing: 15px;
+    font-size: 24px;
+    text-align: center;
+    font-weight: bold;
+}
+
+/* Botões */
 .btn-primary {
     background: var(--purple-accent);
     color: white;
@@ -148,6 +203,44 @@ body, html {
 
 .btn-primary:hover {
     background: #7c3aed;
+}
+
+.btn-google {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--border-color);
+    color: #fff;
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-weight: 500;
+    transition: 0.2s;
+}
+
+.btn-google:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.divider {
+    display: flex;
+    align-items: center;
+    color: #888;
+    font-size: 11px;
+    margin: 5px 0;
+}
+
+.divider::before, .divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border-color);
+}
+
+.divider span {
+    padding: 0 8px;
 }
 
 .auth-switch {
@@ -167,7 +260,7 @@ body, html {
     margin-top: 10px;
 }
 
-/* 3. DESKTOP & WALLPAPER */
+/* 3. DESKTOP & TASKBAR */
 #desktop-screen {
     background: linear-gradient(135deg, #1e112a 0%, #3b136f 50%, #110726 100%);
     background-size: cover;
@@ -211,7 +304,6 @@ body, html {
     text-shadow: 0 2px 4px rgba(0,0,0,0.8);
 }
 
-/* BARRA DE TAREFAS */
 .taskbar {
     position: absolute;
     bottom: 0;
@@ -315,6 +407,13 @@ body, html {
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
+}
+
+.user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .start-apps {
@@ -416,7 +515,6 @@ body, html {
 
 .win-close { background: #ef4444; }
 .win-min { background: #f59e0b; }
-.win-max { background: #10b981; }
 
 .window-body {
     flex: 1;
@@ -500,6 +598,21 @@ body, html {
 .settings-group h4 {
     margin-bottom: 10px;
     color: var(--purple-light);
+}
+
+.pin-config-box {
+    display: flex;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.pin-config-box input {
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid var(--border-color);
+    padding: 8px 12px;
+    border-radius: 6px;
+    color: #fff;
+    width: 120px;
 }
 
 .wallpaper-options {
