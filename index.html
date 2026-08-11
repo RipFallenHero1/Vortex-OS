@@ -3,449 +3,126 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vortex OS</title>
+    <title>Vortex OS 1.0</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <!-- Lucide Icons para ícones estilo Windows -->
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
 
-    <!-- NOTIFICAÇÕES TOAST -->
-    <div id="vortex-notifications"></div>
+    <!-- 1. TELA DE BOOT (DESLIGADO) -->
+    <div id="boot-screen" class="screen active">
+        <div class="power-container">
+            <button id="power-btn" class="power-button">
+                <i data-lucide="power"></i>
+            </button>
+            <p>Clique para ligar o Vortex OS 1.0</p>
+        </div>
+    </div>
 
-    <!-- TELA DE LOGIN / CADASTRO -->
-    <div id="login-screen" class="full-overlay">
+    <!-- 2. TELA DE LOGIN / CADASTRO -->
+    <div id="auth-screen" class="screen hidden">
         <div class="auth-card">
-            <div class="brand-mark">🌀</div>
-            <h1>Vortex OS</h1>
-            <p>Digite seu usuário e PIN para entrar</p>
-            <input type="text" id="auth-username" placeholder="Nome de usuário">
-            <input type="password" id="auth-pin" placeholder="PIN de 4 dígitos" maxlength="4">
-            <input type="email" id="auth-email" placeholder="E-mail (opcional)">
-            <button class="btn primary wide" onclick="loginUser()">Entrar no Vortex OS</button>
+            <div class="avatar-box">
+                <i data-lucide="user"></i>
+            </div>
+            <h2 id="auth-title">Vortex OS</h2>
+            
+            <!-- Formulário de Login -->
+            <form id="login-form" class="auth-form">
+                <input type="email" id="login-email" placeholder="E-mail" required>
+                <input type="password" id="login-password" placeholder="Senha" required>
+                <button type="submit" class="btn-primary">Entrar</button>
+                <p class="auth-switch">Não tem conta? <a href="#" id="to-register">Cadastre-se</a></p>
+            </form>
+
+            <!-- Formulário de Cadastro -->
+            <form id="register-form" class="auth-form hidden">
+                <input type="text" id="reg-name" placeholder="Seu Nome" required>
+                <input type="email" id="reg-email" placeholder="E-mail" required>
+                <input type="password" id="reg-password" placeholder="Senha (mín. 6 caracteres)" required>
+                <button type="submit" class="btn-primary">Criar Conta</button>
+                <p class="auth-switch">Já possui conta? <a href="#" id="to-login">Fazer Login</a></p>
+            </form>
+            <p id="auth-error" class="error-msg"></p>
         </div>
     </div>
 
-    <!-- TELA DE DESLIGAMENTO -->
-    <div id="shutdown-screen" class="full-overlay dark" style="display:none;">
-        <div class="power-card">
-            <div class="brand-mark">⚡</div>
-            <h2>Vortex OS Desligado</h2>
-            <p>O sistema foi encerrado com segurança.</p>
-            <button class="btn primary wide" onclick="powerOn()">Ligar Novamente</button>
-        </div>
-    </div>
-
-    <!-- ÁREA DE TRABALHO -->
-    <div id="desktop" class="desktop">
-        
-        <div class="desktop-icon" onclick="openWindow('win-engine')">
-            <div class="icon-img app-symbol engine-symbol"></div>
-            <span>Vortex Engine</span>
-        </div>
-
-        <div class="desktop-icon" onclick="openWindow('win-vscode')">
-            <div class="icon-img app-symbol code-symbol"></div>
-            <span>Vortex Code</span>
-        </div>
-
-        <div class="desktop-icon" onclick="openWindow('win-messenger')">
-            <div class="icon-img app-symbol msg-symbol"></div>
-            <span>Vortex Messager</span>
-        </div>
-
-        <div class="desktop-icon" onclick="openWindow('win-browser')">
-            <div class="icon-img app-symbol browser-symbol"></div>
-            <span>Navegador</span>
-        </div>
-
-        <div class="desktop-icon" onclick="openWindow('win-files')">
-            <div class="icon-img app-symbol files-symbol"></div>
-            <span>Meus Arquivos</span>
-        </div>
-
-        <div class="desktop-icon" onclick="openWindow('win-store')">
-            <div class="icon-img app-symbol store-symbol"></div>
-            <span>Vortex Store</span>
-        </div>
-
-        <div class="desktop-icon" onclick="openWindow('win-terminal')">
-            <div class="icon-img app-symbol terminal-symbol"></div>
-            <span>Terminal</span>
-        </div>
-
-        <div class="desktop-icon" onclick="openWindow('win-calc')">
-            <div class="icon-img app-symbol calc-symbol"></div>
-            <span>Calculadora</span>
-        </div>
-
-        <div class="desktop-icon" onclick="openWindow('win-settings')">
-            <div class="icon-img app-symbol settings-symbol"></div>
-            <span>Configurações</span>
-        </div>
-
-        <div class="desktop-icon" id="desktop-admin-icon" style="display:none;" onclick="openWindow('win-admin')">
-            <div class="icon-img app-symbol admin-symbol"></div>
-            <span>Admin Panel</span>
-        </div>
-
-    </div>
-
-    <!-- JANELA: VORTEX ENGINE -->
-    <div id="win-engine" class="window vortex-engine-window">
-        <div class="window-header" onmousedown="dragWindow(event, 'win-engine')">
-            <span>🌀 Vortex Engine 2D <small class="engine-version">v11.02</small></span>
-            <div class="window-controls">
-                <button onclick="closeWindow('win-engine')">✕</button>
+    <!-- 3. TELA DA ÁREA DE TRABALHO (DESKTOP) -->
+    <div id="desktop-screen" class="screen hidden">
+        <!-- Ícones da Área de Trabalho -->
+        <div class="desktop-icons">
+            <div class="icon" onclick="vortexOS.openApp('files')">
+                <i data-lucide="folder"></i>
+                <span>Arquivos</span>
+            </div>
+            <div class="icon" onclick="vortexOS.openApp('notepad')">
+                <i data-lucide="file-text"></i>
+                <span>Bloco de Notas</span>
+            </div>
+            <div class="icon" onclick="vortexOS.openApp('calculator')">
+                <i data-lucide="calculator"></i>
+                <span>Calculadora</span>
+            </div>
+            <div class="icon" onclick="vortexOS.openApp('settings')">
+                <i data-lucide="settings"></i>
+                <span>Configurações</span>
             </div>
         </div>
-        <div class="window-body style-none" style="padding:0;">
-            <div class="vortex-editor-shell">
-                <div class="vortex-main-toolbar">
-                    <div class="vortex-tool-group">
-                        <button class="scene-tool active" data-tool="select" onclick="vortexEditorTool('select')" title="Selecionar (V)">🖐️</button>
-                        <button class="scene-tool" data-tool="move" onclick="vortexEditorTool('move')" title="Mover (M)">🛠️</button>
-                        <button class="scene-tool" data-tool="scale" onclick="vortexEditorTool('scale')" title="Redimensionar (R)">📐</button>
-                        <button class="scene-tool" data-tool="rect" onclick="vortexEditorTool('rect')" title="Criar Bloco (B)">⏹️</button>
-                    </div>
-                    <div class="vortex-tool-separator"></div>
-                    <div class="scene-tabs">
-                        <button id="scene-tab-scene" class="scene-tab active" onclick="vortexEditorView('scene')">Scene</button>
-                        <button id="scene-tab-game" class="scene-tab" onclick="vortexEditorView('game')">Game</button>
-                    </div>
-                    <div class="scene-spacer"></div>
-                    <button class="engine-test-top" onclick="toggleEngineTestMode()">▶ Testar Jogo</button>
-                </div>
-                <div class="vortex-editor-workspace">
-                    <!-- HIERARCHY DOCK -->
-                    <div class="vortex-dock hierarchy-dock">
-                        <div class="dock-title">
-                            <span>Hierarquia</span>
-                            <button onclick="vortexCreateObjectMenu()">+</button>
-                        </div>
-                        <div class="hierarchy-search">
-                            <input type="text" id="hierarchy-search" placeholder="Filtrar cena..." oninput="renderHierarchy()">
-                        </div>
-                        <ul id="hierarchy-tree" class="vortex-tree"></ul>
-                    </div>
 
-                    <!-- VIEWPORT -->
-                    <div class="vortex-scene-area">
-                        <div class="scene-object-toolbar">
-                            <button onclick="vortexAddObject('square')">+ Bloco</button>
-                            <button onclick="vortexAddObject('circle')">+ Círculo</button>
-                            <button onclick="vortexAddObject('triangle')">+ Triângulo</button>
-                            <button onclick="vortexAddObject('player')">+ Player</button>
-                            <button onclick="vortexAddObject('coin')">+ Moeda</button>
-                            <div class="scene-help">Shift + Drag para Pan | Wheel Zoom</div>
-                        </div>
-                        <div id="canvas-2d" class="vortex-scene-viewport"></div>
-                        <div class="scene-statusbar">
-                            <span id="scene-coordinates">X 0 Y 0</span>
-                            <span id="engine-viewport-label">Scene 2D</span>
-                        </div>
-                    </div>
+        <!-- Conteiner de Janelas Ativas -->
+        <div id="window-container"></div>
 
-                    <!-- INSPECTOR DOCK -->
-                    <div class="vortex-dock inspector-dock">
-                        <div class="dock-title"><span>Inspector</span></div>
-                        <div id="inspector-content" class="unity-inspector">
-                            <div class="inspector-empty">Nenhum objeto selecionado na cena.</div>
-                        </div>
-                    </div>
+        <!-- Menu Iniciar -->
+        <div id="start-menu" class="start-menu hidden">
+            <div class="start-header">
+                <div class="user-info">
+                    <div class="user-avatar"><i data-lucide="user"></i></div>
+                    <span id="system-user-name">Usuário</span>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <!-- JANELA: VORTEX CODE -->
-    <div id="win-vscode" class="window" style="width:780px; height:480px;">
-        <div class="window-header" onmousedown="dragWindow(event, 'win-vscode')">
-            <span>💻 Vortex Code IDE</span>
-            <div class="window-controls">
-                <button onclick="closeWindow('win-vscode')">✕</button>
-            </div>
-        </div>
-        <div class="window-body code-layout">
-            <div class="api-docs">
-                <h3>Vortex Scripts</h3>
-                <button class="btn primary wide" onclick="createNewScriptPrompt()" style="margin-bottom:12px;">+ Novo Script</button>
-                <div id="scripts-list" class="saved-sites-list" style="flex-direction:column;"></div>
-            </div>
-            <div class="code-main">
-                <div class="code-actions">
-                    <input type="text" id="vscode-script-name" placeholder="nome_do_script.vortex">
-                    <button class="btn primary" onclick="saveCurrentScript()">Salvar</button>
+            <div class="start-apps">
+                <div class="start-app-item" onclick="vortexOS.openApp('files')">
+                    <i data-lucide="folder"></i> <span>Gerenciador de Arquivos</span>
                 </div>
-                <textarea id="vscode-editor" placeholder="// Escreva seu código em linguagem Vortex aqui..."></textarea>
-            </div>
-        </div>
-    </div>
-
-    <!-- JANELA: VORTEX MESSAGER (DISCORD CLONE) -->
-    <div id="win-messenger" class="window discord-window" style="width:920px; height:580px;">
-        <div class="window-header" onmousedown="dragWindow(event, 'win-messenger')">
-            <span>💬 Vortex Messager</span>
-            <div class="window-controls">
-                <button onclick="closeWindow('win-messenger')">✕</button>
-            </div>
-        </div>
-        <div class="window-body style-none" style="padding:0;">
-            <div class="discord-app">
-                <!-- Guilds / Servers Column -->
-                <div class="discord-guilds-bar">
-                    <button class="guild-btn active" id="btn-dm-home" onclick="switchDiscordTab('dms')" title="Mensagens Diretas">
-                        <div class="discord-icon">🌀</div>
-                    </button>
-                    <div class="guild-divider"></div>
-                    <div id="discord-servers-list" class="guild-list"></div>
-                    <button class="guild-btn add-btn" onclick="openCreateServerModal()" title="Criar ou Entrar em Servidor">+</button>
+                <div class="start-app-item" onclick="vortexOS.openApp('notepad')">
+                    <i data-lucide="file-text"></i> <span>Bloco de Notas</span>
                 </div>
-
-                <!-- Channels / DMs Sub-bar -->
-                <div class="discord-channels-bar">
-                    <div class="discord-bar-header" id="discord-sidebar-title">
-                        <span>Mensagens Diretas</span>
-                    </div>
-                    
-                    <!-- Aba de Amigos / DMs -->
-                    <div id="discord-dms-panel" class="discord-panel-section">
-                        <div class="add-friend-box">
-                            <input type="text" id="add-friend-input" placeholder="Adicionar amigo por nick...">
-                            <button onclick="addFriendAction()">+</button>
-                        </div>
-                        <div class="discord-section-label">AMIGOS & DMS</div>
-                        <div id="discord-friends-list" class="discord-list"></div>
-                    </div>
-
-                    <!-- Aba de Canais do Servidor -->
-                    <div id="discord-channels-panel" class="discord-panel-section" style="display:none;">
-                        <div class="discord-section-label">CANAIS DE TEXTO</div>
-                        <div id="discord-channels-list" class="discord-list"></div>
-                        <button class="btn btn-sm primary wide" style="margin-top:10px;" onclick="promptCreateChannel()">+ Criar Canal</button>
-                    </div>
-
-                    <!-- Footer Perfil Logado -->
-                    <div class="discord-user-footer">
-                        <div class="avatar" id="msg-user-avatar">U</div>
-                        <div class="user-info">
-                            <strong id="msg-user-name">Usuário</strong>
-                            <small id="msg-user-status">● Online no Vortex</small>
-                        </div>
-                    </div>
+                <div class="start-app-item" onclick="vortexOS.openApp('calculator')">
+                    <i data-lucide="calculator"></i> <span>Calculadora</span>
                 </div>
-
-                <!-- Main Chat Viewport -->
-                <div class="discord-chat-area">
-                    <div class="discord-chat-header">
-                        <span class="chat-target-symbol" id="chat-target-symbol">@</span>
-                        <strong id="chat-target-name">Selecione uma conversa</strong>
-                        <small id="chat-target-desc" style="margin-left:auto; color:#a78bfa;"></small>
-                    </div>
-
-                    <div id="discord-messages-container" class="discord-messages">
-                        <div class="discord-welcome-msg">
-                            <h3>Bem-vindo ao Vortex Messager!</h3>
-                            <p>Selecione um amigo para conversar ou entre em um servidor.</p>
-                        </div>
-                    </div>
-
-                    <!-- Input Composer -->
-                    <div class="discord-composer">
-                        <input type="file" id="msg-file-input" style="display:none;" onchange="handleFileAttachment(event)">
-                        <button class="attach-btn" onclick="document.getElementById('msg-file-input').click()" title="Anexar Imagem, Vídeo ou Arquivo">➕</button>
-                        <input type="text" id="discord-msg-input" placeholder="Conversar em Vortex Messager..." onkeydown="handleDiscordKeyDown(event)">
-                        <button class="send-btn" onclick="sendDiscordMessage()">Enviar</button>
-                    </div>
+                <div class="start-app-item" onclick="vortexOS.openApp('settings')">
+                    <i data-lucide="settings"></i> <span>Configurações</span>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <!-- JANELA: NAVEGADOR -->
-    <div id="win-browser" class="window" style="width:820px; height:500px;">
-        <div class="window-header" onmousedown="dragWindow(event, 'win-browser')">
-            <span>🌐 Vortex Browser</span>
-            <div class="window-controls">
-                <button onclick="closeWindow('win-browser')">✕</button>
+            <div class="start-footer">
+                <button onclick="vortexOS.restartSystem()" title="Reiniciar">
+                    <i data-lucide="rotate-cw"></i> Reiniciar
+                </button>
+                <button onclick="vortexOS.shutdownSystem()" title="Desligar" class="danger">
+                    <i data-lucide="power"></i> Desligar
+                </button>
             </div>
         </div>
-        <div class="window-body style-none" style="padding:0;">
-            <div class="vortex-browser-shell">
-                <div class="vortex-browser-toolbar">
-                    <button class="browser-nav" onclick="vortexNotify('Início')">🏠</button>
-                    <input type="text" class="browser-address" value="vortex://home" readonly>
-                </div>
-                <div class="vortex-browser-page">
-                    <div class="vortex-browser-home">
-                        <div class="vortex-browser-logo">Vortex Web</div>
-                        <p>Sua rede descentralizada dentro do Vortex OS</p>
-                    </div>
-                </div>
+
+        <!-- Barra de Tarefas (Taskbar estilo Windows) -->
+        <div class="taskbar">
+            <button id="start-btn" class="start-button">
+                <i data-lucide="command"></i>
+            </button>
+            <div id="taskbar-apps" class="taskbar-apps"></div>
+            <div class="system-tray">
+                <div id="clock" class="clock">00:00</div>
             </div>
         </div>
     </div>
 
-    <!-- JANELA: ARQUIVOS -->
-    <div id="win-files" class="window" style="width:640px; height:420px;">
-        <div class="window-header" onmousedown="dragWindow(event, 'win-files')">
-            <span>📁 Meus Arquivos</span>
-            <div class="window-controls">
-                <button onclick="closeWindow('win-files')">✕</button>
-            </div>
-        </div>
-        <div class="window-body">
-            <div id="files-grid-container" class="files-grid"></div>
-        </div>
-    </div>
+    <!-- Firebase SDKs Compat -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
-    <!-- JANELA: STORE -->
-    <div id="win-store" class="window" style="width:680px; height:440px;">
-        <div class="window-header" onmousedown="dragWindow(event, 'win-store')">
-            <span>🛍️ Vortex Store</span>
-            <div class="window-controls">
-                <button onclick="closeWindow('win-store')">✕</button>
-            </div>
-        </div>
-        <div class="window-body">
-            <h2>Loja de Apps & Utilitários</h2>
-            <p>Em breve novos jogos e extensões para o Vortex OS!</p>
-        </div>
-    </div>
-
-    <!-- JANELA: TERMINAL -->
-    <div id="win-terminal" class="window" style="width:580px; height:360px;">
-        <div class="window-header" onmousedown="dragWindow(event, 'win-terminal')">
-            <span>💻 Terminal Prompt</span>
-            <div class="window-controls">
-                <button onclick="closeWindow('win-terminal')">✕</button>
-            </div>
-        </div>
-        <div class="window-body style-none terminal-body">
-            <div id="terminal-output">Vortex OS Kernel v11.03<br>Digite 'help' para comandos.</div>
-            <div style="display:flex; margin-top:8px;">
-                <span style="color:#56ff72; margin-right:6px;">&gt;</span>
-                <input type="text" id="terminal-input" style="flex:1;" onkeydown="handleTerminal(event)">
-            </div>
-        </div>
-    </div>
-
-    <!-- JANELA: CALCULADORA -->
-    <div id="win-calc" class="window small-window" style="width:280px; height:340px;">
-        <div class="window-header" onmousedown="dragWindow(event, 'win-calc')">
-            <span>🧮 Calculadora</span>
-            <div class="window-controls">
-                <button onclick="closeWindow('win-calc')">✕</button>
-            </div>
-        </div>
-        <div class="window-body calc-body">
-            <input type="text" id="calc-display" readonly>
-            <div class="calc-grid">
-                <button onclick="calcClear()">C</button>
-                <button onclick="calcInput('/')">/</button>
-                <button onclick="calcInput('*')">*</button>
-                <button onclick="calcInput('-')">-</button>
-                <button onclick="calcInput('7')">7</button>
-                <button onclick="calcInput('8')">8</button>
-                <button onclick="calcInput('9')">9</button>
-                <button onclick="calcInput('+')">+</button>
-                <button onclick="calcInput('4')">4</button>
-                <button onclick="calcInput('5')">5</button>
-                <button onclick="calcInput('6')">6</button>
-                <button onclick="calcEval()">=</button>
-                <button onclick="calcInput('1')">1</button>
-                <button onclick="calcInput('2')">2</button>
-                <button onclick="calcInput('3')">3</button>
-                <button onclick="calcInput('0')">0</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- JANELA: CONFIGURAÇÕES -->
-    <div id="win-settings" class="window" style="width:520px; height:380px;">
-        <div class="window-header" onmousedown="dragWindow(event, 'win-settings')">
-            <span>⚙️ Configurações do Sistema</span>
-            <div class="window-controls">
-                <button onclick="closeWindow('win-settings')">✕</button>
-            </div>
-        </div>
-        <div class="window-body">
-            <h3>Perfil Atual</h3>
-            <p><strong>Usuário:</strong> <span id="settings-user">-</span></p>
-            <p><strong>E-mail:</strong> <span id="settings-email">-</span></p>
-            <hr>
-            <h3>Temas do Sistema</h3>
-            <div class="theme-grid">
-                <button onclick="setTheme('purple')">Roxo Vortex</button>
-                <button onclick="setTheme('dark-purple')">Roxo Noturno</button>
-                <button onclick="setTheme('cyber-blue')">Cyber Blue</button>
-                <button onclick="setTheme('sunset')">Sunset</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- JANELA: ADMIN PANEL -->
-    <div id="win-admin" class="window" style="width:680px; height:460px;">
-        <div class="window-header" onmousedown="dragWindow(event, 'win-admin')">
-            <span>🛡️ Painel de Administração</span>
-            <div class="window-controls">
-                <button onclick="closeWindow('win-admin')">✕</button>
-            </div>
-        </div>
-        <div class="window-body">
-            <h2>Gerenciamento de Usuários do Vortex OS</h2>
-            <p>Gerencie cargos e privilégios de admin dos usuários cadastrados no Firebase.</p>
-            <div id="admin-users-list" class="admin-grid" style="grid-template-columns:1fr; margin-top:15px;"></div>
-        </div>
-    </div>
-
-    <!-- MENU INICIAR -->
-    <div id="start-menu" class="start-menu">
-        <div class="start-user">
-            <div class="avatar">V</div>
-            <div>
-                <strong id="start-username">Usuário</strong>
-                <small id="start-email">online</small>
-            </div>
-        </div>
-        <div class="start-grid">
-            <button onclick="openWindow('win-engine'); closeStartMenuIfOpen();">🌀 Vortex Engine</button>
-            <button onclick="openWindow('win-vscode'); closeStartMenuIfOpen();">💻 Vortex Code</button>
-            <button onclick="openWindow('win-messenger'); closeStartMenuIfOpen();">💬 Vortex Messager</button>
-            <button onclick="openWindow('win-browser'); closeStartMenuIfOpen();">🌐 Navegador</button>
-            <button onclick="openWindow('win-files'); closeStartMenuIfOpen();">📁 Meus Arquivos</button>
-            <button onclick="openWindow('win-settings'); closeStartMenuIfOpen();">⚙️ Configurações</button>
-            <button id="start-admin-btn" style="display:none;" onclick="openWindow('win-admin'); closeStartMenuIfOpen();">🛡️ Painel Admin</button>
-        </div>
-        <button class="shutdown-link" onclick="shutdownPC()">🔴 Desligar o PC</button>
-    </div>
-
-    <!-- BARRA DE TAREFAS -->
-    <div class="taskbar">
-        <button class="start-btn" onclick="toggleStartMenu()">🌀</button>
-        <div id="taskbar-apps" style="display:flex; gap:6px;"></div>
-        <div class="system-tray">
-            <span id="os-clock">00:00</span>
-        </div>
-    </div>
-
-    <!-- MODAL CRIAR/ENTRAR SERVIDOR DISCORD -->
-    <div id="modal-server" class="modal">
-        <div class="modal-content">
-            <h3 style="margin-top:0;">Servidores Vortex</h3>
-            <p>Crie seu próprio servidor ou entre em um existente.</p>
-            <input type="text" id="server-name-input" placeholder="Nome do novo servidor...">
-            <button class="btn primary wide" onclick="createNewServerAction()">Criar Servidor</button>
-            <hr style="margin:15px 0; border-color:#ffffff12;">
-            <input type="text" id="server-id-input" placeholder="Código/ID do Servidor...">
-            <button class="btn wide" onclick="joinServerAction()">Entrar no Servidor</button>
-            <div class="modal-actions" style="margin-top:15px;">
-                <button class="btn danger" onclick="closeModal('modal-server')">Cancelar</button>
-            </div>
-        </div>
-    </div>
-
+    <!-- App Scripts -->
     <script src="script.js"></script>
 </body>
 </html>
