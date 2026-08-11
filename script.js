@@ -1,4 +1,4 @@
-// Configuração Firebase
+// Configuração do Firebase
 const firebaseConfig = {
     apiKey: "AIzaSyCdivWo9znhaRLQyK01ZXvOQMe1jUB98w4",
     authDomain: "vortex-os-3f1d8.firebaseapp.com",
@@ -35,12 +35,14 @@ class VortexOS {
     initUI() {
         lucide.createIcons();
 
-        // Ligar PC
+        // Tentar Auto-Login ao Ligar
         document.getElementById('power-btn').addEventListener('click', () => {
-            this.switchScreen('auth-screen');
+            if (!this.checkSavedSession()) {
+                this.switchScreen('auth-screen');
+            }
         });
 
-        // Alternadores Cadastro/Login por PIN
+        // Alternadores Cadastro/Login
         const loginForm = document.getElementById('pin-login-form');
         const regForm = document.getElementById('pin-register-form');
         const subtitle = document.getElementById('auth-subtitle');
@@ -62,16 +64,16 @@ class VortexOS {
             errorMsg.innerText = "";
         });
 
-        // Menu Iniciar (ABRE APENAS AO CLICAR NO ÍCONE)
+        // FIX MENU INICIAR BLINDADO (ABRE APENAS AO CLICAR NO ÍCONE)
         const startBtn = document.getElementById('start-btn');
         const startMenu = document.getElementById('start-menu');
 
         startBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // Impede o clique de propagar pro documento
+            e.stopPropagation(); // Bloqueia propagação do clique
             startMenu.classList.toggle('hidden');
         });
 
-        // Fechar Menu Iniciar ao clicar fora dele
+        // Clique em qualquer outro lugar do sistema fecha o menu iniciar
         document.addEventListener('click', (e) => {
             if (!startMenu.contains(e.target) && !startBtn.contains(e.target)) {
                 startMenu.classList.add('hidden');
@@ -92,11 +94,40 @@ class VortexOS {
     startClock() {
         const update = () => {
             const now = new Date();
-            const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            document.getElementById('clock').innerText = time;
+            document.getElementById('clock-time').innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            document.getElementById('clock-date').innerText = now.toLocaleDateString('pt-BR');
         };
         update();
-        setInterval(update, 5000);
+        setInterval(update, 1000);
+    }
+
+    // AUTO-LOGIN (SESSÃO SALVA)
+    checkSavedSession() {
+        const saved = localStorage.getItem('vortex_user_session');
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                this.currentUserUid = parsed.uid;
+                this.userData = parsed.userData;
+                this.updateSystemUserUI();
+                this.switchScreen('desktop-screen');
+                return true;
+            } catch (e) {
+                localStorage.removeItem('vortex_user_session');
+            }
+        }
+        return false;
+    }
+
+    saveSession() {
+        localStorage.setItem('vortex_user_session', JSON.stringify({
+            uid: this.currentUserUid,
+            userData: this.userData
+        }));
+    }
+
+    clearSession() {
+        localStorage.removeItem('vortex_user_session');
     }
 
     // AUTENTICAÇÃO
@@ -106,11 +137,12 @@ class VortexOS {
         const googleBtn = document.getElementById('google-btn');
         const errorMsg = document.getElementById('auth-error');
 
-        // Login PIN
+        // Login por PIN
         loginForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const email = document.getElementById('login-email').value.toLowerCase().trim();
             const pin = document.getElementById('login-pin').value;
+            const remember = document.getElementById('remember-session').checked;
 
             database.ref('users').orderByChild('email').equalTo(email).once('value')
                 .then(snapshot => {
@@ -128,12 +160,12 @@ class VortexOS {
 
                     if (data && data.pin === pin) {
                         this.currentUserUid = uid;
-                        this.loadAndApplyUserData(data);
+                        this.loadAndApplyUserData(data, remember);
                     } else {
                         errorMsg.innerText = "PIN incorreto!";
                     }
                 })
-                .catch(err => errorMsg.innerText = "Erro ao validar PIN: " + err.message);
+                .catch(err => errorMsg.innerText = "Erro ao validar: " + err.message);
         });
 
         // Cadastro PIN
@@ -145,7 +177,7 @@ class VortexOS {
             const pin = document.getElementById('reg-pin').value;
 
             if (pin.length < 4) {
-                errorMsg.innerText = "O PIN precisa ter no mínimo 4 dígitos!";
+                errorMsg.innerText = "O PIN precisa ter pelo menos 4 dígitos!";
                 return;
             }
 
@@ -162,7 +194,7 @@ class VortexOS {
 
             newUserRef.set(initialData).then(() => {
                 this.currentUserUid = newUserRef.key;
-                this.loadAndApplyUserData(initialData);
+                this.loadAndApplyUserData(initialData, true);
             }).catch(err => errorMsg.innerText = "Erro ao cadastrar: " + err.message);
         });
 
@@ -173,7 +205,7 @@ class VortexOS {
                 .then(result => {
                     this.currentUserUid = result.user.uid;
                     const userRef = database.ref('users/' + result.user.uid);
-                    
+
                     userRef.once('value').then(snapshot => {
                         let data = snapshot.val();
                         if (!data) {
@@ -186,20 +218,14 @@ class VortexOS {
                             };
                             userRef.set(data);
                         }
-                        this.loadAndApplyUserData(data);
+                        this.loadAndApplyUserData(data, true);
                     });
                 })
-                .catch(err => {
-                    if (err.code === 'auth/unauthorized-domain') {
-                        errorMsg.innerText = "Erro: Adicione seu domínio no Firebase Console (Authorized Domains).";
-                    } else {
-                        errorMsg.innerText = "Erro Google: " + err.message;
-                    }
-                });
+                .catch(err => errorMsg.innerText = "Erro Google: " + err.message);
         });
     }
 
-    loadAndApplyUserData(data) {
+    loadAndApplyUserData(data, shouldSave = true) {
         this.userData = {
             displayName: data.displayName || data.username || "Usuário",
             username: data.username || "usuario",
@@ -207,6 +233,8 @@ class VortexOS {
             photoUrl: data.photoUrl || "",
             email: data.email || ""
         };
+
+        if (shouldSave) this.saveSession();
 
         this.updateSystemUserUI();
         this.switchScreen('desktop-screen');
@@ -216,12 +244,8 @@ class VortexOS {
         document.getElementById('system-user-name').innerText = this.userData.displayName;
         document.getElementById('system-user-handle').innerText = `@${this.userData.username}`;
 
-        const avatarContainers = [
-            document.getElementById('desktop-avatar'),
-            document.getElementById('auth-avatar')
-        ];
-
-        avatarContainers.forEach(container => {
+        const avatars = [document.getElementById('desktop-avatar'), document.getElementById('auth-avatar')];
+        avatars.forEach(container => {
             if (container) {
                 if (this.userData.photoUrl) {
                     container.innerHTML = `<img src="${this.userData.photoUrl}" alt="Avatar">`;
@@ -233,7 +257,6 @@ class VortexOS {
         lucide.createIcons();
     }
 
-    // SALVAR CONFIGURAÇÕES DO PERFIL (V1.1)
     saveUserSettings(e) {
         e.preventDefault();
         if (!this.currentUserUid) return;
@@ -244,12 +267,7 @@ class VortexOS {
         const recoveryEmail = document.getElementById('set-rec-email').value.trim();
         const statusMsg = document.getElementById('save-status-msg');
 
-        const updatedData = {
-            photoUrl: photoUrl,
-            displayName: displayName,
-            username: username,
-            recoveryEmail: recoveryEmail
-        };
+        const updatedData = { photoUrl, displayName, username, recoveryEmail };
 
         database.ref('users/' + this.currentUserUid).update(updatedData)
             .then(() => {
@@ -258,6 +276,7 @@ class VortexOS {
                 this.userData.username = username;
                 this.userData.recoveryEmail = recoveryEmail;
 
+                this.saveSession();
                 this.updateSystemUserUI();
 
                 statusMsg.style.display = 'block';
@@ -266,15 +285,13 @@ class VortexOS {
             .catch(err => alert("Erro ao salvar: " + err.message));
     }
 
-    // GERENCIADOR DE JANELAS
+    // GERENCIADOR DE JANELAS WINDOWS
     openApp(appId) {
         document.getElementById('start-menu').classList.add('hidden');
 
         if (this.openWindows[appId]) {
             this.bringToFront(this.openWindows[appId]);
-            if (this.openWindows[appId].style.display === 'none') {
-                this.openWindows[appId].style.display = 'flex';
-            }
+            this.openWindows[appId].style.display = 'flex';
             return;
         }
 
@@ -310,16 +327,25 @@ class VortexOS {
                                 <input type="email" id="set-rec-email" value="${this.userData.recoveryEmail}" placeholder="seuemail@backup.com">
                             </div>
                         </div>
-                        <button type="submit" class="btn-primary" style="margin-top: 14px; width: 100%;">Salvar Alterações</button>
-                        <p id="save-status-msg" class="save-status">✓ Perfil atualizado com sucesso!</p>
+                        <button type="submit" class="btn-primary" style="margin-top: 14px; width: 100%;">Salvar Perfil</button>
+                        <p id="save-status-msg" class="save-status">✓ Alterações salvas com sucesso!</p>
                     </form>
 
                     <div class="settings-card">
-                        <h4><i data-lucide="palette"></i> Aparência</h4>
-                        <div class="wallpaper-options">
-                            <div class="wp-thumb" style="background: linear-gradient(135deg, #0e0720, #260e42);" onclick="vortexOS.setWallpaper('default')"></div>
-                            <div class="wp-thumb" style="background: linear-gradient(135deg, #09090b, #27272a);" onclick="vortexOS.setWallpaper('dark')"></div>
-                            <div class="wp-thumb" style="background: linear-gradient(135deg, #4c1d95, #c084fc);" onclick="vortexOS.setWallpaper('neon')"></div>
+                        <h4><i data-lucide="image"></i> Papel de Parede (Wallpapers)</h4>
+                        
+                        <div class="wp-category">TEMAS CLAROS (LIGHT)</div>
+                        <div class="wallpaper-grid">
+                            <div class="wp-thumb" style="background: linear-gradient(135deg, #e0f2fe, #38bdf8);" onclick="vortexOS.setWallpaper('aero-light')">Aero Light</div>
+                            <div class="wp-thumb" style="background: linear-gradient(135deg, #fbcfe8, #f472b6);" onclick="vortexOS.setWallpaper('soft-pink')">Soft Pastels</div>
+                            <div class="wp-thumb" style="background: linear-gradient(135deg, #f1f5f9, #94a3b8);" onclick="vortexOS.setWallpaper('cloud-white')">Minimal Cloud</div>
+                        </div>
+
+                        <div class="wp-category">TEMAS ESCUROS (DARK)</div>
+                        <div class="wallpaper-grid">
+                            <div class="wp-thumb" style="background: linear-gradient(135deg, #0e0720, #260e42);" onclick="vortexOS.setWallpaper('vortex-purple')">Vortex Neon</div>
+                            <div class="wp-thumb" style="background: linear-gradient(135deg, #0f172a, #1e293b);" onclick="vortexOS.setWallpaper('cyber-dark')">Cyber Dark</div>
+                            <div class="wp-thumb" style="background: linear-gradient(135deg, #022c22, #065f46);" onclick="vortexOS.setWallpaper('emerald-night')">Midnight Ocean</div>
                         </div>
                     </div>
                 </div>`;
@@ -354,7 +380,7 @@ class VortexOS {
                 <div class="file-list">
                     <div class="file-item"><i data-lucide="folder"></i><span>Documentos</span></div>
                     <div class="file-item"><i data-lucide="folder"></i><span>Imagens</span></div>
-                    <div class="file-item"><i data-lucide="file-text"></i><span>vortex_log.txt</span></div>
+                    <div class="file-item"><i data-lucide="file-text"></i><span>vortex.log</span></div>
                 </div>`;
         }
 
@@ -362,8 +388,9 @@ class VortexOS {
             <div class="window-header">
                 <div class="window-title"><i data-lucide="app-window"></i> ${title}</div>
                 <div class="window-controls">
-                    <button class="win-btn win-min" onclick="vortexOS.minimizeWindow('${appId}')"></button>
-                    <button class="win-btn win-close" onclick="vortexOS.closeWindow('${appId}')"></button>
+                    <button class="win-btn win-min" title="Minimizar" onclick="vortexOS.minimizeWindow('${appId}')"></button>
+                    <button class="win-btn win-max" title="Maximizar" onclick="vortexOS.maximizeWindow('${appId}')"></button>
+                    <button class="win-btn win-close" title="Fechar" onclick="vortexOS.closeWindow('${appId}')"></button>
                 </div>
             </div>
             <div class="window-body">${content}</div>
@@ -381,31 +408,25 @@ class VortexOS {
 
     makeDraggable(win) {
         const header = win.querySelector('.window-header');
-        let isDragging = false;
-        let startX, startY, initialX, initialY;
+        let isDragging = false, startX, startY, initialX, initialY;
 
         header.addEventListener('mousedown', (e) => {
+            if (win.classList.contains('maximized')) return;
             isDragging = true;
-            startX = e.clientX;
-            startY = e.clientY;
-            initialX = win.offsetLeft;
-            initialY = win.offsetTop;
+            startX = e.clientX; startY = e.clientY;
+            initialX = win.offsetLeft; initialY = win.offsetTop;
         });
 
         document.addEventListener('mousemove', (e) => {
             if (!isDragging) return;
-            const dx = e.clientX - startX;
-            const dy = e.clientY - startY;
-            win.style.left = `${initialX + dx}px`;
-            win.style.top = `${initialY + dy}px`;
+            win.style.left = `${initialX + (e.clientX - startX)}px`;
+            win.style.top = `${initialY + (e.clientY - startY)}px`;
         });
 
-        document.addEventListener('mouseup', () => { isDragging = false; });
+        document.addEventListener('mouseup', () => isDragging = false);
     }
 
-    bringToFront(win) {
-        win.style.zIndex = ++this.highestZIndex;
-    }
+    bringToFront(win) { win.style.zIndex = ++this.highestZIndex; }
 
     closeWindow(appId) {
         if (this.openWindows[appId]) {
@@ -423,6 +444,12 @@ class VortexOS {
         }
     }
 
+    maximizeWindow(appId) {
+        if (this.openWindows[appId]) {
+            this.openWindows[appId].classList.toggle('maximized');
+        }
+    }
+
     addTaskbarItem(appId, title) {
         const tb = document.getElementById('taskbar-apps');
         const item = document.createElement('div');
@@ -436,36 +463,33 @@ class VortexOS {
     calcInput(val) {
         const screen = document.getElementById('calc-screen');
         if (!screen) return;
-
-        if (val === 'C') {
-            screen.innerText = '0';
-        } else if (val === '=') {
-            try {
-                screen.innerText = eval(screen.innerText.replace(/[^0-9+\-*/.]/g, ''));
-            } catch {
-                screen.innerText = 'Erro';
-            }
+        if (val === 'C') screen.innerText = '0';
+        else if (val === '=') {
+            try { screen.innerText = eval(screen.innerText.replace(/[^0-9+\-*/.]/g, '')); }
+            catch { screen.innerText = 'Erro'; }
         } else {
-            if (screen.innerText === '0' || screen.innerText === 'Erro') {
-                screen.innerText = val;
-            } else {
-                screen.innerText += val;
-            }
+            screen.innerText = (screen.innerText === '0' || screen.innerText === 'Erro') ? val : screen.innerText + val;
         }
     }
 
     setWallpaper(theme) {
         const desktop = document.getElementById('desktop-screen');
-        if (theme === 'dark') {
-            desktop.style.background = 'linear-gradient(135deg, #09090b 0%, #27272a 100%)';
-        } else if (theme === 'neon') {
-            desktop.style.background = 'linear-gradient(135deg, #4c1d95 0%, #c084fc 100%)';
-        } else {
-            desktop.style.background = 'linear-gradient(135deg, #0e0720 0%, #260e42 50%, #080314 100%)';
+        const wallpapers = {
+            'aero-light': 'linear-gradient(135deg, #e0f2fe 0%, #38bdf8 100%)',
+            'soft-pink': 'linear-gradient(135deg, #fbcfe8 0%, #f472b6 100%)',
+            'cloud-white': 'linear-gradient(135deg, #f1f5f9 0%, #cbd5e1 100%)',
+            'vortex-purple': 'linear-gradient(135deg, #0e0720 0%, #260e42 50%, #080314 100%)',
+            'cyber-dark': 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+            'emerald-night': 'linear-gradient(135deg, #022c22 0%, #065f46 100%)'
+        };
+
+        if (wallpapers[theme]) {
+            desktop.style.background = wallpapers[theme];
         }
     }
 
     shutdownSystem() {
+        this.clearSession(); // Limpa login ao desligar/sair
         auth.signOut();
         Object.keys(this.openWindows).forEach(appId => this.closeWindow(appId));
         document.getElementById('start-menu').classList.add('hidden');
@@ -473,9 +497,13 @@ class VortexOS {
     }
 
     restartSystem() {
-        this.shutdownSystem();
+        Object.keys(this.openWindows).forEach(appId => this.closeWindow(appId));
+        document.getElementById('start-menu').classList.add('hidden');
+        this.switchScreen('boot-screen');
         setTimeout(() => {
-            this.switchScreen('auth-screen');
+            if (!this.checkSavedSession()) {
+                this.switchScreen('auth-screen');
+            }
         }, 1000);
     }
 }
