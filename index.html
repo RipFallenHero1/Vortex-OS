@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vortex OS 1.0</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Lucide Icons para ícones estilo Windows -->
+    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
@@ -20,23 +20,46 @@
         </div>
     </div>
 
-    <!-- 2. TELA DE LOGIN / CADASTRO -->
+    <!-- 2. TELA DE LOGIN / CADASTRO / PIN -->
     <div id="auth-screen" class="screen hidden">
         <div class="auth-card">
-            <div class="avatar-box">
+            <div class="avatar-box" id="auth-avatar">
                 <i data-lucide="user"></i>
             </div>
             <h2 id="auth-title">Vortex OS</h2>
             
-            <!-- Formulário de Login -->
+            <!-- Botões de Troca de Método de Login -->
+            <div class="login-tabs">
+                <button id="tab-email" class="tab-btn active">E-mail</button>
+                <button id="tab-pin" class="tab-btn">PIN</button>
+            </div>
+
+            <!-- Formulário 1: Login por E-mail -->
             <form id="login-form" class="auth-form">
                 <input type="email" id="login-email" placeholder="E-mail" required>
                 <input type="password" id="login-password" placeholder="Senha" required>
                 <button type="submit" class="btn-primary">Entrar</button>
+                
+                <div class="divider"><span>ou</span></div>
+
+                <button type="button" id="google-btn" class="btn-google">
+                    <i data-lucide="globe"></i> Entrar com Google
+                </button>
+
                 <p class="auth-switch">Não tem conta? <a href="#" id="to-register">Cadastre-se</a></p>
             </form>
 
-            <!-- Formulário de Cadastro -->
+            <!-- Formulário 2: Login por PIN -->
+            <form id="pin-form" class="auth-form hidden">
+                <p class="pin-subtext">Digite o e-mail da conta e o PIN de 4 dígitos</p>
+                <input type="email" id="pin-email" placeholder="Seu E-mail" required>
+                <div class="pin-box">
+                    <input type="password" id="pin-input" maxlength="4" placeholder="••••" pattern="[0-9]{4}" required>
+                </div>
+                <button type="submit" class="btn-primary">Desbloquear com PIN</button>
+            </form>
+
+            <!-- Formulário 3: Cadastro de Nova Conta -->
             <form id="register-form" class="auth-form hidden">
                 <input type="text" id="reg-name" placeholder="Seu Nome" required>
                 <input type="email" id="reg-email" placeholder="E-mail" required>
@@ -44,13 +67,13 @@
                 <button type="submit" class="btn-primary">Criar Conta</button>
                 <p class="auth-switch">Já possui conta? <a href="#" id="to-login">Fazer Login</a></p>
             </form>
+
             <p id="auth-error" class="error-msg"></p>
         </div>
     </div>
 
     <!-- 3. TELA DA ÁREA DE TRABALHO (DESKTOP) -->
     <div id="desktop-screen" class="screen hidden">
-        <!-- Ícones da Área de Trabalho -->
         <div class="desktop-icons">
             <div class="icon" onclick="vortexOS.openApp('files')">
                 <i data-lucide="folder"></i>
@@ -70,14 +93,13 @@
             </div>
         </div>
 
-        <!-- Conteiner de Janelas Ativas -->
         <div id="window-container"></div>
 
         <!-- Menu Iniciar -->
         <div id="start-menu" class="start-menu hidden">
             <div class="start-header">
                 <div class="user-info">
-                    <div class="user-avatar"><i data-lucide="user"></i></div>
+                    <div class="user-avatar" id="desktop-avatar"><i data-lucide="user"></i></div>
                     <span id="system-user-name">Usuário</span>
                 </div>
             </div>
@@ -105,7 +127,7 @@
             </div>
         </div>
 
-        <!-- Barra de Tarefas (Taskbar estilo Windows) -->
+        <!-- Barra de Tarefas -->
         <div class="taskbar">
             <button id="start-btn" class="start-button">
                 <i data-lucide="command"></i>
@@ -117,7 +139,7 @@
         </div>
     </div>
 
-    <!-- Firebase SDKs Compat -->
+    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
