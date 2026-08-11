@@ -1,607 +1,319 @@
-// ==========================================
-// 🌀 VORTEX OS - SCRIPT PRINCIPAL v11.03
-// ==========================================
-
-const OS_VERSION = "11.03";
-
-// ---- FIREBASE CONFIG ----
+// Configuração do Firebase fornecida
 const firebaseConfig = {
-    apiKey: "AIzaSyCAC6tnKdPC6X2SwYWiMGZQI0GxwDq5SeA",
-    authDomain: "vortex-os-971fc.firebaseapp.com",
-    databaseURL: "https://vortex-os-971fc-default-rtdb.firebaseio.com",
-    projectId: "vortex-os-971fc"
+    apiKey: "AIzaSyCdivWo9znhaRLQyK01ZXvOQMe1jUB98w4",
+    authDomain: "vortex-os-3f1d8.firebaseapp.com",
+    databaseURL: "https://vortex-os-3f1d8-default-rtdb.firebaseio.com",
+    projectId: "vortex-os-3f1d8",
+    storageBucket: "vortex-os-3f1d8.firebasestorage.app",
+    messagingSenderId: "203433581297",
+    appId: "1:203433581297:web:62bebe9a7bf1e46c276750",
+    measurementId: "G-317ZP7P907"
 };
-if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+
+// Inicialização do Firebase
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
 const database = firebase.database();
 
-// ESTADO GLOBAL DO SISTEMA
-let currentUser = null;
-let highestZIndex = 100;
-let openApps = new Set();
-let clockInterval = null;
+// CLASSE PRINCIPAL DO SISTEMA OPERACIONAL
+class VortexOS {
+    constructor() {
+        this.highestZIndex = 100;
+        this.openWindows = {};
+        this.currentUser = null;
 
-// ESTADO DO VORTEX MESSAGER
-let activeDiscordTab = 'dms'; // 'dms' ou 'server'
-let activeChatTarget = null;  // friendKey ou { serverId, channelId }
-let pendingAttachment = null; // { type: 'image'|'video'|'file', dataUrl, name }
-
-// ==========================================
-// NOTIFICAÇÕES & UTILITÁRIOS
-// ==========================================
-function vortexNotify(message, kind = 'info', duration = 3600) {
-    const host = document.getElementById('vortex-notifications') || (() => {
-        const el = document.createElement('div');
-        el.id = 'vortex-notifications';
-        document.body.appendChild(el);
-        return el;
-    })();
-    const item = document.createElement('div');
-    item.className = 'vortex-toast ' + kind;
-    const title = kind === 'error' ? 'Vortex Error' : kind === 'success' ? 'Concluído' : 'Vortex OS';
-    item.innerHTML = `<div class="vortex-toast-title">${escapeHTML(title)}</div><div class="vortex-toast-text">${escapeHTML(message)}</div>`;
-    host.appendChild(item);
-    requestAnimationFrame(() => item.classList.add('show'));
-    setTimeout(() => { item.classList.remove('show'); setTimeout(() => item.remove(), 220); }, duration);
-}
-
-function escapeHTML(str) {
-    return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-// ==========================================
-// 1. AUTENTICAÇÃO E PERFIL
-// ==========================================
-function isVortexAdmin() {
-    if (!currentUser) return false;
-    // Permite admin se o flag isAdmin for true, se a role for admin ou se for o usuário principal
-    return currentUser.isAdmin === true || currentUser.role === 'admin' || currentUser.key === 'admin' || currentUser.key === 'vortex';
-}
-
-function loginUser() {
-    const usernameInput = document.getElementById('auth-username');
-    const pinInput = document.getElementById('auth-pin');
-    const emailInput = document.getElementById('auth-email');
-
-    const username = usernameInput.value.trim();
-    const pin = pinInput.value.trim();
-    const email = emailInput.value.trim();
-
-    if (!username) { vortexNotify('⚠️ Digite um nome de usuário.'); return; }
-    if (!/^\d{4}$/.test(pin)) { vortexNotify('⚠️ O PIN deve ter exatamente 4 dígitos numéricos.'); return; }
-
-    const userKey = username.toLowerCase().replace(/[.#$/\[\]]/g, '_');
-    const userRef = database.ref('users/' + userKey);
-
-    userRef.once('value').then(snapshot => {
-        if (snapshot.exists()) {
-            const data = snapshot.val();
-            if (data.pin === pin) {
-                startSession(userKey, data);
-            } else {
-                vortexNotify('❌ PIN incorreto para o usuário "' + username + '".', 'error');
-            }
-        } else {
-            const newUser = {
-                displayName: username,
-                pin: pin,
-                email: email || '',
-                balance: 100,
-                isAdmin: userKey === 'admin' || userKey === 'vortex',
-                createdAt: Date.now()
-            };
-            userRef.set(newUser).then(() => {
-                startSession(userKey, newUser);
-                vortexNotify('✅ Conta criada com sucesso! Bem-vindo, ' + username + '.', 'success');
-            });
-        }
-    });
-}
-
-function startSession(userKey, data) {
-    currentUser = Object.assign({ key: userKey }, data);
-    localStorage.setItem('vortex_current_user', userKey);
-
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('shutdown-screen').style.display = 'none';
-
-    const displayName = data.displayName || userKey;
-    document.getElementById('start-username').innerText = displayName;
-    document.getElementById('start-email').innerText = data.email || 'online';
-    document.getElementById('settings-user').innerText = displayName;
-    document.getElementById('settings-email').innerText = data.email || '-';
-
-    // Atualiza dados no Messager
-    const msgUser = document.getElementById('msg-user-name');
-    if (msgUser) msgUser.innerText = displayName;
-    const msgAvatar = document.getElementById('msg-user-avatar');
-    if (msgAvatar) msgAvatar.innerText = displayName.charAt(0).toUpperCase();
-
-    startClock();
-    
-    // Verificação e Exibição do Admin Panel
-    if (isVortexAdmin()) {
-        const adminDesktop = document.getElementById('desktop-admin-icon');
-        if (adminDesktop) adminDesktop.style.display = 'flex';
-        const adminStart = document.getElementById('start-admin-btn');
-        if (adminStart) adminStart.style.display = 'block';
-        loadAdminUsersList();
+        this.initUI();
+        this.initAuth();
+        this.startClock();
     }
 
-    // Inicializa o Messager
-    initVortexMessager();
-}
+    // Gerenciador de Inicialização da Interface
+    initUI() {
+        // Renderizar ícones do Lucide
+        lucide.createIcons();
 
-function tryAutoLogin() {
-    const savedKey = localStorage.getItem('vortex_current_user');
-    if (!savedKey) return;
-
-    database.ref('users/' + savedKey).once('value').then(snapshot => {
-        if (snapshot.exists()) {
-            startSession(savedKey, snapshot.val());
-        } else {
-            localStorage.removeItem('vortex_current_user');
-        }
-    });
-}
-
-window.addEventListener('DOMContentLoaded', tryAutoLogin);
-
-// ==========================================
-// 2. PAINEL DE ADMIN CORRIGIDO
-// ==========================================
-function loadAdminUsersList() {
-    const container = document.getElementById('admin-users-list');
-    if (!container) return;
-
-    database.ref('users').on('value', snapshot => {
-        container.innerHTML = '';
-        if (!snapshot.exists()) return;
-
-        snapshot.forEach(child => {
-            const userKey = child.key;
-            const u = child.val();
-            const row = document.createElement('div');
-            row.style.cssText = "display:flex; justify-content:space-between; align-items:center; background:#1e1b26; padding:10px 14px; border-radius:8px; margin-bottom:8px;";
-            
-            const isAdmin = u.isAdmin === true || u.role === 'admin';
-            
-            row.innerHTML = `
-                <div>
-                    <strong>${escapeHTML(u.displayName || userKey)}</strong>
-                    <small style="display:block; color:#a78bfa;">${u.email || 'sem e-mail'}</small>
-                </div>
-                <div style="display:flex; gap:10px; align-items:center;">
-                    <label style="font-size:12px; cursor:pointer;">
-                        <input type="checkbox" ${isAdmin ? 'checked' : ''} onchange="toggleUserAdminStatus('${userKey}', this.checked)"> Admin
-                    </label>
-                </div>
-            `;
-            container.appendChild(row);
+        // Botão Ligar
+        document.getElementById('power-btn').addEventListener('click', () => {
+            this.switchScreen('auth-screen');
         });
-    });
-}
 
-function toggleUserAdminStatus(userKey, grantAdmin) {
-    database.ref('users/' + userKey + '/isAdmin').set(grantAdmin).then(() => {
-        vortexNotify(`Status de Admin de ${userKey} atualizado para: ${grantAdmin}`, 'success');
-    });
-}
+        // Alternadores Login/Cadastro
+        document.getElementById('to-register').addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('login-form').classList.add('hidden');
+            document.getElementById('register-form').classList.remove('hidden');
+            document.getElementById('auth-title').innerText = "Criar Conta - Vortex";
+        });
 
-// ==========================================
-// 3. GERENCIADOR DE JANELAS E SISTEMA
-// ==========================================
-function openWindow(id) {
-    const win = document.getElementById(id);
-    if (!win) return;
-    win.style.display = 'flex';
-    bringToFront(win);
-    openApps.add(id);
+        document.getElementById('to-login').addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('register-form').classList.add('hidden');
+            document.getElementById('login-form').classList.remove('hidden');
+            document.getElementById('auth-title').innerText = "Vortex OS";
+        });
 
-    if (id === 'win-messenger') {
-        initVortexMessager();
-    }
-}
-
-function closeWindow(id) {
-    const win = document.getElementById(id);
-    if (win) win.style.display = 'none';
-    openApps.delete(id);
-}
-
-function bringToFront(element) {
-    highestZIndex++;
-    element.style.zIndex = highestZIndex;
-}
-
-function dragWindow(e, winId) {
-    const win = document.getElementById(winId);
-    bringToFront(win);
-    let pos3 = e.clientX, pos4 = e.clientY;
-    document.onmouseup = () => { document.onmouseup = null; document.onmousemove = null; };
-    document.onmousemove = (ev) => {
-        ev.preventDefault();
-        const pos1 = pos3 - ev.clientX;
-        const pos2 = pos4 - ev.clientY;
-        pos3 = ev.clientX; pos4 = ev.clientY;
-        win.style.top = (win.offsetTop - pos2) + "px";
-        win.style.left = (win.offsetLeft - pos1) + "px";
-    };
-}
-
-function startClock() {
-    if (clockInterval) clearInterval(clockInterval);
-    const update = () => {
-        const now = new Date();
-        const h = String(now.getHours()).padStart(2, '0');
-        const m = String(now.getMinutes()).padStart(2, '0');
-        const clockEl = document.getElementById('os-clock');
-        if (clockEl) clockEl.innerText = `${h}:${m}`;
-    };
-    update();
-    clockInterval = setInterval(update, 30000);
-}
-
-function toggleStartMenu() {
-    const menu = document.getElementById('start-menu');
-    if (menu) menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
-}
-
-function closeStartMenuIfOpen() {
-    const menu = document.getElementById('start-menu');
-    if (menu) menu.style.display = 'none';
-}
-
-function shutdownPC() {
-    document.getElementById('shutdown-screen').style.display = 'flex';
-}
-
-function powerOn() {
-    document.getElementById('shutdown-screen').style.display = 'none';
-}
-
-function setTheme(theme) {
-    const bgMap = {
-        'purple': 'linear-gradient(135deg, #2e0854, #12002b, #4a154b)',
-        'dark-purple': 'linear-gradient(135deg, #0f172a, #1e1b4b, #311042)',
-        'cyber-blue': 'linear-gradient(135deg, #0284c7, #0f172a, #1e1b4b)',
-        'sunset': 'linear-gradient(135deg, #831843, #312e81, #0f172a)'
-    };
-    document.body.style.background = bgMap[theme] || bgMap['purple'];
-}
-
-// ==========================================
-// 4. VORTEX MESSAGER (DISCORD ENGINE)
-// ==========================================
-function initVortexMessager() {
-    if (!currentUser) return;
-    loadFriendsList();
-    loadServersList();
-}
-
-function switchDiscordTab(tab) {
-    activeDiscordTab = tab;
-    const dmsPanel = document.getElementById('discord-dms-panel');
-    const channelsPanel = document.getElementById('discord-channels-panel');
-    const sidebarTitle = document.getElementById('discord-sidebar-title');
-
-    document.querySelectorAll('.guild-btn').forEach(b => b.classList.remove('active'));
-
-    if (tab === 'dms') {
-        document.getElementById('btn-dm-home').classList.add('active');
-        dmsPanel.style.display = 'block';
-        channelsPanel.style.display = 'none';
-        sidebarTitle.innerHTML = '<span>Mensagens Diretas</span>';
-    } else {
-        dmsPanel.style.display = 'none';
-        channelsPanel.style.display = 'block';
-    }
-}
-
-// --- SISTEMA DE AMIGOS ---
-function addFriendAction() {
-    const input = document.getElementById('add-friend-input');
-    const targetNick = input.value.trim();
-    if (!targetNick) return;
-
-    const targetKey = targetNick.toLowerCase().replace(/[.#$/\[\]]/g, '_');
-    if (targetKey === currentUser.key) {
-        vortexNotify('Você não pode adicionar a si mesmo!', 'error');
-        return;
+        // Menu Iniciar
+        document.getElementById('start-btn').addEventListener('click', () => {
+            document.getElementById('start-menu').classList.toggle('hidden');
+        });
     }
 
-    database.ref('users/' + targetKey).once('value').then(snap => {
-        if (snap.exists()) {
-            database.ref(`users/${currentUser.key}/friends/${targetKey}`).set(true);
-            database.ref(`users/${targetKey}/friends/${currentUser.key}`).set(true);
-            vortexNotify(`Amigo ${snap.val().displayName || targetNick} adicionado!`, 'success');
-            input.value = '';
-        } else {
-            vortexNotify('Usuário não encontrado no Vortex OS.', 'error');
-        }
-    });
-}
+    // Controle de Telas (Boot -> Auth -> Desktop)
+    switchScreen(screenId) {
+        document.querySelectorAll('.screen').forEach(s => {
+            s.classList.remove('active');
+            s.classList.add('hidden');
+        });
+        const target = document.getElementById(screenId);
+        target.classList.remove('hidden');
+        target.classList.add('active');
+    }
 
-function loadFriendsList() {
-    const listEl = document.getElementById('discord-friends-list');
-    if (!listEl) return;
+    // Relógio do Sistema
+    startClock() {
+        const update = () => {
+            const now = new Date();
+            const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            document.getElementById('clock').innerText = time;
+        };
+        update();
+        setInterval(update, 10000);
+    }
 
-    database.ref(`users/${currentUser.key}/friends`).on('value', snap => {
-        listEl.innerHTML = '';
-        if (!snap.exists()) {
-            listEl.innerHTML = '<small style="color:#80848e; padding:6px;">Nenhum amigo adicionado.</small>';
+    // Autenticação Realtime com Firebase
+    initAuth() {
+        const loginForm = document.getElementById('login-form');
+        const regForm = document.getElementById('register-form');
+        const errorMsg = document.getElementById('auth-error');
+
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const pass = document.getElementById('login-password').value;
+
+            auth.signInWithEmailAndPassword(email, pass)
+                .then(userCred => {
+                    this.onLoginSuccess(userCred.user);
+                })
+                .catch(err => errorMsg.innerText = "Erro ao entrar: " + err.message);
+        });
+
+        regForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = document.getElementById('reg-name').value;
+            const email = document.getElementById('reg-email').value;
+            const pass = document.getElementById('reg-password').value;
+
+            auth.createUserWithEmailAndPassword(email, pass)
+                .then(userCred => {
+                    database.ref('users/' + userCred.user.uid).set({
+                        username: name,
+                        email: email,
+                        created_at: Date.now()
+                    });
+                    this.onLoginSuccess(userCred.user, name);
+                })
+                .catch(err => errorMsg.innerText = "Erro ao cadastrar: " + err.message);
+        });
+    }
+
+    onLoginSuccess(user, fallbackName = "Usuário") {
+        this.currentUser = user;
+        database.ref('users/' + user.uid).once('value').then(snapshot => {
+            const val = snapshot.val();
+            const name = val ? val.username : fallbackName;
+            document.getElementById('system-user-name').innerText = name;
+        });
+        this.switchScreen('desktop-screen');
+    }
+
+    // SISTEMA DE GERENCIAMENTO DE JANELAS
+    openApp(appId) {
+        document.getElementById('start-menu').classList.add('hidden');
+
+        if (this.openWindows[appId]) {
+            this.bringToFront(this.openWindows[appId]);
             return;
         }
 
-        snap.forEach(child => {
-            const friendKey = child.key;
-            database.ref('users/' + friendKey).once('value').then(uSnap => {
-                if (!uSnap.exists()) return;
-                const u = uSnap.val();
-                const item = document.createElement('div');
-                item.className = 'discord-list-item';
-                item.onclick = () => openDirectMessage(friendKey, u.displayName || friendKey);
-                item.innerHTML = `
-                    <div class="avatar-sm">${(u.displayName || friendKey).charAt(0).toUpperCase()}</div>
-                    <span>${escapeHTML(u.displayName || friendKey)}</span>
-                `;
-                listEl.appendChild(item);
-            });
-        });
-    });
-}
+        const win = document.createElement('div');
+        win.className = 'window';
+        win.id = `win-${appId}`;
+        win.style.zIndex = ++this.highestZIndex;
 
-function openDirectMessage(friendKey, friendName) {
-    switchDiscordTab('dms');
-    activeChatTarget = { type: 'dm', friendKey, friendName };
+        let title = "Aplicativo";
+        let content = "";
 
-    document.getElementById('chat-target-symbol').innerText = '@';
-    document.getElementById('chat-target-name').innerText = friendName;
-    document.getElementById('chat-target-desc').innerText = 'Conversa Direta';
-
-    const chatId = [currentUser.key, friendKey].sort().join('_chat_');
-    listenToChatMessages(`messenger/dms/${chatId}/messages`);
-}
-
-// --- SISTEMA DE SERVIDORES ---
-function openCreateServerModal() {
-    document.getElementById('modal-server').style.display = 'flex';
-}
-
-function closeModal(id) {
-    document.getElementById(id).style.display = 'none';
-}
-
-function createNewServerAction() {
-    const nameInput = document.getElementById('server-name-input');
-    const serverName = nameInput.value.trim();
-    if (!serverName) return;
-
-    const newServerRef = database.ref('messenger/servers').push();
-    const serverData = {
-        id: newServerRef.key,
-        name: serverName,
-        owner: currentUser.key,
-        members: { [currentUser.key]: true },
-        channels: {
-            geral: { name: 'geral' },
-            midia: { name: 'mídia' }
-        }
-    };
-
-    newServerRef.set(serverData).then(() => {
-        closeModal('modal-server');
-        nameInput.value = '';
-        vortexNotify('Servidor criado com sucesso!', 'success');
-    });
-}
-
-function joinServerAction() {
-    const idInput = document.getElementById('server-id-input');
-    const serverId = idInput.value.trim();
-    if (!serverId) return;
-
-    database.ref('messenger/servers/' + serverId).once('value').then(snap => {
-        if (snap.exists()) {
-            database.ref(`messenger/servers/${serverId}/members/${currentUser.key}`).set(true);
-            closeModal('modal-server');
-            idInput.value = '';
-            vortexNotify('Você entrou no servidor!', 'success');
-        } else {
-            vortexNotify('Servidor não encontrado!', 'error');
-        }
-    });
-}
-
-function loadServersList() {
-    const container = document.getElementById('discord-servers-list');
-    if (!container) return;
-
-    database.ref('messenger/servers').on('value', snap => {
-        container.innerHTML = '';
-        if (!snap.exists()) return;
-
-        snap.forEach(child => {
-            const server = child.val();
-            if (server.members && server.members[currentUser.key]) {
-                const btn = document.createElement('button');
-                btn.className = 'guild-btn';
-                btn.title = server.name;
-                btn.innerHTML = `<span style="font-weight:bold;">${server.name.substring(0, 2).toUpperCase()}</span>`;
-                btn.onclick = () => selectServer(server);
-                container.appendChild(btn);
-            }
-        });
-    });
-}
-
-function selectServer(server) {
-    switchDiscordTab('server');
-    document.getElementById('discord-sidebar-title').innerHTML = `<span>${escapeHTML(server.name)}</span>`;
-
-    const channelsList = document.getElementById('discord-channels-list');
-    channelsList.innerHTML = '';
-
-    const channels = server.channels || {};
-    Object.keys(channels).forEach(cId => {
-        const channel = channels[cId];
-        const item = document.createElement('div');
-        item.className = 'discord-list-item';
-        item.innerHTML = `# ${escapeHTML(channel.name || cId)}`;
-        item.onclick = () => openChannelChat(server, cId, channel.name || cId);
-        channelsList.appendChild(item);
-    });
-
-    // Abre o primeiro canal por padrão
-    const firstChan = Object.keys(channels)[0];
-    if (firstChan) openChannelChat(server, firstChan, channels[firstChan].name || firstChan);
-}
-
-function openChannelChat(server, channelId, channelName) {
-    activeChatTarget = { type: 'server', serverId: server.id, channelId, channelName };
-
-    document.getElementById('chat-target-symbol').innerText = '#';
-    document.getElementById('chat-target-name').innerText = channelName;
-    document.getElementById('chat-target-desc').innerText = `ID Servidor: ${server.id}`;
-
-    listenToChatMessages(`messenger/servers/${server.id}/channels/${channelId}/messages`);
-}
-
-function promptCreateChannel() {
-    if (!activeChatTarget || activeChatTarget.type !== 'server') return;
-    const name = prompt('Nome do novo canal:');
-    if (!name) return;
-
-    const chanKey = name.toLowerCase().replace(/[^a-z0-9]/g, '-');
-    database.ref(`messenger/servers/${activeChatTarget.serverId}/channels/${chanKey}`).set({ name });
-}
-
-// --- MENSAGENS E ANEXOS DE MÍDIA ---
-function listenToChatMessages(dbPath) {
-    const container = document.getElementById('discord-messages-container');
-    container.innerHTML = '';
-
-    database.ref(dbPath).off();
-    database.ref(dbPath).limitToLast(50).on('value', snap => {
-        container.innerHTML = '';
-        if (!snap.exists()) {
-            container.innerHTML = '<div class="discord-welcome-msg"><p>Nenhuma mensagem aqui ainda. Comece a conversar!</p></div>';
-            return;
-        }
-
-        snap.forEach(child => {
-            const msg = child.val();
-            const row = document.createElement('div');
-            row.className = 'discord-msg-row';
-
-            let mediaHTML = '';
-            if (msg.attachment) {
-                if (msg.attachment.type === 'image') {
-                    mediaHTML = `<br><img src="${msg.attachment.dataUrl}" class="chat-attachment-img">`;
-                } else if (msg.attachment.type === 'video') {
-                    mediaHTML = `<br><video src="${msg.attachment.dataUrl}" controls class="chat-attachment-video"></video>`;
-                } else {
-                    mediaHTML = `<br><a href="${msg.attachment.dataUrl}" download="${msg.attachment.name}" class="chat-attachment-file">📎 Baixar ${escapeHTML(msg.attachment.name)}</a>`;
-                }
-            }
-
-            const timeStr = new Date(msg.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-            row.innerHTML = `
-                <div class="avatar">${escapeHTML(msg.authorName || 'U').charAt(0).toUpperCase()}</div>
-                <div class="msg-content-box">
-                    <div class="msg-author-header">
-                        <strong>${escapeHTML(msg.authorName || 'Usuário')}</strong>
-                        <small>${timeStr}</small>
+        // Template de Apps
+        if (appId === 'calculator') {
+            title = "Calculadora";
+            content = `
+                <div class="calc-display" id="calc-screen">0</div>
+                <div class="calc-grid">
+                    <button class="calc-btn" onclick="vortexOS.calcInput('C')">C</button>
+                    <button class="calc-btn" onclick="vortexOS.calcInput('/')">/</button>
+                    <button class="calc-btn" onclick="vortexOS.calcInput('*')">*</button>
+                    <button class="calc-btn" onclick="vortexOS.calcInput('-')">-</button>
+                    <button class="calc-btn" onclick="vortexOS.calcInput('7')">7</button>
+                    <button class="calc-btn" onclick="vortexOS.calcInput('8')">8</button>
+                    <button class="calc-btn" onclick="vortexOS.calcInput('9')">9</button>
+                    <button class="calc-btn" onclick="vortexOS.calcInput('+')">+</button>
+                    <button class="calc-btn" onclick="vortexOS.calcInput('4')">4</button>
+                    <button class="calc-btn" onclick="vortexOS.calcInput('5')">5</button>
+                    <button class="calc-btn" onclick="vortexOS.calcInput('6')">6</button>
+                    <button class="calc-btn" onclick="vortexOS.calcInput('=')">=</button>
+                    <button class="calc-btn" onclick="vortexOS.calcInput('1')">1</button>
+                    <button class="calc-btn" onclick="vortexOS.calcInput('2')">2</button>
+                    <button class="calc-btn" onclick="vortexOS.calcInput('3')">3</button>
+                    <button class="calc-btn" onclick="vortexOS.calcInput('0')">0</button>
+                </div>`;
+        } else if (appId === 'notepad') {
+            title = "Bloco de Notas";
+            content = `<textarea class="notepad-text" placeholder="Digite seu texto aqui..."></textarea>`;
+        } else if (appId === 'files') {
+            title = "Gerenciador de Arquivos";
+            content = `
+                <div class="file-list">
+                    <div class="file-item"><i data-lucide="folder"></i><span>Documentos</span></div>
+                    <div class="file-item"><i data-lucide="folder"></i><span>Imagens</span></div>
+                    <div class="file-item"><i data-lucide="file"></i><span>notas.txt</span></div>
+                </div>`;
+        } else if (appId === 'settings') {
+            title = "Configurações";
+            content = `
+                <div class="settings-group">
+                    <h4>Plano de Fundo (Wallpaper)</h4>
+                    <div class="wallpaper-options">
+                        <div class="wp-thumb" style="background: linear-gradient(135deg, #1e112a, #3b136f);" onclick="vortexOS.setWallpaper('default')"></div>
+                        <div class="wp-thumb" style="background: linear-gradient(135deg, #09090b, #27272a);" onclick="vortexOS.setWallpaper('dark')"></div>
+                        <div class="wp-thumb" style="background: linear-gradient(135deg, #4c1d95, #c084fc);" onclick="vortexOS.setWallpaper('neon')"></div>
                     </div>
-                    <div class="msg-text">${escapeHTML(msg.text || '')} ${mediaHTML}</div>
                 </div>
-            `;
-            container.appendChild(row);
+                <div class="settings-group">
+                    <h4>Sobre o Sistema</h4>
+                    <p style="font-size:12px; color:#aaa;">Vortex OS Version 1.0 (Build 2026)</p>
+                </div>`;
+        }
+
+        win.innerHTML = `
+            <div class="window-header">
+                <div class="window-title"><i data-lucide="app-window"></i> ${title}</div>
+                <div class="window-controls">
+                    <button class="win-btn win-min" onclick="vortexOS.minimizeWindow('${appId}')"></button>
+                    <button class="win-btn win-close" onclick="vortexOS.closeWindow('${appId}')"></button>
+                </div>
+            </div>
+            <div class="window-body">${content}</div>
+        `;
+
+        document.getElementById('window-container').appendChild(win);
+        this.openWindows[appId] = win;
+        this.makeDraggable(win);
+
+        win.addEventListener('mousedown', () => this.bringToFront(win));
+
+        this.addTaskbarItem(appId, title);
+        lucide.createIcons();
+    }
+
+    // Funcionalidades de Arrastar Janela
+    makeDraggable(win) {
+        const header = win.querySelector('.window-header');
+        let isDragging = false, offsetXR = 0, offsetYR = 0;
+
+        header.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            offsetXR = e.clientX - win.offsetLeft;
+            offsetYR = e.clientY - win.offsetTop;
         });
-        container.scrollTop = container.scrollHeight;
-    });
-}
 
-function handleFileAttachment(event) {
-    const file = event.target.files[0];
-    if (!file) return;
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            win.style.left = `${e.clientX - offsetXR}px`;
+            win.style.top = `${e.clientY - offsetYR}px`;
+        });
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const dataUrl = e.target.result;
-        let type = 'file';
-        if (file.type.startsWith('image/')) type = 'image';
-        else if (file.type.startsWith('video/')) type = 'video';
-
-        pendingAttachment = { type, dataUrl, name: file.name };
-        vortexNotify(`Anexo "${file.name}" pronto para envio.`, 'info');
-    };
-    reader.readAsDataURL(file);
-}
-
-function handleDiscordKeyDown(event) {
-    if (event.key === 'Enter') sendDiscordMessage();
-}
-
-function sendDiscordMessage() {
-    const input = document.getElementById('discord-msg-input');
-    const text = input.value.trim();
-
-    if (!text && !pendingAttachment) return;
-    if (!activeChatTarget) {
-        vortexNotify('Selecione uma conversa para enviar mensagem.', 'error');
-        return;
+        document.addEventListener('mouseup', () => isDragging = false);
     }
 
-    let targetPath = '';
-    if (activeChatTarget.type === 'dm') {
-        const chatId = [currentUser.key, activeChatTarget.friendKey].sort().join('_chat_');
-        targetPath = `messenger/dms/${chatId}/messages`;
-    } else {
-        targetPath = `messenger/servers/${activeChatTarget.serverId}/channels/${activeChatTarget.channelId}/messages`;
+    bringToFront(win) {
+        win.style.zIndex = ++this.highestZIndex;
     }
 
-    const newMsg = {
-        authorKey: currentUser.key,
-        authorName: currentUser.displayName || currentUser.key,
-        text: text,
-        attachment: pendingAttachment || null,
-        timestamp: Date.now()
-    };
+    closeWindow(appId) {
+        if (this.openWindows[appId]) {
+            this.openWindows[appId].remove();
+            delete this.openWindows[appId];
+            const tbItem = document.getElementById(`tb-${appId}`);
+            if (tbItem) tbItem.remove();
+        }
+    }
 
-    database.ref(targetPath).push().then(() => {
-        input.value = '';
-        pendingAttachment = null;
-        document.getElementById('msg-file-input').value = '';
-    });
-}
+    minimizeWindow(appId) {
+        if (this.openWindows[appId]) {
+            this.openWindows[appId].style.display = 
+                this.openWindows[appId].style.display === 'none' ? 'flex' : 'none';
+        }
+    }
 
-// ==========================================
-// 5. CALCULADORA & TERMINAL
-// ==========================================
-function handleTerminal(event) {
-    if (event.key !== 'Enter') return;
-    const input = document.getElementById('terminal-input');
-    const output = document.getElementById('terminal-output');
-    const cmd = input.value.trim();
-    input.value = '';
+    addTaskbarItem(appId, title) {
+        const tb = document.getElementById('taskbar-apps');
+        const item = document.createElement('div');
+        item.className = 'taskbar-item active';
+        item.id = `tb-${appId}`;
+        item.innerText = title;
+        item.onclick = () => this.minimizeWindow(appId);
+        tb.appendChild(item);
+    }
 
-    output.innerHTML += `<br>&gt; ${escapeHTML(cmd)}`;
-    if (cmd === 'help') output.innerHTML += '<br>Comandos: help, clear, whoami, shutdown';
-    else if (cmd === 'clear') output.innerHTML = '';
-    else if (cmd === 'whoami') output.innerHTML += `<br>${currentUser ? currentUser.displayName : 'Deslogado'}`;
-    else if (cmd === 'shutdown') shutdownPC();
-    else output.innerHTML += `<br>Comando não reconhecido: ${escapeHTML(cmd)}`;
+    // Lógica dos Aplicativos
+    calcInput(val) {
+        const screen = document.getElementById('calc-screen');
+        if (!screen) return;
 
-    output.scrollTop = output.scrollHeight;
-}
+        if (val === 'C') {
+            screen.innerText = '0';
+        } else if (val === '=') {
+            try {
+                screen.innerText = eval(screen.innerText.replace(/[^0-9+\-*/.]/g, ''));
+            } catch {
+                screen.innerText = 'Erro';
+            }
+        } else {
+            if (screen.innerText === '0' || screen.innerText === 'Erro') {
+                screen.innerText = val;
+            } else {
+                screen.innerText += val;
+            }
+        }
+    }
 
-function calcInput(val) { document.getElementById('calc-display').value += val; }
-function calcClear() { document.getElementById('calc-display').value = ''; }
-function calcEval() {
-    try {
-        document.getElementById('calc-display').value = eval(document.getElementById('calc-display').value);
-    } catch (e) {
-        document.getElementById('calc-display').value = 'Erro';
+    setWallpaper(theme) {
+        const desktop = document.getElementById('desktop-screen');
+        if (theme === 'dark') {
+            desktop.style.background = 'linear-gradient(135deg, #09090b 0%, #27272a 100%)';
+        } else if (theme === 'neon') {
+            desktop.style.background = 'linear-gradient(135deg, #4c1d95 0%, #c084fc 100%)';
+        } else {
+            desktop.style.background = 'linear-gradient(135deg, #1e112a 0%, #3b136f 50%, #110726 100%)';
+        }
+    }
+
+    // Opções de Energia
+    shutdownSystem() {
+        auth.signOut();
+        Object.keys(this.openWindows).forEach(appId => this.closeWindow(appId));
+        document.getElementById('start-menu').classList.add('hidden');
+        this.switchScreen('boot-screen');
+    }
+
+    restartSystem() {
+        this.shutdownSystem();
+        setTimeout(() => {
+            this.switchScreen('auth-screen');
+        }, 1200);
     }
 }
+
+// Inicializar o Sistema
+const vortexOS = new VortexOS();
