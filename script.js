@@ -1,4 +1,4 @@
-// Configuração do Firebase fornecida
+// Configuração do Firebase
 const firebaseConfig = {
     apiKey: "AIzaSyCdivWo9znhaRLQyK01ZXvOQMe1jUB98w4",
     authDomain: "vortex-os-3f1d8.firebaseapp.com",
@@ -10,12 +10,11 @@ const firebaseConfig = {
     measurementId: "G-317ZP7P907"
 };
 
-// Inicialização do Firebase
+// Inicialização
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const database = firebase.database();
 
-// CLASSE PRINCIPAL DO SISTEMA OPERACIONAL
 class VortexOS {
     constructor() {
         this.highestZIndex = 100;
@@ -27,9 +26,7 @@ class VortexOS {
         this.startClock();
     }
 
-    // Gerenciador de Inicialização da Interface
     initUI() {
-        // Renderizar ícones do Lucide
         lucide.createIcons();
 
         // Botão Ligar
@@ -37,19 +34,49 @@ class VortexOS {
             this.switchScreen('auth-screen');
         });
 
-        // Alternadores Login/Cadastro
+        // Troca de Abas no Login (E-mail vs PIN)
+        const tabEmail = document.getElementById('tab-email');
+        const tabPin = document.getElementById('tab-pin');
+        const loginForm = document.getElementById('login-form');
+        const pinForm = document.getElementById('pin-form');
+        const regForm = document.getElementById('register-form');
+        const errorMsg = document.getElementById('auth-error');
+
+        tabEmail.addEventListener('click', () => {
+            tabEmail.classList.add('active');
+            tabPin.classList.remove('active');
+            loginForm.classList.remove('hidden');
+            pinForm.classList.add('hidden');
+            regForm.classList.add('hidden');
+            errorMsg.innerText = "";
+        });
+
+        tabPin.addEventListener('click', () => {
+            tabPin.classList.add('active');
+            tabEmail.classList.remove('active');
+            pinForm.classList.remove('hidden');
+            loginForm.classList.add('hidden');
+            regForm.classList.add('hidden');
+            errorMsg.innerText = "";
+        });
+
+        // Alternadores Cadastro/Login
         document.getElementById('to-register').addEventListener('click', (e) => {
             e.preventDefault();
-            document.getElementById('login-form').classList.add('hidden');
-            document.getElementById('register-form').classList.remove('hidden');
+            loginForm.classList.add('hidden');
+            pinForm.classList.add('hidden');
+            regForm.classList.remove('hidden');
             document.getElementById('auth-title').innerText = "Criar Conta - Vortex";
+            errorMsg.innerText = "";
         });
 
         document.getElementById('to-login').addEventListener('click', (e) => {
             e.preventDefault();
-            document.getElementById('register-form').classList.add('hidden');
-            document.getElementById('login-form').classList.remove('hidden');
+            regForm.classList.add('hidden');
+            loginForm.classList.remove('hidden');
+            tabEmail.click();
             document.getElementById('auth-title').innerText = "Vortex OS";
+            errorMsg.innerText = "";
         });
 
         // Menu Iniciar
@@ -58,7 +85,6 @@ class VortexOS {
         });
     }
 
-    // Controle de Telas (Boot -> Auth -> Desktop)
     switchScreen(screenId) {
         document.querySelectorAll('.screen').forEach(s => {
             s.classList.remove('active');
@@ -69,7 +95,6 @@ class VortexOS {
         target.classList.add('active');
     }
 
-    // Relógio do Sistema
     startClock() {
         const update = () => {
             const now = new Date();
@@ -80,24 +105,72 @@ class VortexOS {
         setInterval(update, 10000);
     }
 
-    // Autenticação Realtime com Firebase
+    // SISTEMA DE AUTENTICAÇÃO (Email, Google, PIN)
     initAuth() {
         const loginForm = document.getElementById('login-form');
         const regForm = document.getElementById('register-form');
+        const pinForm = document.getElementById('pin-form');
+        const googleBtn = document.getElementById('google-btn');
         const errorMsg = document.getElementById('auth-error');
 
+        // 1. Login por E-mail e Senha
         loginForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const email = document.getElementById('login-email').value;
             const pass = document.getElementById('login-password').value;
 
             auth.signInWithEmailAndPassword(email, pass)
-                .then(userCred => {
-                    this.onLoginSuccess(userCred.user);
-                })
+                .then(userCred => this.onLoginSuccess(userCred.user))
                 .catch(err => errorMsg.innerText = "Erro ao entrar: " + err.message);
         });
 
+        // 2. Login por Google
+        googleBtn.addEventListener('click', () => {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider)
+                .then(result => {
+                    // Salvar usuário no banco se for primeiro acesso
+                    database.ref('users/' + result.user.uid).update({
+                        username: result.user.displayName,
+                        email: result.user.email,
+                        photo: result.user.photoURL
+                    });
+                    this.onLoginSuccess(result.user, result.user.displayName, result.user.photoURL);
+                })
+                .catch(err => errorMsg.innerText = "Erro no Google: " + err.message);
+        });
+
+        // 3. Login por PIN
+        pinForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('pin-email').value;
+            const pinEntered = document.getElementById('pin-input').value;
+
+            // Busca no Realtime Database pelo usuário correspondente
+            database.ref('users').orderByChild('email').equalTo(email).once('value')
+                .then(snapshot => {
+                    if (!snapshot.exists()) {
+                        errorMsg.innerText = "E-mail não encontrado!";
+                        return;
+                    }
+
+                    let userData = null;
+                    let uid = null;
+                    snapshot.forEach(child => {
+                        uid = child.key;
+                        userData = child.val();
+                    });
+
+                    if (userData && userData.pin === pinEntered) {
+                        this.onLoginSuccess({ uid: uid, email: userData.email }, userData.username, userData.photo);
+                    } else {
+                        errorMsg.innerText = "PIN incorreto ou não configurado!";
+                    }
+                })
+                .catch(err => errorMsg.innerText = "Erro de validação PIN: " + err.message);
+        });
+
+        // 4. Cadastro de E-mail
         regForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const name = document.getElementById('reg-name').value;
@@ -117,17 +190,37 @@ class VortexOS {
         });
     }
 
-    onLoginSuccess(user, fallbackName = "Usuário") {
+    onLoginSuccess(user, fallbackName = "Usuário", photoUrl = null) {
         this.currentUser = user;
         database.ref('users/' + user.uid).once('value').then(snapshot => {
             const val = snapshot.val();
             const name = val ? val.username : fallbackName;
+            const photo = val && val.photo ? val.photo : photoUrl;
+
             document.getElementById('system-user-name').innerText = name;
+
+            if (photo) {
+                document.getElementById('desktop-avatar').innerHTML = `<img src="${photo}">`;
+                document.getElementById('auth-avatar').innerHTML = `<img src="${photo}">`;
+            }
         });
         this.switchScreen('desktop-screen');
     }
 
-    // SISTEMA DE GERENCIAMENTO DE JANELAS
+    // Configurar / Salvar PIN no Perfil do Usuário
+    saveUserPin(newPin) {
+        if (!this.currentUser) return;
+        if (newPin.length !== 4 || isNaN(newPin)) {
+            alert("O PIN deve ter exatamente 4 números!");
+            return;
+        }
+
+        database.ref('users/' + this.currentUser.uid).update({ pin: newPin })
+            .then(() => alert("PIN salvo com sucesso! Agora você pode usar o PIN na tela inicial."))
+            .catch(err => alert("Erro ao salvar PIN: " + err.message));
+    }
+
+    // JANELAS
     openApp(appId) {
         document.getElementById('start-menu').classList.add('hidden');
 
@@ -144,7 +237,6 @@ class VortexOS {
         let title = "Aplicativo";
         let content = "";
 
-        // Template de Apps
         if (appId === 'calculator') {
             title = "Calculadora";
             content = `
@@ -182,6 +274,14 @@ class VortexOS {
             title = "Configurações";
             content = `
                 <div class="settings-group">
+                    <h4>Segurança e PIN</h4>
+                    <p style="font-size:12px; color:#aaa;">Cadastre um PIN de 4 dígitos para login rápido:</p>
+                    <div class="pin-config-box">
+                        <input type="password" id="new-pin-input" maxlength="4" placeholder="Ex: 1234">
+                        <button class="btn-primary" onclick="vortexOS.saveUserPin(document.getElementById('new-pin-input').value)">Salvar PIN</button>
+                    </div>
+                </div>
+                <div class="settings-group">
                     <h4>Plano de Fundo (Wallpaper)</h4>
                     <div class="wallpaper-options">
                         <div class="wp-thumb" style="background: linear-gradient(135deg, #1e112a, #3b136f);" onclick="vortexOS.setWallpaper('default')"></div>
@@ -216,7 +316,6 @@ class VortexOS {
         lucide.createIcons();
     }
 
-    // Funcionalidades de Arrastar Janela
     makeDraggable(win) {
         const header = win.querySelector('.window-header');
         let isDragging = false, offsetXR = 0, offsetYR = 0;
@@ -266,7 +365,6 @@ class VortexOS {
         tb.appendChild(item);
     }
 
-    // Lógica dos Aplicativos
     calcInput(val) {
         const screen = document.getElementById('calc-screen');
         if (!screen) return;
@@ -299,7 +397,6 @@ class VortexOS {
         }
     }
 
-    // Opções de Energia
     shutdownSystem() {
         auth.signOut();
         Object.keys(this.openWindows).forEach(appId => this.closeWindow(appId));
@@ -315,5 +412,4 @@ class VortexOS {
     }
 }
 
-// Inicializar o Sistema
 const vortexOS = new VortexOS();
