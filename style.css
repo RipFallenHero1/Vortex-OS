@@ -1,147 +1,518 @@
-/* ==========================================
-   🌀 VORTEX OS - ESTILOS GERAIS + DISCORD MESSAGER
-   ========================================== */
+:root {
+    --purple-dark: #0f0a1c;
+    --purple-main: #2a1b4e;
+    --purple-light: #a78bfa;
+    --purple-accent: #8b5cf6;
+    --purple-glass: rgba(30, 20, 50, 0.75);
+    --text-color: #f3f4f6;
+    --border-color: rgba(167, 139, 250, 0.2);
+}
 
-*{box-sizing:border-box}
-html,body{margin:0;width:100%;height:100%;overflow:hidden;font-family:Inter,Segoe UI,Arial,sans-serif;color:#eee;background:#12002b}
-button,input,textarea,select{font:inherit; color-scheme: dark;}
-button{color:inherit; cursor:pointer;}
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    user-select: none;
+}
 
-.full-overlay{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 20%,#442080,#08040e 70%)}
-.full-overlay.dark{background:#050507}
-.auth-card,.power-card{width:min(390px,90vw);padding:34px;border:1px solid #ffffff18;border-radius:24px;background:#15121dcc;box-shadow:0 25px 80px #0008;text-align:center;backdrop-filter:blur(18px)}
-.brand-mark{width:64px;height:64px;border-radius:18px;background:linear-gradient(135deg,#a78bfa,#6d28d9);display:grid;place-items:center;font-size:32px;font-weight:900;margin:0 auto 16px}
-.auth-card input{display:block;width:100%;margin:10px 0;padding:13px 14px;border-radius:12px;border:1px solid #ffffff15;background:#0d0b12;color:#fff;outline:none}
+body, html {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: var(--purple-dark);
+    color: var(--text-color);
+}
 
-.btn{border:1px solid #ffffff14;background:#24202c;padding:10px 13px;border-radius:10px;cursor:pointer; color:#fff;}
-.btn:hover{filter:brightness(1.15)}
-.btn.primary{background:#7c3aed;border-color:#8b5cf6}
-.btn.danger,.danger{background:#7f1d1d;border-color:#991b1b}
-.wide{width:100%}
+/* Gerenciador de Telas */
+.screen {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    transition: opacity 0.4s ease;
+}
 
-/* DESKTOP & ÍCONES DOS APPS */
-.desktop{position:absolute;inset:0 0 46px;padding:24px;display:flex;flex-wrap:wrap;align-content:flex-start;gap:18px}
-.desktop-icon{width:90px;text-align:center;cursor:pointer;padding:8px;border-radius:12px; transition: background .15s ease, transform .15s ease;}
-.desktop-icon:hover{background:#ffffff12; transform:translateY(-2px);}
-.desktop-icon span{display:block;margin-top:8px;font-size:12px}
+.screen.hidden {
+    opacity: 0;
+    pointer-events: none;
+    z-index: -1;
+}
 
-.icon-img.app-symbol{width:54px;height:54px;margin:auto;border-radius:15px;position:relative;display:grid;place-items:center;border:1px solid rgba(255,255,255,.12);box-shadow:0 8px 18px rgba(0,0,0,.28)}
-.icon-img.app-symbol::before{content:"";position:absolute;display:block}
+.screen.active {
+    opacity: 1;
+    pointer-events: all;
+    z-index: 10;
+}
 
-.engine-symbol{background:linear-gradient(135deg,#8b5cf6,#4c1d95)}
-.engine-symbol::before{width:20px;height:20px;border:4px solid #fff;border-radius:5px;transform:rotate(45deg)}
-.code-symbol{background:linear-gradient(135deg,#2563eb,#172554)}
-.code-symbol::before{content:"<>";color:#fff;font:900 18px/1 Consolas,monospace}
-.msg-symbol{background:linear-gradient(135deg,#5865F2,#2b328c)}
-.msg-symbol::before{content:"💬";font-size:22px;}
-.store-symbol{background:linear-gradient(135deg,#f59e0b,#78350f)}
-.store-symbol::before{content:"🛍️";font-size:22px;}
-.files-symbol{background:linear-gradient(135deg,#38bdf8,#0c4a6e)}
-.files-symbol::before{content:"📁";font-size:22px;}
-.settings-symbol{background:linear-gradient(135deg,#64748b,#1e293b)}
-.settings-symbol::before{content:"⚙️";font-size:22px;}
-.terminal-symbol{background:linear-gradient(135deg,#22c55e,#14532d)}
-.terminal-symbol::before{content:">_";color:#fff;font:900 16px/1 Consolas,monospace}
-.calc-symbol{background:linear-gradient(135deg,#a855f7,#581c87)}
-.calc-symbol::before{content:"🧮";font-size:22px;}
-.browser-symbol{background:linear-gradient(135deg,#c084fc,#581c87)}
-.browser-symbol::before{content:"🌐";font-size:22px;}
-.admin-symbol{background:linear-gradient(135deg,#f59e0b,#7c2d12)}
-.admin-symbol::before{content:"🛡️";font-size:22px;}
+/* 1. TELA DE BOOT */
+#boot-screen {
+    background: radial-gradient(circle, #2e1065 0%, #0f0a1c 100%);
+    justify-content: center;
+    align-items: center;
+}
 
-/* JANELAS SISTEMA */
-.window{position:absolute;display:none;flex-direction:column;min-width:320px;min-height:220px;z-index:100;border:1px solid #ffffff18;border-radius:14px;overflow:hidden;background:#111018f5;box-shadow:0 25px 80px #0009;backdrop-filter:blur(14px)}
-.window-header{height:40px;flex:none;padding:0 12px;display:flex;align-items:center;justify-content:space-between;background:#1a1722;border-bottom:1px solid #ffffff0e;cursor:move;font-size:13px;font-weight:700}
-.window-controls button{border:0;background:transparent;color:#ccc;font-size:16px;cursor:pointer; padding:4px 8px; border-radius:4px;}
-.window-controls button:hover{background:#ffffff1a; color:#fff;}
-.window-body{padding:18px;overflow:auto;flex:1}
-.window-body.style-none{padding:0;}
+.power-container {
+    text-align: center;
+}
 
-/* BARRA DE TAREFAS E MENU INICIAR */
-.taskbar{position:absolute;left:0;right:0;bottom:0;height:46px;background:#100e16eF;border-top:1px solid #ffffff10;display:flex;align-items:center;gap:8px;padding:6px 8px;z-index:8500}
-.start-btn{width:38px;height:34px;border:0;border-radius:9px;background:#7c3aed;font-weight:900;cursor:pointer; font-size:18px;}
-.taskbar-app-btn{border:1px solid #ffffff0e;background:#211e29;color:#eee;border-radius:7px;padding:6px 12px;cursor:pointer}
-.system-tray{margin-left:auto;display:flex;align-items:center;gap:7px;font-size:12px; color:#a78bfa; font-weight:700;}
+.power-button {
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    border: 2px solid var(--purple-light);
+    background: rgba(139, 92, 246, 0.1);
+    color: var(--purple-light);
+    cursor: pointer;
+    margin-bottom: 20px;
+    transition: 0.3s;
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+}
 
-.start-menu{display:none;position:absolute;left:10px;bottom:54px;width:360px;background:#15131bf5;border:1px solid #ffffff18;border-radius:15px;padding:12px;z-index:8000;box-shadow:0 20px 60px #0009}
-.start-user{display:flex;align-items:center;gap:10px;padding:8px}
-.avatar{width:36px;height:36px;border-radius:50%;background:#7c3aed;display:grid;place-items:center;font-weight:800; color:#fff;}
-.start-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0}
-.start-grid button{border:0;background:#211e29;color:#eee;padding:12px;text-align:left;border-radius:8px;cursor:pointer}
-.shutdown-link{width:100%;background:#3b1115;color:#fca5a5;border:0;padding:10px;border-radius:8px;cursor:pointer}
+.power-button:hover {
+    background: var(--purple-accent);
+    color: #fff;
+    box-shadow: 0 0 35px rgba(139, 92, 246, 0.8);
+    transform: scale(1.08);
+}
 
-/* ==========================================
-   💬 VORTEX MESSAGER - DISCORD INTERFACE
-   ========================================== */
-.discord-app{display:flex; width:100%; height:100%; background:#313338; color:#dbdee1;}
+.power-button svg {
+    width: 40px;
+    height: 40px;
+}
 
-/* Coluna 1: Guilds / Servidores */
-.discord-guilds-bar{width:72px; background:#1e1f22; padding:12px 0; display:flex; flex-direction:column; align-items:center; gap:8px; flex-none:1;}
-.guild-btn{width:48px; height:48px; border-radius:50%; background:#313338; border:0; display:grid; place-items:center; cursor:pointer; transition: border-radius .2s ease, background-color .2s ease;}
-.guild-btn:hover, .guild-btn.active{border-radius:16px; background:#5865F2;}
-.guild-btn.add-btn{background:#313338; color:#23a55a; font-size:22px;}
-.guild-btn.add-btn:hover{background:#23a55a; color:#fff;}
-.guild-divider{width:32px; height:2px; background:#35363c; border-radius:1px; margin:4px 0;}
-.guild-list{display:flex; flex-direction:column; gap:8px; width:100%; align-items:center;}
+/* 2. TELA DE LOGIN */
+#auth-screen {
+    background: radial-gradient(circle, #3b0764 0%, #0f0a1c 100%);
+    justify-content: center;
+    align-items: center;
+}
 
-/* Coluna 2: Lista de DMs e Canais */
-.discord-channels-bar{width:240px; background:#2b2d31; display:flex; flex-direction:column; flex-none:1; border-right:1px solid #1f2023;}
-.discord-bar-header{height:48px; border-bottom:1px solid #1f2023; padding:0 16px; display:flex; align-items:center; font-weight:700; color:#f2f3f5;}
-.discord-panel-section{padding:10px; flex:1; overflow-y:auto;}
-.add-friend-box{display:flex; gap:6px; margin-bottom:12px;}
-.add-friend-box input{flex:1; background:#1e1f22; border:0; padding:8px; border-radius:6px; color:#fff; font-size:12px; outline:none;}
-.add-friend-box button{background:#5865F2; border:0; color:#fff; border-radius:6px; padding:0 10px; font-weight:bold;}
-.discord-section-label{font-size:11px; font-weight:800; color:#949ba4; margin:12px 0 6px 6px; letter-spacing:0.5px;}
+.auth-card {
+    background: var(--purple-glass);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--border-color);
+    padding: 40px;
+    border-radius: 16px;
+    width: 340px;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
 
-.discord-list-item{display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:6px; cursor:pointer; color:#949ba4; margin-bottom:2px;}
-.discord-list-item:hover, .discord-list-item.active{background:#35373c; color:#f2f3f5;}
-.discord-list-item .avatar-sm{width:32px; height:32px; border-radius:50%; background:#5865F2; display:grid; place-items:center; color:#fff; font-weight:bold; font-size:13px;}
+.avatar-box {
+    width: 70px;
+    height: 70px;
+    background: var(--purple-accent);
+    border-radius: 50%;
+    margin: 0 auto 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
 
-.discord-user-footer{height:52px; background:#232428; padding:0 10px; display:flex; align-items:center; gap:8px;}
-.discord-user-footer .user-info{display:flex; flex-direction:column; font-size:12px;}
-.discord-user-footer .user-info strong{color:#f2f3f5;}
-.discord-user-footer .user-info small{color:#23a55a; font-size:10px;}
+.avatar-box svg {
+    width: 35px;
+    height: 35px;
+}
 
-/* Coluna 3: Chat Principal */
-.discord-chat-area{flex:1; display:flex; flex-direction:column; background:#313338; min-width:0;}
-.discord-chat-header{height:48px; border-bottom:1px solid #1f2023; padding:0 16px; display:flex; align-items:center; gap:8px; background:#313338;}
-.chat-target-symbol{font-size:20px; color:#80848e;}
-.discord-chat-header strong{color:#f2f3f5; font-size:15px;}
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 20px;
+}
 
-.discord-messages{flex:1; padding:16px; overflow-y:auto; display:flex; flex-direction:column; gap:14px;}
-.discord-welcome-msg{text-align:center; margin:auto; color:#949ba4;}
-.discord-welcome-msg h3{color:#f2f3f5; margin-bottom:6px;}
+.auth-form input {
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid var(--border-color);
+    padding: 12px;
+    border-radius: 8px;
+    color: #fff;
+    outline: none;
+}
 
-.discord-msg-row{display:flex; gap:14px; line-height:1.4;}
-.discord-msg-row .avatar{flex-none:1; width:40px; height:40px; border-radius:50%; background:#5865F2; display:grid; place-items:center; color:#fff; font-weight:bold;}
-.msg-content-box{display:flex; flex-direction:column;}
-.msg-author-header{display:flex; align-items:center; gap:8px;}
-.msg-author-header strong{color:#f2f3f5; font-size:14px;}
-.msg-author-header small{color:#949ba4; font-size:11px;}
-.msg-text{color:#dbdee1; margin-top:2px; font-size:14px; word-break:break-word;}
+.auth-form input:focus {
+    border-color: var(--purple-light);
+}
 
-/* Anexos de Mídia */
-.chat-attachment-img{max-width:320px; max-height:260px; border-radius:8px; margin-top:6px; border:1px solid #1e1f22;}
-.chat-attachment-video{max-width:380px; max-height:280px; border-radius:8px; margin-top:6px; outline:none; background:#000;}
-.chat-attachment-file{display:inline-flex; align-items:center; gap:8px; background:#2b2d31; padding:10px 14px; border-radius:8px; border:1px solid #1f2023; text-decoration:none; color:#00a8fc; margin-top:6px; font-size:13px;}
+.btn-primary {
+    background: var(--purple-accent);
+    color: white;
+    border: none;
+    padding: 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: 0.2s;
+}
 
-/* Composer / Input Bar */
-.discord-composer{padding:0 16px 20px 16px; display:flex; gap:10px; align-items:center;}
-.attach-btn{width:42px; height:42px; border-radius:50%; background:#383a40; border:0; color:#b5bac1; font-size:18px; cursor:pointer;}
-.attach-btn:hover{background:#4e5058; color:#fff;}
-.discord-composer input[type=text]{flex:1; background:#383a40; border:0; padding:12px 16px; border-radius:8px; color:#f2f3f5; outline:none; font-size:14px;}
-.discord-composer .send-btn{background:#5865F2; border:0; padding:0 20px; height:42px; border-radius:8px; color:#fff; font-weight:bold; cursor:pointer;}
-.discord-composer .send-btn:hover{background:#4752C4;}
+.btn-primary:hover {
+    background: #7c3aed;
+}
 
-/* MODALS */
-.modal{position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;z-index:9000}
-.modal-content{width:min(420px,90vw);background:#17141e;border:1px solid #ffffff14;border-radius:15px; padding:22px;}
-.modal-content input{width:100%;padding:11px;background:#0e0c13;color:#fff;border:1px solid #ffffff12;border-radius:8px;margin:6px 0; outline:none;}
-.modal-actions{display:flex;gap:8px;margin-top:12px}
+.auth-switch {
+    font-size: 12px;
+    margin-top: 10px;
+    color: #ccc;
+}
 
-/* TOASTS */
-#vortex-notifications{position:fixed;right:18px;top:18px;z-index:200000;display:flex;flex-direction:column;gap:9px;pointer-events:none;width:min(360px,calc(100vw - 36px))}
-.vortex-toast{opacity:0;transform:translateY(-10px);transition:.22s;background:rgba(26,16,43,.97);border:1px solid rgba(168,85,247,.42);box-shadow:0 14px 40px #0009;border-radius:12px;padding:11px 13px;color:#f3e8ff}
-.vortex-toast.show{opacity:1;transform:none}
-.vortex-toast-title{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:#c084fc;font-weight:800}
-.vortex-toast-text{margin-top:3px;font-size:.82rem}
+.auth-switch a {
+    color: var(--purple-light);
+    text-decoration: none;
+}
+
+.error-msg {
+    color: #f87171;
+    font-size: 12px;
+    margin-top: 10px;
+}
+
+/* 3. DESKTOP & WALLPAPER */
+#desktop-screen {
+    background: linear-gradient(135deg, #1e112a 0%, #3b136f 50%, #110726 100%);
+    background-size: cover;
+    background-position: center;
+    flex-direction: column;
+}
+
+.desktop-icons {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 20px;
+    width: max-content;
+}
+
+.icon {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 80px;
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    gap: 8px;
+    transition: background 0.2s;
+}
+
+.icon:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.icon svg {
+    width: 36px;
+    height: 36px;
+    color: var(--purple-light);
+}
+
+.icon span {
+    font-size: 12px;
+    text-align: center;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+}
+
+/* BARRA DE TAREFAS */
+.taskbar {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    height: 48px;
+    background: var(--purple-glass);
+    backdrop-filter: blur(15px);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    padding: 0 15px;
+    z-index: 9999;
+}
+
+.start-button {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--border-color);
+    color: var(--purple-light);
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.2s;
+}
+
+.start-button:hover {
+    background: var(--purple-accent);
+    color: #fff;
+}
+
+.taskbar-apps {
+    flex: 1;
+    display: flex;
+    margin-left: 15px;
+    gap: 8px;
+}
+
+.taskbar-item {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.taskbar-item.active {
+    border-bottom: 2px solid var(--purple-light);
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.system-tray {
+    font-size: 13px;
+    color: var(--purple-light);
+    font-weight: 500;
+}
+
+/* MENU INICIAR */
+.start-menu {
+    position: absolute;
+    bottom: 60px;
+    left: 15px;
+    width: 320px;
+    background: var(--purple-glass);
+    backdrop-filter: blur(25px);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    z-index: 9998;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.start-header {
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 10px;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.user-avatar {
+    width: 32px;
+    height: 32px;
+    background: var(--purple-accent);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.start-apps {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.start-app-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.start-app-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.start-footer {
+    display: flex;
+    justify-content: space-between;
+    border-top: 1px solid var(--border-color);
+    padding-top: 10px;
+}
+
+.start-footer button {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+}
+
+.start-footer button.danger:hover {
+    background: #ef4444;
+    border-color: #ef4444;
+}
+
+/* SISTEMA DE JANELAS */
+.window {
+    position: absolute;
+    top: 80px;
+    left: 120px;
+    width: 500px;
+    height: 350px;
+    background: rgba(20, 14, 34, 0.92);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 280px;
+    min-height: 200px;
+}
+
+.window-header {
+    height: 36px;
+    background: rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    cursor: move;
+}
+
+.window-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--purple-light);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.window-controls {
+    display: flex;
+    gap: 8px;
+}
+
+.win-btn {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+}
+
+.win-close { background: #ef4444; }
+.win-min { background: #f59e0b; }
+.win-max { background: #10b981; }
+
+.window-body {
+    flex: 1;
+    padding: 15px;
+    overflow: auto;
+}
+
+/* APPS INTERNOS */
+/* Calculadora */
+.calc-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+
+.calc-display {
+    grid-column: span 4;
+    height: 50px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: #fff;
+    font-size: 24px;
+    text-align: right;
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+.calc-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-color);
+    color: #fff;
+    padding: 15px;
+    font-size: 16px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.calc-btn:hover { background: var(--purple-accent); }
+
+/* Bloco de Notas */
+.notepad-text {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    border: none;
+    color: #fff;
+    resize: none;
+    outline: none;
+    font-family: monospace;
+    font-size: 14px;
+}
+
+/* Gerenciador de Arquivos */
+.file-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.file-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 70px;
+    padding: 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 11px;
+    text-align: center;
+}
+
+.file-item:hover { background: rgba(255, 255, 255, 0.1); }
+.file-item svg { width: 32px; height: 32px; color: var(--purple-light); }
+
+/* Configurações */
+.settings-group {
+    margin-bottom: 20px;
+}
+
+.settings-group h4 {
+    margin-bottom: 10px;
+    color: var(--purple-light);
+}
+
+.wallpaper-options {
+    display: flex;
+    gap: 10px;
+}
+
+.wp-thumb {
+    width: 80px;
+    height: 50px;
+    border-radius: 6px;
+    border: 2px solid transparent;
+    cursor: pointer;
+}
+
+.wp-thumb:hover { border-color: var(--purple-light); }
