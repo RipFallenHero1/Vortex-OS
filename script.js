@@ -1,511 +1,424 @@
-// Configuração do Firebase
-const firebaseConfig = {
-    apiKey: "AIzaSyCdivWo9znhaRLQyK01ZXvOQMe1jUB98w4",
-    authDomain: "vortex-os-3f1d8.firebaseapp.com",
-    databaseURL: "https://vortex-os-3f1d8-default-rtdb.firebaseio.com",
-    projectId: "vortex-os-3f1d8",
-    storageBucket: "vortex-os-3f1d8.firebasestorage.app",
-    messagingSenderId: "203433581297",
-    appId: "1:203433581297:web:62bebe9a7bf1e46c276750",
-    measurementId: "G-317ZP7P907"
-};
+import React, { useState, useEffect } from 'react';
 
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const database = firebase.database();
+// ==========================================
+// ÍCONES SVG PERSONALIZADOS (100% CSS/TAILWIND)
+// ==========================================
+const VortexIcon = ({ className = "w-5 h-5" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+    <path d="M12 6C8.68 6 6 8.68 6 12C6 15.32 8.68 18 12 18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+    <circle cx="12" cy="12" r="2" fill="currentColor" />
+  </svg>
+);
 
-class VortexOS {
-    constructor() {
-        this.highestZIndex = 100;
-        this.openWindows = {};
-        this.currentUserUid = null;
-        this.userData = {
-            displayName: "Usuário",
-            username: "usuario",
-            recoveryEmail: "",
-            photoUrl: "",
-            email: ""
-        };
+const ChromeIcon = ({ className = "w-5 h-5" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="9" />
+    <circle cx="12" cy="12" r="4" />
+    <line x1="21.17" y1="8" x2="12" y2="8" />
+    <line x1="3.95" y1="6.06" x2="8.54" y2="14" />
+    <line x1="10.88" y1="21.94" x2="15.46" y2="14" />
+  </svg>
+);
 
-        this.initUI();
-        this.initAuth();
-        this.startClock();
-    }
+const CodeIcon = ({ className = "w-5 h-5" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="16 18 22 12 16 6" />
+    <polyline points="8 6 2 12 8 18" />
+  </svg>
+);
 
-    initUI() {
-        lucide.createIcons();
+const RefreshIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M23 4v6h-6" />
+    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+  </svg>
+);
 
-        // Tentar Auto-Login ao Ligar
-        document.getElementById('power-btn').addEventListener('click', () => {
-            if (!this.checkSavedSession()) {
-                this.switchScreen('auth-screen');
-            }
-        });
+const HistoryIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <polyline points="12 6 12 12 16 14" />
+  </svg>
+);
 
-        // Alternadores Cadastro/Login
-        const loginForm = document.getElementById('pin-login-form');
-        const regForm = document.getElementById('pin-register-form');
-        const subtitle = document.getElementById('auth-subtitle');
-        const errorMsg = document.getElementById('auth-error');
+export default function VortexOS() {
+  // Estado de Janelas e Sistema
+  const [isStartOpen, setIsStartOpen] = useState(false);
+  const [activeApp, setActiveApp] = useState(null); // 'browser' | 'creator' | null
 
-        document.getElementById('to-register').addEventListener('click', (e) => {
-            e.preventDefault();
-            loginForm.classList.add('hidden');
-            regForm.classList.remove('hidden');
-            subtitle.innerText = "Cadastre seu perfil e PIN único";
-            errorMsg.innerText = "";
-        });
+  // Registro de Sites .vort (Persistência Local)
+  const [publishedSites, setPublishedSites] = useState(() => {
+    const saved = localStorage.getItem('vort_sites');
+    return saved ? JSON.parse(saved) : {
+      "meusite.vort": {
+        title: "Meu Primeiro Site Vortex",
+        html: "<div class='content'><h1>Bem-vindo ao Vortex OS!</h1><p>Este é um site hospedado no ecossistema .vort</p></div>",
+        css: ".content { font-family: sans-serif; text-align: center; margin-top: 50px; color: #3b82f6; }",
+        js: "console.log('Site .vort carregado!');"
+      }
+    };
+  });
 
-        document.getElementById('to-login').addEventListener('click', (e) => {
-            e.preventDefault();
-            regForm.classList.add('hidden');
-            loginForm.classList.remove('hidden');
-            subtitle.innerText = "Digite seu PIN de acesso";
-            errorMsg.innerText = "";
-        });
+  // Salva no localStorage sempre que um novo site for publicado
+  useEffect(() => {
+    localStorage.setItem('vort_sites', JSON.stringify(publishedSites));
+  }, [publishedSites]);
 
-        // FIX MENU INICIAR BLINDADO (ABRE APENAS AO CLICAR NO ÍCONE)
-        const startBtn = document.getElementById('start-btn');
-        const startMenu = document.getElementById('start-menu');
+  return (
+    <div className="relative w-screen h-screen bg-slate-950 text-slate-100 font-sans overflow-hidden select-none bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-indigo-950 to-slate-950">
+      
+      {/* AREA DE TRABALHO / DESKTOP */}
+      <div className="p-6 grid grid-cols-1 gap-6 w-32">
+        <DesktopShortcut 
+          title="Navegador Vortex" 
+          icon={<ChromeIcon className="w-8 h-8 text-cyan-400" />}
+          onClick={() => setActiveApp('browser')}
+        />
+        <DesktopShortcut 
+          title="Vortex Web Studio" 
+          icon={<CodeIcon className="w-8 h-8 text-indigo-400" />}
+          onClick={() => setActiveApp('creator')}
+        />
+      </div>
 
-        startBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // Bloqueia propagação do clique
-            startMenu.classList.toggle('hidden');
-        });
+      {/* JANELAS ATIVAS */}
+      {activeApp === 'browser' && (
+        <VortexBrowserApp 
+          onClose={() => setActiveApp(null)} 
+          publishedSites={publishedSites}
+        />
+      )}
 
-        // Clique em qualquer outro lugar do sistema fecha o menu iniciar
-        document.addEventListener('click', (e) => {
-            if (!startMenu.contains(e.target) && !startBtn.contains(e.target)) {
-                startMenu.classList.add('hidden');
-            }
-        });
-    }
+      {activeApp === 'creator' && (
+        <VortexWebStudio 
+          onClose={() => setActiveApp(null)}
+          onPublish={(domain, data) => {
+            setPublishedSites(prev => ({ ...prev, [domain]: data }));
+            alert(`Site ${domain} publicado com sucesso no Navegador Vortex!`);
+          }}
+        />
+      )}
 
-    switchScreen(screenId) {
-        document.querySelectorAll('.screen').forEach(s => {
-            s.classList.remove('active');
-            s.classList.add('hidden');
-        });
-        const target = document.getElementById(screenId);
-        target.classList.remove('hidden');
-        target.classList.add('active');
-    }
-
-    startClock() {
-        const update = () => {
-            const now = new Date();
-            document.getElementById('clock-time').innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            document.getElementById('clock-date').innerText = now.toLocaleDateString('pt-BR');
-        };
-        update();
-        setInterval(update, 1000);
-    }
-
-    // AUTO-LOGIN (SESSÃO SALVA)
-    checkSavedSession() {
-        const saved = localStorage.getItem('vortex_user_session');
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                this.currentUserUid = parsed.uid;
-                this.userData = parsed.userData;
-                this.updateSystemUserUI();
-                this.switchScreen('desktop-screen');
-                return true;
-            } catch (e) {
-                localStorage.removeItem('vortex_user_session');
-            }
-        }
-        return false;
-    }
-
-    saveSession() {
-        localStorage.setItem('vortex_user_session', JSON.stringify({
-            uid: this.currentUserUid,
-            userData: this.userData
-        }));
-    }
-
-    clearSession() {
-        localStorage.removeItem('vortex_user_session');
-    }
-
-    // AUTENTICAÇÃO
-    initAuth() {
-        const loginForm = document.getElementById('pin-login-form');
-        const regForm = document.getElementById('pin-register-form');
-        const googleBtn = document.getElementById('google-btn');
-        const errorMsg = document.getElementById('auth-error');
-
-        // Login por PIN
-        loginForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const email = document.getElementById('login-email').value.toLowerCase().trim();
-            const pin = document.getElementById('login-pin').value;
-            const remember = document.getElementById('remember-session').checked;
-
-            database.ref('users').orderByChild('email').equalTo(email).once('value')
-                .then(snapshot => {
-                    if (!snapshot.exists()) {
-                        errorMsg.innerText = "Usuário não encontrado!";
-                        return;
-                    }
-
-                    let uid = null;
-                    let data = null;
-                    snapshot.forEach(child => {
-                        uid = child.key;
-                        data = child.val();
-                    });
-
-                    if (data && data.pin === pin) {
-                        this.currentUserUid = uid;
-                        this.loadAndApplyUserData(data, remember);
-                    } else {
-                        errorMsg.innerText = "PIN incorreto!";
-                    }
-                })
-                .catch(err => errorMsg.innerText = "Erro ao validar: " + err.message);
-        });
-
-        // Cadastro PIN
-        regForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const name = document.getElementById('reg-name').value;
-            const username = document.getElementById('reg-username').value.replace('@', '');
-            const email = document.getElementById('reg-email').value.toLowerCase().trim();
-            const pin = document.getElementById('reg-pin').value;
-
-            if (pin.length < 4) {
-                errorMsg.innerText = "O PIN precisa ter pelo menos 4 dígitos!";
-                return;
-            }
-
-            const newUserRef = database.ref('users').push();
-            const initialData = {
-                username: username,
-                displayName: name,
-                email: email,
-                recoveryEmail: "",
-                photoUrl: "",
-                pin: pin,
-                created_at: Date.now()
-            };
-
-            newUserRef.set(initialData).then(() => {
-                this.currentUserUid = newUserRef.key;
-                this.loadAndApplyUserData(initialData, true);
-            }).catch(err => errorMsg.innerText = "Erro ao cadastrar: " + err.message);
-        });
-
-        // Login Google
-        googleBtn.addEventListener('click', () => {
-            const provider = new firebase.auth.GoogleAuthProvider();
-            auth.signInWithPopup(provider)
-                .then(result => {
-                    this.currentUserUid = result.user.uid;
-                    const userRef = database.ref('users/' + result.user.uid);
-
-                    userRef.once('value').then(snapshot => {
-                        let data = snapshot.val();
-                        if (!data) {
-                            data = {
-                                username: result.user.email.split('@')[0],
-                                displayName: result.user.displayName,
-                                email: result.user.email,
-                                recoveryEmail: "",
-                                photoUrl: result.user.photoURL || ""
-                            };
-                            userRef.set(data);
-                        }
-                        this.loadAndApplyUserData(data, true);
-                    });
-                })
-                .catch(err => errorMsg.innerText = "Erro Google: " + err.message);
-        });
-    }
-
-    loadAndApplyUserData(data, shouldSave = true) {
-        this.userData = {
-            displayName: data.displayName || data.username || "Usuário",
-            username: data.username || "usuario",
-            recoveryEmail: data.recoveryEmail || "",
-            photoUrl: data.photoUrl || "",
-            email: data.email || ""
-        };
-
-        if (shouldSave) this.saveSession();
-
-        this.updateSystemUserUI();
-        this.switchScreen('desktop-screen');
-    }
-
-    updateSystemUserUI() {
-        document.getElementById('system-user-name').innerText = this.userData.displayName;
-        document.getElementById('system-user-handle').innerText = `@${this.userData.username}`;
-
-        const avatars = [document.getElementById('desktop-avatar'), document.getElementById('auth-avatar')];
-        avatars.forEach(container => {
-            if (container) {
-                if (this.userData.photoUrl) {
-                    container.innerHTML = `<img src="${this.userData.photoUrl}" alt="Avatar">`;
-                } else {
-                    container.innerHTML = `<i data-lucide="user"></i>`;
-                }
-            }
-        });
-        lucide.createIcons();
-    }
-
-    saveUserSettings(e) {
-        e.preventDefault();
-        if (!this.currentUserUid) return;
-
-        const photoUrl = document.getElementById('set-photo').value.trim();
-        const displayName = document.getElementById('set-displayname').value.trim();
-        const username = document.getElementById('set-username').value.trim().replace('@', '');
-        const recoveryEmail = document.getElementById('set-rec-email').value.trim();
-        const statusMsg = document.getElementById('save-status-msg');
-
-        const updatedData = { photoUrl, displayName, username, recoveryEmail };
-
-        database.ref('users/' + this.currentUserUid).update(updatedData)
-            .then(() => {
-                this.userData.photoUrl = photoUrl;
-                this.userData.displayName = displayName;
-                this.userData.username = username;
-                this.userData.recoveryEmail = recoveryEmail;
-
-                this.saveSession();
-                this.updateSystemUserUI();
-
-                statusMsg.style.display = 'block';
-                setTimeout(() => { statusMsg.style.display = 'none'; }, 3000);
-            })
-            .catch(err => alert("Erro ao salvar: " + err.message));
-    }
-
-    // GERENCIADOR DE JANELAS WINDOWS
-    openApp(appId) {
-        document.getElementById('start-menu').classList.add('hidden');
-
-        if (this.openWindows[appId]) {
-            this.bringToFront(this.openWindows[appId]);
-            this.openWindows[appId].style.display = 'flex';
-            return;
-        }
-
-        const win = document.createElement('div');
-        win.className = 'window';
-        win.id = `win-${appId}`;
-        win.style.zIndex = ++this.highestZIndex;
-
-        let title = "Aplicativo";
-        let content = "";
-
-        if (appId === 'settings') {
-            title = "Configurações do Sistema";
-            content = `
-                <div class="settings-container">
-                    <form class="settings-card" onsubmit="vortexOS.saveUserSettings(event)">
-                        <h4><i data-lucide="user-check"></i> Perfil do Usuário</h4>
-                        <div class="form-grid">
-                            <div class="form-group full">
-                                <label>URL da Foto de Perfil</label>
-                                <input type="url" id="set-photo" value="${this.userData.photoUrl}" placeholder="https://exemplo.com/sua-foto.jpg">
-                            </div>
-                            <div class="form-group">
-                                <label>Nome de Exibição</label>
-                                <input type="text" id="set-displayname" value="${this.userData.displayName}" required>
-                            </div>
-                            <div class="form-group">
-                                <label>Username (@)</label>
-                                <input type="text" id="set-username" value="${this.userData.username}" required>
-                            </div>
-                            <div class="form-group full">
-                                <label>E-mail de Recuperação</label>
-                                <input type="email" id="set-rec-email" value="${this.userData.recoveryEmail}" placeholder="seuemail@backup.com">
-                            </div>
-                        </div>
-                        <button type="submit" class="btn-primary" style="margin-top: 14px; width: 100%;">Salvar Perfil</button>
-                        <p id="save-status-msg" class="save-status">✓ Alterações salvas com sucesso!</p>
-                    </form>
-
-                    <div class="settings-card">
-                        <h4><i data-lucide="image"></i> Papel de Parede (Wallpapers)</h4>
-                        
-                        <div class="wp-category">TEMAS CLAROS (LIGHT)</div>
-                        <div class="wallpaper-grid">
-                            <div class="wp-thumb" style="background: linear-gradient(135deg, #e0f2fe, #38bdf8);" onclick="vortexOS.setWallpaper('aero-light')">Aero Light</div>
-                            <div class="wp-thumb" style="background: linear-gradient(135deg, #fbcfe8, #f472b6);" onclick="vortexOS.setWallpaper('soft-pink')">Soft Pastels</div>
-                            <div class="wp-thumb" style="background: linear-gradient(135deg, #f1f5f9, #94a3b8);" onclick="vortexOS.setWallpaper('cloud-white')">Minimal Cloud</div>
-                        </div>
-
-                        <div class="wp-category">TEMAS ESCUROS (DARK)</div>
-                        <div class="wallpaper-grid">
-                            <div class="wp-thumb" style="background: linear-gradient(135deg, #0e0720, #260e42);" onclick="vortexOS.setWallpaper('vortex-purple')">Vortex Neon</div>
-                            <div class="wp-thumb" style="background: linear-gradient(135deg, #0f172a, #1e293b);" onclick="vortexOS.setWallpaper('cyber-dark')">Cyber Dark</div>
-                            <div class="wp-thumb" style="background: linear-gradient(135deg, #022c22, #065f46);" onclick="vortexOS.setWallpaper('emerald-night')">Midnight Ocean</div>
-                        </div>
-                    </div>
-                </div>`;
-        } else if (appId === 'calculator') {
-            title = "Calculadora";
-            content = `
-                <div class="calc-display" id="calc-screen">0</div>
-                <div class="calc-grid">
-                    <button class="calc-btn" onclick="vortexOS.calcInput('C')">C</button>
-                    <button class="calc-btn" onclick="vortexOS.calcInput('/')">/</button>
-                    <button class="calc-btn" onclick="vortexOS.calcInput('*')">*</button>
-                    <button class="calc-btn" onclick="vortexOS.calcInput('-')">-</button>
-                    <button class="calc-btn" onclick="vortexOS.calcInput('7')">7</button>
-                    <button class="calc-btn" onclick="vortexOS.calcInput('8')">8</button>
-                    <button class="calc-btn" onclick="vortexOS.calcInput('9')">9</button>
-                    <button class="calc-btn" onclick="vortexOS.calcInput('+')">+</button>
-                    <button class="calc-btn" onclick="vortexOS.calcInput('4')">4</button>
-                    <button class="calc-btn" onclick="vortexOS.calcInput('5')">5</button>
-                    <button class="calc-btn" onclick="vortexOS.calcInput('6')">6</button>
-                    <button class="calc-btn" onclick="vortexOS.calcInput('=')">=</button>
-                    <button class="calc-btn" onclick="vortexOS.calcInput('1')">1</button>
-                    <button class="calc-btn" onclick="vortexOS.calcInput('2')">2</button>
-                    <button class="calc-btn" onclick="vortexOS.calcInput('3')">3</button>
-                    <button class="calc-btn" onclick="vortexOS.calcInput('0')">0</button>
-                </div>`;
-        } else if (appId === 'notepad') {
-            title = "Bloco de Notas";
-            content = `<textarea class="notepad-text" placeholder="Escreva suas anotações aqui..."></textarea>`;
-        } else if (appId === 'files') {
-            title = "Gerenciador de Arquivos";
-            content = `
-                <div class="file-list">
-                    <div class="file-item"><i data-lucide="folder"></i><span>Documentos</span></div>
-                    <div class="file-item"><i data-lucide="folder"></i><span>Imagens</span></div>
-                    <div class="file-item"><i data-lucide="file-text"></i><span>vortex.log</span></div>
-                </div>`;
-        }
-
-        win.innerHTML = `
-            <div class="window-header">
-                <div class="window-title"><i data-lucide="app-window"></i> ${title}</div>
-                <div class="window-controls">
-                    <button class="win-btn win-min" title="Minimizar" onclick="vortexOS.minimizeWindow('${appId}')"></button>
-                    <button class="win-btn win-max" title="Maximizar" onclick="vortexOS.maximizeWindow('${appId}')"></button>
-                    <button class="win-btn win-close" title="Fechar" onclick="vortexOS.closeWindow('${appId}')"></button>
-                </div>
+      {/* MENU INICIAR (VORTEX MENU) */}
+      {isStartOpen && (
+        <div className="absolute bottom-14 left-3 w-80 bg-slate-900/90 backdrop-blur-xl border border-slate-700/50 rounded-xl shadow-2xl p-4 z-50 animate-in fade-in slide-in-from-bottom-3 duration-200">
+          <div className="flex items-center gap-3 pb-3 border-b border-slate-800">
+            <div className="p-2 bg-indigo-600/30 text-indigo-400 rounded-lg">
+              <VortexIcon className="w-6 h-6" />
             </div>
-            <div class="window-body">${content}</div>
-        `;
+            <div>
+              <p className="font-bold text-sm">Vortex OS</p>
+              <p className="text-xs text-slate-400">Versão 1.3 Pro</p>
+            </div>
+          </div>
 
-        document.getElementById('window-container').appendChild(win);
-        this.openWindows[appId] = win;
-        this.makeDraggable(win);
+          <div className="py-3 space-y-1">
+            <button 
+              onClick={() => { setActiveApp('browser'); setIsStartOpen(false); }}
+              className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-indigo-600/20 hover:text-indigo-300 rounded-lg transition"
+            >
+              <ChromeIcon className="w-5 h-5 text-cyan-400" />
+              Navegador Vortex
+            </button>
+            <button 
+              onClick={() => { setActiveApp('creator'); setIsStartOpen(false); }}
+              className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-indigo-600/20 hover:text-indigo-300 rounded-lg transition"
+            >
+              <CodeIcon className="w-5 h-5 text-indigo-400" />
+              Vortex Web Studio (Criador)
+            </button>
+          </div>
+        </div>
+      )}
 
-        win.addEventListener('mousedown', () => this.bringToFront(win));
+      {/* BARRA DE TAREFAS (TASKBAR - ESTILO WINDOWS) */}
+      <div className="absolute bottom-0 left-0 right-0 h-12 bg-slate-900/80 backdrop-blur-md border-t border-slate-800/80 flex items-center justify-between px-3 z-40">
+        <div className="flex items-center gap-2">
+          {/* BOTÃO START VORTEX */}
+          <button 
+            onClick={() => setIsStartOpen(!isStartOpen)}
+            className={`p-2 rounded-lg transition-all flex items-center justify-center ${
+              isStartOpen 
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' 
+                : 'hover:bg-slate-800 text-slate-300 hover:text-white'
+            }`}
+            title="Iniciar Vortex"
+          >
+            <VortexIcon className="w-5 h-5" />
+          </button>
 
-        this.addTaskbarItem(appId, title);
-        lucide.createIcons();
-    }
+          <div className="h-5 w-[1px] bg-slate-800 mx-1" />
 
-    makeDraggable(win) {
-        const header = win.querySelector('.window-header');
-        let isDragging = false, startX, startY, initialX, initialY;
+          {/* APPS FIXADOS NA BARRA */}
+          <button 
+            onClick={() => setActiveApp('browser')}
+            className={`p-2 rounded-lg transition ${
+              activeApp === 'browser' ? 'bg-slate-800 border-b-2 border-cyan-400' : 'hover:bg-slate-800/50'
+            }`}
+          >
+            <ChromeIcon className="w-5 h-5 text-cyan-400" />
+          </button>
+          <button 
+            onClick={() => setActiveApp('creator')}
+            className={`p-2 rounded-lg transition ${
+              activeApp === 'creator' ? 'bg-slate-800 border-b-2 border-indigo-400' : 'hover:bg-slate-800/50'
+            }`}
+          >
+            <CodeIcon className="w-5 h-5 text-indigo-400" />
+          </button>
+        </div>
 
-        header.addEventListener('mousedown', (e) => {
-            if (win.classList.contains('maximized')) return;
-            isDragging = true;
-            startX = e.clientX; startY = e.clientY;
-            initialX = win.offsetLeft; initialY = win.offsetTop;
-        });
+        {/* RELÓGIO DA TASKBAR */}
+        <div className="text-xs text-slate-400 font-medium px-2">
+          {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </div>
+      </div>
 
-        document.addEventListener('mousemove', (e) => {
-            if (!isDragging) return;
-            win.style.left = `${initialX + (e.clientX - startX)}px`;
-            win.style.top = `${initialY + (e.clientY - startY)}px`;
-        });
-
-        document.addEventListener('mouseup', () => isDragging = false);
-    }
-
-    bringToFront(win) { win.style.zIndex = ++this.highestZIndex; }
-
-    closeWindow(appId) {
-        if (this.openWindows[appId]) {
-            this.openWindows[appId].remove();
-            delete this.openWindows[appId];
-            const tbItem = document.getElementById(`tb-${appId}`);
-            if (tbItem) tbItem.remove();
-        }
-    }
-
-    minimizeWindow(appId) {
-        if (this.openWindows[appId]) {
-            const win = this.openWindows[appId];
-            win.style.display = win.style.display === 'none' ? 'flex' : 'none';
-        }
-    }
-
-    maximizeWindow(appId) {
-        if (this.openWindows[appId]) {
-            this.openWindows[appId].classList.toggle('maximized');
-        }
-    }
-
-    addTaskbarItem(appId, title) {
-        const tb = document.getElementById('taskbar-apps');
-        const item = document.createElement('div');
-        item.className = 'taskbar-item active';
-        item.id = `tb-${appId}`;
-        item.innerText = title;
-        item.onclick = () => this.minimizeWindow(appId);
-        tb.appendChild(item);
-    }
-
-    calcInput(val) {
-        const screen = document.getElementById('calc-screen');
-        if (!screen) return;
-        if (val === 'C') screen.innerText = '0';
-        else if (val === '=') {
-            try { screen.innerText = eval(screen.innerText.replace(/[^0-9+\-*/.]/g, '')); }
-            catch { screen.innerText = 'Erro'; }
-        } else {
-            screen.innerText = (screen.innerText === '0' || screen.innerText === 'Erro') ? val : screen.innerText + val;
-        }
-    }
-
-    setWallpaper(theme) {
-        const desktop = document.getElementById('desktop-screen');
-        const wallpapers = {
-            'aero-light': 'linear-gradient(135deg, #e0f2fe 0%, #38bdf8 100%)',
-            'soft-pink': 'linear-gradient(135deg, #fbcfe8 0%, #f472b6 100%)',
-            'cloud-white': 'linear-gradient(135deg, #f1f5f9 0%, #cbd5e1 100%)',
-            'vortex-purple': 'linear-gradient(135deg, #0e0720 0%, #260e42 50%, #080314 100%)',
-            'cyber-dark': 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-            'emerald-night': 'linear-gradient(135deg, #022c22 0%, #065f46 100%)'
-        };
-
-        if (wallpapers[theme]) {
-            desktop.style.background = wallpapers[theme];
-        }
-    }
-
-    shutdownSystem() {
-        this.clearSession(); // Limpa login ao desligar/sair
-        auth.signOut();
-        Object.keys(this.openWindows).forEach(appId => this.closeWindow(appId));
-        document.getElementById('start-menu').classList.add('hidden');
-        this.switchScreen('boot-screen');
-    }
-
-    restartSystem() {
-        Object.keys(this.openWindows).forEach(appId => this.closeWindow(appId));
-        document.getElementById('start-menu').classList.add('hidden');
-        this.switchScreen('boot-screen');
-        setTimeout(() => {
-            if (!this.checkSavedSession()) {
-                this.switchScreen('auth-screen');
-            }
-        }, 1000);
-    }
+    </div>
+  );
 }
 
-const vortexOS = new VortexOS();
+// Atalho da Área de Trabalho
+function DesktopShortcut({ title, icon, onClick }) {
+  return (
+    <button 
+      onClick={onClick}
+      className="flex flex-col items-center justify-center p-3 rounded-xl hover:bg-slate-800/40 hover:backdrop-blur-sm transition group border border-transparent hover:border-slate-700/50"
+    >
+      <div className="p-3 bg-slate-900/60 rounded-2xl group-hover:scale-105 transition-transform border border-slate-800 shadow-md">
+        {icon}
+      </div>
+      <span className="text-xs mt-2 text-slate-300 text-center font-medium group-hover:text-white">
+        {title}
+      </span>
+    </button>
+  );
+}
+
+// ==========================================
+// COMPONENTE: NAVEGADOR VORTEX (ESTILO CHROME)
+// ==========================================
+function VortexBrowserApp({ onClose, publishedSites }) {
+  const [url, setUrl] = useState('meusite.vort');
+  const [currentUrl, setCurrentUrl] = useState('meusite.vort');
+  const [history, setHistory] = useState(['meusite.vort']);
+  const [showHistory, setShowHistory] = useState(false);
+
+  const handleNavigate = (e) => {
+    e?.preventDefault();
+    let target = url.trim().toLowerCase();
+    if (!target.endsWith('.vort') && !target.startsWith('http')) {
+      target += '.vort';
+    }
+    setCurrentUrl(target);
+    setUrl(target);
+    setHistory(prev => [target, ...prev]);
+  };
+
+  const renderContent = () => {
+    const site = publishedSites[currentUrl];
+    if (site) {
+      const srcDoc = `
+        <!DOCTYPE html>
+        <html>
+          <head><style>${site.css}</style></head>
+          <body>
+            ${site.html}
+            <script>${site.js}</script>
+          </body>
+        </html>
+      `;
+      return <iframe title="Vortex Web" srcDoc={srcDoc} className="w-full h-full bg-white border-0" />;
+    }
+
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-slate-400 bg-slate-950 p-6 text-center">
+        <div className="p-4 bg-slate-900 rounded-full mb-4 border border-slate-800">
+          <ChromeIcon className="w-12 h-12 text-slate-600" />
+        </div>
+        <h3 className="text-lg font-semibold text-slate-200">Não foi possível acessar este site</h3>
+        <p className="text-sm mt-1 max-w-sm text-slate-500">
+          O domínio <span className="text-cyan-400 font-mono">{currentUrl}</span> não foi encontrado na rede .vort. Crie-o usando o Vortex Web Studio!
+        </p>
+      </div>
+    );
+  };
+
+  return (
+    <div className="absolute top-10 left-10 right-10 bottom-16 bg-slate-900 border border-slate-700/60 rounded-xl shadow-2xl flex flex-col overflow-hidden z-30">
+      {/* BARRA DE ABAS E BOTOES DE JANELA */}
+      <div className="bg-slate-950 px-3 pt-2 flex items-center justify-between border-b border-slate-800">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 bg-slate-900 px-4 py-1.5 rounded-t-lg border-t border-x border-slate-700 text-xs text-slate-200 font-medium w-48 truncate">
+            <ChromeIcon className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+            <span className="truncate">{publishedSites[currentUrl]?.title || currentUrl}</span>
+          </div>
+        </div>
+        
+        {/* BOTÃO FECHAR */}
+        <button onClick={onClose} className="px-3 py-1 text-slate-400 hover:bg-red-500 hover:text-white rounded text-xs transition">✕</button>
+      </div>
+
+      {/* BARRA DE NAVEGAÇÃO / URL */}
+      <div className="bg-slate-900 p-2 flex items-center gap-2 border-b border-slate-800">
+        <button onClick={() => handleNavigate()} className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition">
+          <RefreshIcon />
+        </button>
+
+        <form onSubmit={handleNavigate} className="flex-1">
+          <input 
+            type="text" 
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="Digite um domínio .vort (ex: meusite.vort)"
+            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 transition font-mono"
+          />
+        </form>
+
+        <button 
+          onClick={() => setShowHistory(!showHistory)}
+          className={`p-1.5 rounded-lg transition ${showHistory ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-400 hover:bg-slate-800'}`}
+          title="Histórico de Navegação"
+        >
+          <HistoryIcon />
+        </button>
+      </div>
+
+      {/* ÁREA DE CONTEÚDO E PAINEL DE HISTÓRICO */}
+      <div className="flex-1 relative">
+        {renderContent()}
+
+        {/* DRAWER DE HISTÓRICO */}
+        {showHistory && (
+          <div className="absolute top-0 right-0 w-64 bottom-0 bg-slate-900/95 backdrop-blur-md border-l border-slate-800 p-4 shadow-xl overflow-y-auto">
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Histórico de Visitas</h4>
+            <div className="space-y-1">
+              {history.map((hUrl, index) => (
+                <button
+                  key={index}
+                  onClick={() => { setUrl(hUrl); setCurrentUrl(hUrl); setShowHistory(false); }}
+                  className="w-full text-left px-3 py-2 hover:bg-slate-800 rounded text-xs font-mono text-cyan-400 truncate block"
+                >
+                  {hUrl}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// COMPONENTE: VORTEX WEB STUDIO (CRIADOR DE SITES)
+// ==========================================
+function VortexWebStudio({ onClose, onPublish }) {
+  const [domain, setDomain] = useState('novosite');
+  const [activeTab, setActiveTab] = useState('html'); // 'html' | 'css' | 'js'
+
+  const [code, setCode] = useState({
+    html: `<div class="card">\n  <h1>Meu Novo Site no Vortex!</h1>\n  <p>Criado com a versão 1.3</p>\n  <button onclick="saudar()">Clique Aqui</button>\n</div>`,
+    css: `body {\n  background: #0f172a;\n  color: white;\n  font-family: sans-serif;\n  display: flex;\n  justify-content: center;\n  align-items: center;\n  height: 100vh;\n}\n\n.card {\n  background: #1e293b;\n  padding: 2rem;\n  border-radius: 12px;\n  text-align: center;\n  border: 1px solid #334155;\n}\n\nbutton {\n  background: #6366f1;\n  color: white;\n  border: none;\n  padding: 8px 16px;\n  border-radius: 6px;\n  cursor: pointer;\n}`,
+    js: `function saudar() {\n  alert('Olá do seu site .vort!');\n}`
+  });
+
+  const handlePublish = () => {
+    const fullDomain = domain.toLowerCase().endsWith('.vort') ? domain.toLowerCase() : `${domain.toLowerCase()}.vort`;
+    onPublish(fullDomain, {
+      title: domain,
+      html: code.html,
+      css: code.css,
+      js: code.js
+    });
+  };
+
+  const previewSrcDoc = `
+    <!DOCTYPE html>
+    <html>
+      <head><style>${code.css}</style></head>
+      <body>
+        ${code.html}
+        <script>${code.js}</script>
+      </body>
+    </html>
+  `;
+
+  return (
+    <div className="absolute top-8 left-8 right-8 bottom-16 bg-slate-900 border border-slate-700/60 rounded-xl shadow-2xl flex flex-col overflow-hidden z-30">
+      {/* HEADER DA JANELA */}
+      <div className="bg-slate-950 px-4 py-2 flex items-center justify-between border-b border-slate-800">
+        <div className="flex items-center gap-2 text-indigo-400 font-bold text-xs">
+          <CodeIcon className="w-4 h-4" />
+          <span>Vortex Web Studio - Criador de Sites</span>
+        </div>
+        <button onClick={onClose} className="px-3 py-1 text-slate-400 hover:bg-red-500 hover:text-white rounded text-xs transition">✕</button>
+      </div>
+
+      {/* BARRA DE CONFIGURAÇÕES / DOMÍNIO E LANÇAMENTO */}
+      <div className="bg-slate-900/90 p-3 border-b border-slate-800 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-400 font-medium">Domínio:</span>
+          <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg px-2 py-1">
+            <input 
+              type="text" 
+              value={domain}
+              onChange={(e) => setDomain(e.target.value)}
+              className="bg-transparent text-xs text-slate-200 focus:outline-none font-mono text-right w-28"
+            />
+            <span className="text-xs text-indigo-400 font-mono font-bold">.vort</span>
+          </div>
+        </div>
+
+        <button 
+          onClick={handlePublish}
+          className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 rounded-lg text-xs font-semibold shadow-lg shadow-indigo-600/30 transition"
+        >
+          🚀 Publicar Site no Vortex
+        </button>
+      </div>
+
+      {/* PAINEL PRINCIPAL (EDITOR + PREVIEW) */}
+      <div className="flex-1 grid grid-cols-2 divide-x divide-slate-800 overflow-hidden">
+        
+        {/* LADO ESQUERDO: EDITOR DE CÓDIGO */}
+        <div className="flex flex-col bg-slate-950">
+          <div className="flex bg-slate-900/50 border-b border-slate-800">
+            {['html', 'css', 'js'].map((lang) => (
+              <button
+                key={lang}
+                onClick={() => setActiveTab(lang)}
+                className={`px-4 py-2 text-xs font-mono font-semibold uppercase transition ${
+                  activeTab === lang 
+                    ? 'border-b-2 border-indigo-500 text-indigo-400 bg-slate-900' 
+                    : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                {lang}
+              </button>
+            ))}
+          </div>
+
+          <textarea 
+            value={code[activeTab]}
+            onChange={(e) => setCode({ ...code, [activeTab]: e.target.value })}
+            className="flex-1 bg-slate-950 text-slate-200 p-4 font-mono text-xs focus:outline-none resize-none leading-relaxed"
+            spellCheck="false"
+          />
+        </div>
+
+        {/* LADO DIREITO: PRÉVIA EM TEMPO REAL */}
+        <div className="flex flex-col bg-slate-900">
+          <div className="bg-slate-900 px-4 py-2 border-b border-slate-800 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+            Prévia em Tempo Real
+          </div>
+          <div className="flex-1 bg-white">
+            <iframe title="Live Preview" srcDoc={previewSrcDoc} className="w-full h-full border-0" />
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
