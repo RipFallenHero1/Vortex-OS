@@ -232,3 +232,90 @@ body {
 #taskbar { height: 48px; width: 100vw; background: rgba(15, 7, 26, 0.9); border-top: 1px solid rgba(168, 85, 247, 0.3); display: flex; align-items: center; justify-content: space-between; padding: 0 15px; position: fixed; bottom: 0; backdrop-filter: blur(10px); z-index: 1000; }
 #start-btn { background: linear-gradient(135deg, #7e22ce, #a855f7); border: none; color: white; padding: 8px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; }
 #clock { font-size: 13px; color: #e9d5ff; background: rgba(139, 92, 246, 0.15); padding: 6px 12px; border-radius: 6px; border: 1px solid rgba(168, 85, 247, 0.2); }
+
+/* MODAIS DO MESSENGER (SEM POPUP NATIVO) */
+.msgr-modal {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 3, 14, 0.85);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.msgr-modal-card {
+  background: #1a0b2e;
+  border: 1px solid rgba(168, 85, 247, 0.5);
+  padding: 20px;
+  border-radius: 12px;
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+}
+
+.msgr-modal-card h3 {
+  font-size: 16px;
+  color: #f3e8ff;
+}
+
+.msgr-modal-card p {
+  font-size: 11px;
+  color: #c084fc;
+  line-height: 1.4;
+}
+
+.msgr-modal-card code {
+  background: rgba(168, 85, 247, 0.2);
+  padding: 2px 4px;
+  border-radius: 4px;
+  color: #e9d5ff;
+}
+
+.msgr-modal-card input {
+  background: rgba(13, 6, 20, 0.9);
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: white;
+  outline: none;
+  font-size: 13px;
+}
+
+.msgr-modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 5px;
+}
+
+.btn-secondary {
+  background: transparent;
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  color: #e9d5ff;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.btn-add-friend {
+  background: rgba(168, 85, 247, 0.2);
+  border: 1px dashed rgba(168, 85, 247, 0.5);
+  color: #e9d5ff;
+  padding: 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  cursor: pointer;
+  text-align: center;
+  margin-bottom: 8px;
+  transition: 0.2s;
+}
+
+.btn-add-friend:hover {
+  background: #a855f7;
+  color: white;
+}
