@@ -171,7 +171,7 @@ function lockSystem() {
   checkUserRegistrationStatus();
 }
 
-// === APLICATIVOS VORTEX (CHROME, SITE BUILDER, MESSENGER) ===
+// === APLICATIVOS VORTEX ===
 
 // 1. VORTEX CHROME & DOMÍNIOS .VORT
 let publishedSites = JSON.parse(localStorage.getItem('vortex_sites') || '{}');
@@ -235,9 +235,11 @@ function publishSite() {
 }
 
 // 3. VORTEX MESSENGER
-let msgrCurrentView = 'dm'; // 'dm' ou serverId
-let msgrMessages = JSON.parse(localStorage.getItem('vortex_msgr_chats') || '{"geral": []}');
+let msgrCurrentView = 'dm'; // 'dm' ou id do servidor
+let msgrActiveTarget = 'bot_vortex'; // ID do chat ativo (bot, username do amigo ou 'geral')
+let msgrMessages = JSON.parse(localStorage.getItem('vortex_msgr_chats') || '{"bot_vortex": [], "geral": []}');
 let msgrServers = JSON.parse(localStorage.getItem('vortex_msgr_servers') || '[{"id":"geral","name":"Comunidade Vortex","code":"VTX-COMM"}]');
+let msgrFriends = JSON.parse(localStorage.getItem('vortex_msgr_friends') || '[{"username":"bot_vortex","displayName":"Bot Vortex","avatar":"🤖"}]');
 
 function initSystemApps() {
   renderMsgrServers();
@@ -266,6 +268,13 @@ function renderMsgrServers() {
   const addBtn = list.querySelector('.add-server');
   list.querySelectorAll('.server-dynamic').forEach(e => e.remove());
 
+  const dmIcon = document.getElementById('server-icon-dm');
+  if (msgrCurrentView === 'dm') {
+    dmIcon.classList.add('active');
+  } else {
+    dmIcon.classList.remove('active');
+  }
+
   msgrServers.forEach(s => {
     const el = document.createElement('div');
     el.className = `server-icon server-dynamic ${msgrCurrentView === s.id ? 'active' : ''}`;
@@ -273,6 +282,7 @@ function renderMsgrServers() {
     el.title = `${s.name} (${s.code})`;
     el.onclick = () => {
       msgrCurrentView = s.id;
+      msgrActiveTarget = 'geral';
       renderMsgrServers();
       renderMsgrChannels();
     };
@@ -288,12 +298,29 @@ function renderMsgrChannels() {
 
   if (msgrCurrentView === 'dm') {
     title.textContent = 'Mensagens Diretas';
-    chatTitle.textContent = '💬 Amigos & DMs';
     
-    const friend = document.createElement('div');
-    friend.className = 'msgr-item active';
-    friend.textContent = '🤖 Bot Vortex';
-    list.appendChild(friend);
+    // Botão para adicionar amigo
+    const addBtn = document.createElement('button');
+    addBtn.className = 'btn-add-friend';
+    addBtn.textContent = '+ Adicionar Amigo';
+    addBtn.onclick = openMsgrFriendModal;
+    list.appendChild(addBtn);
+
+    // Renderiza lista de amigos
+    msgrFriends.forEach(f => {
+      const item = document.createElement('div');
+      item.className = `msgr-item ${msgrActiveTarget === f.username ? 'active' : ''}`;
+      item.textContent = `${f.avatar} ${f.displayName}`;
+      item.onclick = () => {
+        msgrActiveTarget = f.username;
+        renderMsgrChannels();
+      };
+      list.appendChild(item);
+    });
+
+    const activeFriend = msgrFriends.find(f => f.username === msgrActiveTarget);
+    chatTitle.textContent = activeFriend ? `💬 @${activeFriend.displayName}` : '💬 Mensagens Diretas';
+
   } else {
     const server = msgrServers.find(s => s.id === msgrCurrentView);
     title.textContent = server ? server.name : 'Servidor';
@@ -311,7 +338,9 @@ function renderMsgrChannels() {
 function loadMsgrMessages() {
   const box = document.getElementById('msgr-messages-box');
   box.innerHTML = '';
-  const msgs = msgrMessages[msgrCurrentView] || [];
+  
+  const targetKey = msgrCurrentView === 'dm' ? msgrActiveTarget : msgrCurrentView;
+  const msgs = msgrMessages[targetKey] || [];
 
   msgs.forEach(m => {
     const el = document.createElement('div');
@@ -331,9 +360,11 @@ function sendMsgrMessage() {
   const text = input.value.trim();
   if (!text) return;
 
-  if (!msgrMessages[msgrCurrentView]) msgrMessages[msgrCurrentView] = [];
+  const targetKey = msgrCurrentView === 'dm' ? msgrActiveTarget : msgrCurrentView;
 
-  msgrMessages[msgrCurrentView].push({
+  if (!msgrMessages[targetKey]) msgrMessages[targetKey] = [];
+
+  msgrMessages[targetKey].push({
     author: currentUser.displayName,
     avatar: currentUser.avatar,
     text: text
@@ -343,32 +374,52 @@ function sendMsgrMessage() {
   input.value = '';
   loadMsgrMessages();
 
-  // Resposta automática do Bot se estiver em DMs
-  if (msgrCurrentView === 'dm') {
+  // Resposta automática se conversar com o Bot Vortex
+  if (msgrCurrentView === 'dm' && msgrActiveTarget === 'bot_vortex') {
     setTimeout(() => {
-      msgrMessages['dm'].push({
+      msgrMessages['bot_vortex'].push({
         author: 'Bot Vortex',
         avatar: '🤖',
-        text: `Olá ${currentUser.displayName}! Recebi sua mensagem: "${text}"`
+        text: `Fala ${currentUser.displayName}! Recebi sua mensagem: "${text}"`
       });
       localStorage.setItem('vortex_msgr_chats', JSON.stringify(msgrMessages));
       loadMsgrMessages();
       playNotificationSound();
-    }, 1200);
+    }, 1000);
   }
 }
 
-function promptCreateServer() {
-  const code = prompt('Digite um Código de Convite para entrar ou um Nome para criar um novo Servidor:');
-  if (!code) return;
+function switchMsgrView(view) {
+  msgrCurrentView = view;
+  if (view === 'dm') msgrActiveTarget = msgrFriends[0]?.username || 'bot_vortex';
+  renderMsgrServers();
+  renderMsgrChannels();
+}
 
-  const existing = msgrServers.find(s => s.code.toLowerCase() === code.toLowerCase());
+// === CONTROLE DOS MODAIS INTERNOS ===
+
+// Modal Criar/Entrar Servidor
+function openMsgrServerModal() {
+  document.getElementById('msgr-modal-server').classList.remove('hidden');
+  document.getElementById('msgr-server-input').focus();
+}
+
+function closeMsgrServerModal() {
+  document.getElementById('msgr-modal-server').classList.add('hidden');
+  document.getElementById('msgr-server-input').value = '';
+}
+
+function confirmCreateServer() {
+  const inputVal = document.getElementById('msgr-server-input').value.trim();
+  if (!inputVal) return;
+
+  const existing = msgrServers.find(s => s.code.toLowerCase() === inputVal.toLowerCase());
   if (existing) {
     msgrCurrentView = existing.id;
   } else {
     const newServer = {
       id: 'srv_' + Date.now(),
-      name: code,
+      name: inputVal,
       code: 'VTX-' + Math.floor(1000 + Math.random() * 9000)
     };
     msgrServers.push(newServer);
@@ -376,17 +427,46 @@ function promptCreateServer() {
     msgrCurrentView = newServer.id;
   }
 
+  closeMsgrServerModal();
   renderMsgrServers();
   renderMsgrChannels();
 }
 
-function switchMsgrView(view) {
-  msgrCurrentView = view;
-  renderMsgrServers();
+// Modal Adicionar Amigo
+function openMsgrFriendModal() {
+  document.getElementById('msgr-modal-friend').classList.remove('hidden');
+  document.getElementById('msgr-friend-input').focus();
+}
+
+function closeMsgrFriendModal() {
+  document.getElementById('msgr-modal-friend').classList.add('hidden');
+  document.getElementById('msgr-friend-input').value = '';
+}
+
+function confirmAddFriend() {
+  const friendName = document.getElementById('msgr-friend-input').value.trim();
+  if (!friendName) return;
+
+  const cleanUsername = friendName.replace('@', '').toLowerCase();
+
+  // Verifica se já não é amigo
+  const exists = msgrFriends.some(f => f.username === cleanUsername);
+  if (!exists) {
+    const newFriend = {
+      username: cleanUsername,
+      displayName: friendName,
+      avatar: '👤'
+    };
+    msgrFriends.push(newFriend);
+    localStorage.setItem('vortex_msgr_friends', JSON.stringify(msgrFriends));
+    msgrActiveTarget = cleanUsername;
+  }
+
+  closeMsgrFriendModal();
   renderMsgrChannels();
 }
 
-// === JANELAS E ARRASTE (MANTIDO) ===
+// === JANELAS E ARRASTE ===
 let highestZIndex = 10;
 
 function openWindow(appId) {
