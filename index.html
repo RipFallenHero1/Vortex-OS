@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vortex OS v1.2</title>
+  <title>Vortex OS v1.3</title>
   <link rel="stylesheet" href="style.css">
   
-  <!-- SDKs do Firebase (Versão Compatível para JS Puro) -->
+  <!-- SDKs do Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 </head>
@@ -16,16 +16,16 @@
   <div id="boot-screen">
     <div class="boot-logo">🌀</div>
     <div class="boot-spinner"></div>
-    <p>Iniciando Vortex OS...</p>
+    <p>Iniciando Vortex OS v1.3...</p>
   </div>
 
   <!-- 2. TELA DE LOGIN / CADASTRO -->
   <div id="auth-screen" class="hidden">
     <div class="auth-clock" id="auth-clock">00:00</div>
     <div class="auth-card">
-      <div class="user-avatar">🌀</div>
+      <div class="user-avatar" id="login-avatar-display">🌀</div>
 
-      <!-- FORMULÁRIO 1: PRIMEIRO ACESSO (CADASTRO) -->
+      <!-- FORMULÁRIO 1: CADASTRO -->
       <form id="register-form" class="auth-form">
         <h2>Criar Conta no Vortex OS</h2>
         <input type="text" id="reg-username" placeholder="Nome de Usuário" required>
@@ -35,7 +35,7 @@
         <button type="button" id="google-btn" class="btn-google">🌐 Entrar com Google</button>
       </form>
 
-      <!-- FORMULÁRIO 2: LOGIN SUBSEQUENTE (PIN) -->
+      <!-- FORMULÁRIO 2: LOGIN SUBSEQUENTE -->
       <form id="login-form" class="auth-form hidden">
         <h2 id="welcome-user">Bem-vindo!</h2>
         <p class="auth-subtitle">Insira seu PIN para desbloquear</p>
@@ -49,7 +49,22 @@
 
   <!-- 3. ÁREA DE TRABALHO -->
   <main id="desktop" class="hidden">
-    <!-- Ícones -->
+    <!-- ÍCONES DA ÁREA DE TRABALHO -->
+    <div class="app-icon" onclick="openWindow('chrome')">
+      <div class="icon-box">🌐</div>
+      <span>Vortex Chrome</span>
+    </div>
+
+    <div class="app-icon" onclick="openWindow('sitebuilder')">
+      <div class="icon-box">🛠️</div>
+      <span>Criador de Sites</span>
+    </div>
+
+    <div class="app-icon" onclick="openWindow('messenger')">
+      <div class="icon-box">💬</div>
+      <span>Messenger</span>
+    </div>
+
     <div class="app-icon" onclick="openWindow('notepad')">
       <div class="icon-box">📝</div>
       <span>Bloco de Notas</span>
@@ -60,7 +75,122 @@
       <span>Configurações</span>
     </div>
 
-    <!-- Janela: Bloco de Notas -->
+    <!-- JANELA 1: VORTEX CHROME -->
+    <div class="window window-large" id="window-chrome">
+      <div class="window-header" onmousedown="startDrag(event, 'window-chrome')">
+        <span class="window-title">🌐 Vortex Chrome</span>
+        <div class="window-controls">
+          <button onclick="minimizeWindow('chrome')">🗕</button>
+          <button onclick="maximizeWindow('chrome')">🗖</button>
+          <button class="close-btn" onclick="closeWindow('chrome')">✕</button>
+        </div>
+      </div>
+      <div class="chrome-container">
+        <div class="chrome-tabs">
+          <div class="chrome-tab active" id="chrome-tab-title">
+            <span>Início</span>
+          </div>
+        </div>
+        <div class="chrome-bar">
+          <button class="chrome-btn" onclick="reloadChrome()">🔄</button>
+          <input type="text" id="chrome-url" placeholder="Pesquise ou digite um domínio .vort (ex: meusite.vort)..." onkeydown="if(event.key==='Enter') navigateChrome()">
+          <button class="chrome-btn-go" onclick="navigateChrome()">Ir</button>
+          <div class="chrome-user-badge">
+            <span id="chrome-user-avatar">🌀</span>
+            <span id="chrome-user-name">Usuário</span>
+          </div>
+        </div>
+        <div class="chrome-viewport">
+          <iframe id="chrome-frame"></iframe>
+        </div>
+      </div>
+    </div>
+
+    <!-- JANELA 2: CRIADOR DE SITES -->
+    <div class="window window-large" id="window-sitebuilder">
+      <div class="window-header" onmousedown="startDrag(event, 'window-sitebuilder')">
+        <span class="window-title">🛠️ Criador de Sites .vort</span>
+        <div class="window-controls">
+          <button onclick="minimizeWindow('sitebuilder')">🗕</button>
+          <button onclick="maximizeWindow('sitebuilder')">🗖</button>
+          <button class="close-btn" onclick="closeWindow('sitebuilder')">✕</button>
+        </div>
+      </div>
+      <div class="builder-container">
+        <div class="builder-header">
+          <label>Domínio do Site:</label>
+          <div class="domain-input-group">
+            <input type="text" id="builder-domain" placeholder="exemplo">
+            <span>.vort</span>
+          </div>
+          <button class="btn-primary" onclick="publishSite()">🚀 Publicar Site</button>
+        </div>
+        <div class="builder-editors">
+          <div class="editor-box">
+            <span>HTML</span>
+            <textarea id="builder-html" placeholder="<h1>Meu Site Vortex</h1>\n<p>Bem-vindo!</p>"></textarea>
+          </div>
+          <div class="editor-box">
+            <span>CSS</span>
+            <textarea id="builder-css" placeholder="body { background: #1a0b2e; color: #fff; font-family: sans-serif; }"></textarea>
+          </div>
+          <div class="editor-box">
+            <span>JavaScript</span>
+            <textarea id="builder-js" placeholder="console.log('Site carregado no Vortex OS!');"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- JANELA 3: VORTEX MESSENGER -->
+    <div class="window window-large" id="window-messenger">
+      <div class="window-header" onmousedown="startDrag(event, 'window-messenger')">
+        <span class="window-title">💬 Vortex Messenger</span>
+        <div class="window-controls">
+          <button onclick="minimizeWindow('messenger')">🗕</button>
+          <button onclick="maximizeWindow('messenger')">🗖</button>
+          <button class="close-btn" onclick="closeWindow('messenger')">✕</button>
+        </div>
+      </div>
+      <div class="messenger-container">
+        <!-- Sidebar Servidores (Discord Style) -->
+        <div class="msgr-servers" id="msgr-servers-list">
+          <div class="server-icon active" onclick="switchMsgrView('dm')" title="Mensagens Diretas">💬</div>
+          <div class="server-divider"></div>
+          <!-- Servidores entram aqui -->
+          <div class="server-icon add-server" onclick="promptCreateServer()" title="Criar ou Entrar em Servidor">+</div>
+        </div>
+
+        <!-- Lista de Canais / Amigos -->
+        <div class="msgr-channels">
+          <div class="msgr-channels-header" id="msgr-sidebar-title">Mensagens Diretas</div>
+          <div class="msgr-channels-list" id="msgr-channels-list">
+            <!-- Canais/Amigos dinâmicos -->
+          </div>
+          <div class="msgr-user-bar">
+            <span class="msgr-user-avatar" id="msgr-self-avatar">🌀</span>
+            <div class="msgr-user-info">
+              <strong id="msgr-self-display">Usuário</strong>
+              <small id="msgr-self-username">@usuario</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Área do Chat -->
+        <div class="msgr-chat-area">
+          <div class="msgr-chat-header" id="msgr-chat-title"># geral</div>
+          <div class="msgr-messages" id="msgr-messages-box">
+            <!-- Mensagens -->
+          </div>
+          <div class="msgr-input-box">
+            <input type="text" id="msgr-input" placeholder="Enviar mensagem..." onkeydown="if(event.key==='Enter') sendMsgrMessage()">
+            <button onclick="sendMsgrMessage()">Enviar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- JANELA: BLOCO DE NOTAS -->
     <div class="window" id="window-notepad">
       <div class="window-header" onmousedown="startDrag(event, 'window-notepad')">
         <span class="window-title">📝 Bloco de Notas</span>
@@ -75,7 +205,7 @@
       </div>
     </div>
 
-    <!-- Janela: Configurações -->
+    <!-- JANELA: CONFIGURAÇÕES -->
     <div class="window" id="window-settings">
       <div class="window-header" onmousedown="startDrag(event, 'window-settings')">
         <span class="window-title">⚙️ Configurações</span>
@@ -86,20 +216,44 @@
         </div>
       </div>
       <div class="window-body">
+        <h2>Perfil do Usuário</h2>
+        <div class="settings-group">
+          <label>Avatar (Emoji):</label>
+          <input type="text" id="settings-avatar" maxlength="2" placeholder="🌀">
+        </div>
+        <div class="settings-group">
+          <label>Nome de Exibição:</label>
+          <input type="text" id="settings-displayname" placeholder="Seu Nome">
+        </div>
+        <div class="settings-group">
+          <label>Username:</label>
+          <input type="text" id="settings-username" placeholder="@usuario">
+        </div>
+        <button class="btn-primary" onclick="saveProfileSettings()">Salvar Alterações</button>
+
+        <hr style="border-color: rgba(168, 85, 247, 0.2); margin: 15px 0;">
         <h2>Vortex OS</h2>
-        <p><strong>Versão do Sistema:</strong> 1.2</p>
+        <p><strong>Versão do Sistema:</strong> 1.3</p>
         <p><strong>Cor Base:</strong> Roxo (Deep Purple Glass)</p>
         <p><strong>Usuário Ativo:</strong> <span id="current-user-display">--</span></p>
-        <p><strong>Status:</strong> Autenticado com Sucesso</p>
       </div>
     </div>
 
-    <!-- Menu Iniciar (Windows Style) -->
+    <!-- MENU INICIAR -->
     <div id="start-menu" class="hidden">
       <div class="start-header">
         <span>🌀 Vortex OS Menu</span>
       </div>
       <div class="start-apps">
+        <div class="start-item" onclick="openWindow('chrome'); toggleStartMenu();">
+          <span>🌐</span> Vortex Chrome
+        </div>
+        <div class="start-item" onclick="openWindow('sitebuilder'); toggleStartMenu();">
+          <span>🛠️</span> Criador de Sites
+        </div>
+        <div class="start-item" onclick="openWindow('messenger'); toggleStartMenu();">
+          <span>💬</span> Vortex Messenger
+        </div>
         <div class="start-item" onclick="openWindow('notepad'); toggleStartMenu();">
           <span>📝</span> Bloco de Notas
         </div>
