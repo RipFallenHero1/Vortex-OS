@@ -3,219 +3,122 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vortex OS 1.3</title>
-  <!-- Tailwind CSS via CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  <title>Vortex OS v1.2</title>
   <link rel="stylesheet" href="style.css">
+  
+  <!-- SDKs do Firebase (Versão Compatível para JS Puro) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 </head>
-<body class="bg-slate-950 text-slate-100 font-sans overflow-hidden select-none bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-indigo-950 to-slate-950 h-screen w-screen relative">
+<body>
 
-  <!-- ========================================== -->
-  <!-- ÁREA DE TRABALHO / DESKTOP                 -->
-  <!-- ========================================== -->
-  <div class="p-6 grid grid-cols-1 gap-6 w-32">
-    <!-- Atalho Navegador -->
-    <button onclick="openApp('browser-app')" class="flex flex-col items-center justify-center p-3 rounded-xl hover:bg-slate-800/40 hover:backdrop-blur-sm transition group border border-transparent hover:border-slate-700/50">
-      <div class="p-3 bg-slate-900/60 rounded-2xl group-hover:scale-105 transition-transform border border-slate-800 shadow-md">
-        <svg class="w-8 h-8 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4" />
-          <line x1="21.17" y1="8" x2="12" y2="8" /><line x1="3.95" y1="6.06" x2="8.54" y2="14" />
-          <line x1="10.88" y1="21.94" x2="15.46" y2="14" />
-        </svg>
-      </div>
-      <span class="text-xs mt-2 text-slate-300 text-center font-medium group-hover:text-white">Navegador Vortex</span>
-    </button>
-
-    <!-- Atalho Criador de Sites -->
-    <button onclick="openApp('studio-app')" class="flex flex-col items-center justify-center p-3 rounded-xl hover:bg-slate-800/40 hover:backdrop-blur-sm transition group border border-transparent hover:border-slate-700/50">
-      <div class="p-3 bg-slate-900/60 rounded-2xl group-hover:scale-105 transition-transform border border-slate-800 shadow-md">
-        <svg class="w-8 h-8 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
-        </svg>
-      </div>
-      <span class="text-xs mt-2 text-slate-300 text-center font-medium group-hover:text-white">Vortex Web Studio</span>
-    </button>
+  <!-- 1. TELA DE BOOT -->
+  <div id="boot-screen">
+    <div class="boot-logo">🌀</div>
+    <div class="boot-spinner"></div>
+    <p>Iniciando Vortex OS...</p>
   </div>
 
-  <!-- ========================================== -->
-  <!-- JANELA 1: NAVEGADOR VORTEX (ESTILO CHROME)  -->
-  <!-- ========================================== -->
-  <div id="browser-app" class="window hidden absolute top-10 left-10 right-10 bottom-16 bg-slate-900 border border-slate-700/60 rounded-xl shadow-2xl flex flex-col overflow-hidden z-30">
-    <!-- Barra de Abas -->
-    <div class="bg-slate-950 px-3 pt-2 flex items-center justify-between border-b border-slate-800">
-      <div class="flex items-center gap-2">
-        <div class="flex items-center gap-2 bg-slate-900 px-4 py-1.5 rounded-t-lg border-t border-x border-slate-700 text-xs text-slate-200 font-medium w-52 truncate">
-          <svg class="w-3.5 h-3.5 text-cyan-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4" />
-          </svg>
-          <span id="browser-tab-title" class="truncate">meusite.vort</span>
-        </div>
-      </div>
-      <button onclick="closeApp('browser-app')" class="px-3 py-1 text-slate-400 hover:bg-red-500 hover:text-white rounded text-xs transition">✕</button>
-    </div>
+  <!-- 2. TELA DE LOGIN / CADASTRO -->
+  <div id="auth-screen" class="hidden">
+    <div class="auth-clock" id="auth-clock">00:00</div>
+    <div class="auth-card">
+      <div class="user-avatar">🌀</div>
 
-    <!-- Barra de URL / Ferramentas -->
-    <div class="bg-slate-900 p-2 flex items-center gap-2 border-b border-slate-800">
-      <button onclick="reloadBrowser()" class="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition" title="Recarregar">
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M23 4v6h-6" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-        </svg>
-      </button>
-
-      <form onsubmit="handleBrowserSearch(event)" class="flex-1">
-        <input 
-          id="browser-url-input" 
-          type="text" 
-          value="meusite.vort" 
-          placeholder="Digite um domínio .vort (ex: meusite.vort)" 
-          class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 transition font-mono"
-        >
+      <!-- FORMULÁRIO 1: PRIMEIRO ACESSO (CADASTRO) -->
+      <form id="register-form" class="auth-form">
+        <h2>Criar Conta no Vortex OS</h2>
+        <input type="text" id="reg-username" placeholder="Nome de Usuário" required>
+        <input type="password" id="reg-password" placeholder="Senha" required>
+        <input type="password" id="reg-pin" placeholder="Criar PIN (4 dígitos)" maxlength="4" required>
+        <button type="submit" class="btn-primary">Criar Conta</button>
+        <button type="button" id="google-btn" class="btn-google">🌐 Entrar com Google</button>
       </form>
 
-      <button onclick="toggleHistoryDrawer()" class="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition" title="Histórico">
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
-        </svg>
-      </button>
-    </div>
-
-    <!-- Frame do Conteúdo da Web -->
-    <div class="flex-1 relative bg-white">
-      <iframe id="browser-viewport" class="w-full h-full border-0"></iframe>
-
-      <!-- Painel de Histórico (Drawer) -->
-      <div id="history-drawer" class="hidden absolute top-0 right-0 w-64 bottom-0 bg-slate-900/95 backdrop-blur-md border-l border-slate-800 p-4 shadow-xl overflow-y-auto z-10">
-        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Histórico de Visitas</h4>
-        <div id="history-list" class="space-y-1"></div>
-      </div>
+      <!-- FORMULÁRIO 2: LOGIN SUBSEQUENTE (PIN) -->
+      <form id="login-form" class="auth-form hidden">
+        <h2 id="welcome-user">Bem-vindo!</h2>
+        <p class="auth-subtitle">Insira seu PIN para desbloquear</p>
+        <input type="text" id="login-username" placeholder="Usuário" required>
+        <input type="password" id="login-pin" placeholder="PIN" maxlength="4" required>
+        <button type="submit" class="btn-primary">Desbloquear</button>
+        <button type="button" id="switch-account-btn" class="btn-link">Trocar ou Criar Conta</button>
+      </form>
     </div>
   </div>
 
-  <!-- ========================================== -->
-  <!-- JANELA 2: VORTEX WEB STUDIO (CRIADOR)     -->
-  <!-- ========================================== -->
-  <div id="studio-app" class="window hidden absolute top-8 left-8 right-8 bottom-16 bg-slate-900 border border-slate-700/60 rounded-xl shadow-2xl flex flex-col overflow-hidden z-30">
-    <!-- Header do Studio -->
-    <div class="bg-slate-950 px-4 py-2 flex items-center justify-between border-b border-slate-800">
-      <div class="flex items-center gap-2 text-indigo-400 font-bold text-xs">
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
-        </svg>
-        <span>Vortex Web Studio - Criador de Sites</span>
-      </div>
-      <button onclick="closeApp('studio-app')" class="px-3 py-1 text-slate-400 hover:bg-red-500 hover:text-white rounded text-xs transition">✕</button>
+  <!-- 3. ÁREA DE TRABALHO -->
+  <main id="desktop" class="hidden">
+    <!-- Ícones -->
+    <div class="app-icon" onclick="openWindow('notepad')">
+      <div class="icon-box">📝</div>
+      <span>Bloco de Notas</span>
     </div>
 
-    <!-- Barra de Configuração de Domínio e Publicação -->
-    <div class="bg-slate-900/90 p-3 border-b border-slate-800 flex items-center justify-between gap-4">
-      <div class="flex items-center gap-2">
-        <span class="text-xs text-slate-400 font-medium">Domínio:</span>
-        <div class="flex items-center bg-slate-950 border border-slate-800 rounded-lg px-2 py-1">
-          <input id="studio-domain-input" type="text" value="meusite" class="bg-transparent text-xs text-slate-200 focus:outline-none font-mono text-right w-32">
-          <span class="text-xs text-indigo-400 font-mono font-bold">.vort</span>
+    <div class="app-icon" onclick="openWindow('settings')">
+      <div class="icon-box">⚙️</div>
+      <span>Configurações</span>
+    </div>
+
+    <!-- Janela: Bloco de Notas -->
+    <div class="window" id="window-notepad">
+      <div class="window-header" onmousedown="startDrag(event, 'window-notepad')">
+        <span class="window-title">📝 Bloco de Notas</span>
+        <div class="window-controls">
+          <button onclick="minimizeWindow('notepad')">🗕</button>
+          <button onclick="maximizeWindow('notepad')">🗖</button>
+          <button class="close-btn" onclick="closeWindow('notepad')">✕</button>
         </div>
       </div>
-
-      <button onclick="publishSite()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 rounded-lg text-xs font-semibold shadow-lg shadow-indigo-600/30 transition">
-        🚀 Publicar Site no Vortex
-      </button>
+      <div class="window-body">
+        <textarea placeholder="Escreva algo no Vortex OS..."></textarea>
+      </div>
     </div>
 
-    <!-- Editor de Código + Prévia -->
-    <div class="flex-1 grid grid-cols-2 divide-x divide-slate-800 overflow-hidden">
-      <!-- Editor de Código -->
-      <div class="flex flex-col bg-slate-950">
-        <!-- Abas do Editor -->
-        <div class="flex bg-slate-900/50 border-b border-slate-800">
-          <button onclick="switchTab('html')" id="tab-html" class="tab-btn active-tab px-4 py-2 text-xs font-mono font-semibold uppercase transition">HTML</button>
-          <button onclick="switchTab('css')" id="tab-css" class="tab-btn px-4 py-2 text-xs font-mono font-semibold uppercase transition text-slate-500">CSS</button>
-          <button onclick="switchTab('js')" id="tab-js" class="tab-btn px-4 py-2 text-xs font-mono font-semibold uppercase transition text-slate-500">JS</button>
-        </div>
-
-        <!-- Textareas de Código -->
-        <textarea id="code-html" class="code-area flex-1 bg-slate-950 text-slate-200 p-4 font-mono text-xs focus:outline-none resize-none leading-relaxed" spellcheck="false"></textarea>
-        <textarea id="code-css" class="code-area hidden flex-1 bg-slate-950 text-slate-200 p-4 font-mono text-xs focus:outline-none resize-none leading-relaxed" spellcheck="false"></textarea>
-        <textarea id="code-js" class="code-area hidden flex-1 bg-slate-950 text-slate-200 p-4 font-mono text-xs focus:outline-none resize-none leading-relaxed" spellcheck="false"></textarea>
-      </div>
-
-      <!-- Prévia em Tempo Real -->
-      <div class="flex flex-col bg-slate-900">
-        <div class="bg-slate-900 px-4 py-2 border-b border-slate-800 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-          Prévia em Tempo Real
-        </div>
-        <div class="flex-1 bg-white">
-          <iframe id="studio-preview" class="w-full h-full border-0"></iframe>
+    <!-- Janela: Configurações -->
+    <div class="window" id="window-settings">
+      <div class="window-header" onmousedown="startDrag(event, 'window-settings')">
+        <span class="window-title">⚙️ Configurações</span>
+        <div class="window-controls">
+          <button onclick="minimizeWindow('settings')">🗕</button>
+          <button onclick="maximizeWindow('settings')">🗖</button>
+          <button class="close-btn" onclick="closeWindow('settings')">✕</button>
         </div>
       </div>
-    </div>
-  </div>
-
-  <!-- ========================================== -->
-  <!-- MENU INICIAR (VORTEX MENU - ESTILO WINDOWS)-->
-  <!-- ========================================== -->
-  <div id="start-menu" class="hidden absolute bottom-14 left-3 w-80 bg-slate-900/90 backdrop-blur-xl border border-slate-700/50 rounded-xl shadow-2xl p-4 z-50">
-    <div class="flex items-center gap-3 pb-3 border-b border-slate-800">
-      <div class="p-2 bg-indigo-600/30 text-indigo-400 rounded-lg">
-        <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12" stroke-linecap="round" />
-          <path d="M12 6C8.68 6 6 8.68 6 12C6 15.32 8.68 18 12 18" stroke-linecap="round" />
-          <circle cx="12" cy="12" r="2" fill="currentColor" />
-        </svg>
-      </div>
-      <div>
-        <p class="font-bold text-sm">Vortex OS</p>
-        <p class="text-xs text-slate-400">Versão 1.3 Pro</p>
+      <div class="window-body">
+        <h2>Vortex OS</h2>
+        <p><strong>Versão do Sistema:</strong> 1.2</p>
+        <p><strong>Cor Base:</strong> Roxo (Deep Purple Glass)</p>
+        <p><strong>Usuário Ativo:</strong> <span id="current-user-display">--</span></p>
+        <p><strong>Status:</strong> Autenticado com Sucesso</p>
       </div>
     </div>
 
-    <div class="py-3 space-y-1">
-      <button onclick="openApp('browser-app'); toggleStartMenu();" class="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-indigo-600/20 hover:text-indigo-300 rounded-lg transition">
-        <svg class="w-5 h-5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4" />
-        </svg>
-        Navegador Vortex
-      </button>
-      <button onclick="openApp('studio-app'); toggleStartMenu();" class="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-indigo-600/20 hover:text-indigo-300 rounded-lg transition">
-        <svg class="w-5 h-5 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
-        </svg>
-        Vortex Web Studio (Criador)
-      </button>
+    <!-- Menu Iniciar (Windows Style) -->
+    <div id="start-menu" class="hidden">
+      <div class="start-header">
+        <span>🌀 Vortex OS Menu</span>
+      </div>
+      <div class="start-apps">
+        <div class="start-item" onclick="openWindow('notepad'); toggleStartMenu();">
+          <span>📝</span> Bloco de Notas
+        </div>
+        <div class="start-item" onclick="openWindow('settings'); toggleStartMenu();">
+          <span>⚙️</span> Configurações
+        </div>
+      </div>
+      <div class="start-footer">
+        <span id="start-user-name">Usuário</span>
+        <button onclick="lockSystem()" class="btn-lock">🔒 Bloquear</button>
+      </div>
     </div>
-  </div>
+  </main>
 
-  <!-- ========================================== -->
-  <!-- BARRA DE TAREFAS (TASKBAR WINDOWS ESTILO) -->
-  <!-- ========================================== -->
-  <div class="absolute bottom-0 left-0 right-0 h-12 bg-slate-900/80 backdrop-blur-md border-t border-slate-800/80 flex items-center justify-between px-3 z-40">
-    <div class="flex items-center gap-2">
-      <!-- BOTÃO VORTEX (NO CANTO ESQUERDO IGUAL WINDOWS) -->
-      <button id="start-button" onclick="toggleStartMenu()" class="p-2 rounded-lg transition-all flex items-center justify-center hover:bg-slate-800 text-slate-300 hover:text-white" title="Iniciar Vortex">
-        <svg class="w-5 h-5 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12" stroke-linecap="round" />
-          <path d="M12 6C8.68 6 6 8.68 6 12C6 15.32 8.68 18 12 18" stroke-linecap="round" />
-          <circle cx="12" cy="12" r="2" fill="currentColor" />
-        </svg>
-      </button>
-
-      <div class="h-5 w-[1px] bg-slate-800 mx-1"></div>
-
-      <!-- Ícones Fixados na Taskbar -->
-      <button onclick="openApp('browser-app')" class="p-2 rounded-lg hover:bg-slate-800/50 transition">
-        <svg class="w-5 h-5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4" />
-        </svg>
-      </button>
-      <button onclick="openApp('studio-app')" class="p-2 rounded-lg hover:bg-slate-800/50 transition">
-        <svg class="w-5 h-5 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
-        </svg>
-      </button>
-    </div>
-
-    <!-- Relógio do Sistema -->
-    <div id="system-clock" class="text-xs text-slate-400 font-medium px-2">00:00</div>
-  </div>
+  <!-- 4. BARRA DE TAREFAS -->
+  <footer id="taskbar" class="hidden">
+    <button id="start-btn" onclick="toggleStartMenu()">🌀 Vortex</button>
+    <div id="clock">00:00:00</div>
+  </footer>
 
   <script src="script.js"></script>
 </body>
