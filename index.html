@@ -142,7 +142,7 @@
       </div>
     </div>
 
-    <!-- JANELA 3: VORTEX MESSENGER -->
+  <!-- JANELA 3: VORTEX MESSENGER (ATUALIZADA) -->
     <div class="window window-large" id="window-messenger">
       <div class="window-header" onmousedown="startDrag(event, 'window-messenger')">
         <span class="window-title">💬 Vortex Messenger</span>
@@ -155,10 +155,10 @@
       <div class="messenger-container">
         <!-- Sidebar Servidores (Discord Style) -->
         <div class="msgr-servers" id="msgr-servers-list">
-          <div class="server-icon active" onclick="switchMsgrView('dm')" title="Mensagens Diretas">💬</div>
+          <div class="server-icon active" id="server-icon-dm" onclick="switchMsgrView('dm')" title="Mensagens Diretas">💬</div>
           <div class="server-divider"></div>
-          <!-- Servidores entram aqui -->
-          <div class="server-icon add-server" onclick="promptCreateServer()" title="Criar ou Entrar em Servidor">+</div>
+          <!-- Servidores entram aqui dinamicamente -->
+          <div class="server-icon add-server" onclick="openMsgrServerModal()" title="Criar ou Entrar em Servidor">+</div>
         </div>
 
         <!-- Lista de Canais / Amigos -->
@@ -187,6 +187,33 @@
             <button onclick="sendMsgrMessage()">Enviar</button>
           </div>
         </div>
+
+        <!-- MODAL: CRIAR / ENTRAR EM SERVIDOR -->
+        <div class="msgr-modal hidden" id="msgr-modal-server">
+          <div class="msgr-modal-card">
+            <h3>Entrar ou Criar Servidor</h3>
+            <p>Digite um Código de Convite existente (ex: <code>VTX-COMM</code>) ou um nome para criar um novo servidor.</p>
+            <input type="text" id="msgr-server-input" placeholder="Ex: Servidor do Mano ou VTX-1234">
+            <div class="msgr-modal-buttons">
+              <button class="btn-secondary" onclick="closeMsgrServerModal()">Cancelar</button>
+              <button class="btn-primary" onclick="confirmCreateServer()">Confirmar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- MODAL: ADICIONAR AMIGO -->
+        <div class="msgr-modal hidden" id="msgr-modal-friend">
+          <div class="msgr-modal-card">
+            <h3>Adicionar Amigo</h3>
+            <p>Insira o nome de usuário do seu amigo para iniciar uma conversa direta.</p>
+            <input type="text" id="msgr-friend-input" placeholder="Ex: mano_script">
+            <div class="msgr-modal-buttons">
+              <button class="btn-secondary" onclick="closeMsgrFriendModal()">Cancelar</button>
+              <button class="btn-primary" onclick="confirmAddFriend()">Adicionar</button>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
 
