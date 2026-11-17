@@ -1,78 +1,77 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="dark">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="theme-color" content="#04060f" />
-<title>VORTEX 4 — Sistema</title>
+<meta name="theme-color" content="#08040f" />
+<title>VORTEX 4 — vortexOS 4.02</title>
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-<div id="bg-particles"></div>
+<div class="bg-wave"></div>
 
 <!-- ================= BOOT ================= -->
 <section class="screen active" id="screen-boot">
-  <div class="boot-logo">
-    <div class="vortex-mark">V</div>
-    <h1>VORTEX<span>4</span></h1>
-    <p class="boot-sub">Vortex OS 4.02 — Iniciando sistema</p>
-    <div class="boot-bar"><div class="boot-bar-fill"></div></div>
-    <p class="boot-hint">Carregando módulos…</p>
+  <div class="boot-vortex"></div>
+  <div class="boot-content">
+    <div class="boot-logo">V</div>
+    <h1 class="boot-title">VORTEX <span>4</span></h1>
+    <div class="boot-progress"><div class="boot-progress-fill"></div></div>
+    <p class="boot-tip">vortexOS 4.02</p>
   </div>
 </section>
 
 <!-- ================= PERFIS ================= -->
 <section class="screen" id="screen-profiles">
-  <header class="mini-top">
-    <span class="brand-mini">VORTEX<span>4</span></span>
-    <span class="clock"></span>
-  </header>
-
-  <div class="profiles-wrap">
-    <h2>Quem está jogando?</h2>
-    <div class="profiles-list" id="profiles-list"></div>
-    <p class="hint">← → navegar · Enter entrar · duplo clique loga · ✕ apaga</p>
+  <div class="profiles-header">
+    <span class="brand-mark">VORTEX <span>4</span></span>
+    <span class="clock" data-clock></span>
   </div>
+  <h2 class="profiles-title">Quem está usando este Vortex 4?</h2>
+  <div class="profiles-row" id="profiles-row"></div>
+  <p class="profiles-hint">← → navegar · Enter confirmar · ✕ remover</p>
 </section>
 
-<!-- ================= MENU ================= -->
+<!-- ================= HOME ================= -->
 <section class="screen" id="screen-menu">
-  <header class="menu-top">
-    <div class="user-chip">
-      <div class="avatar" id="user-avatar">V</div>
-      <div class="user-txt">
-        <strong id="user-name">Jogador</strong>
-        <span>Online</span>
-      </div>
+  <div class="home-bg" id="home-bg"></div>
+
+  <header class="home-topbar">
+    <div class="user-badge" id="user-badge">
+      <div class="user-avatar" id="user-avatar">V</div>
+      <span id="user-name">Jogador</span>
     </div>
-
-    <nav class="menu-tabs">
-      <button class="tab active">Jogos</button>
-      <button class="tab">Biblioteca</button>
-      <button class="tab">Loja</button>
-      <button class="tab">Configurações</button>
+    <nav class="topbar-nav">
+      <button class="topbar-btn" data-action="notifications" title="Notificações">🔔</button>
+      <button class="topbar-btn" data-action="settings" title="Configurações">⚙️</button>
+      <button class="topbar-btn" data-action="power" title="Desligar">⏻</button>
     </nav>
-
-    <span class="clock"></span>
+    <span class="topbar-clock" data-clock></span>
   </header>
 
-  <div class="menu-body">
-    <div class="game-info">
-      <span class="game-badge" id="game-badge">AÇÃO</span>
-      <h2 id="game-title">—</h2>
-      <p id="game-desc">—</p>
-      <div class="info-actions">
-        <button class="btn-play" id="btn-play">▶ Iniciar</button>
-        <button class="btn-ghost" id="btn-logout">Sair do perfil</button>
+  <main class="home-main">
+    <div class="hero">
+      <span class="hero-genre" id="hero-genre">—</span>
+      <h1 class="hero-title" id="hero-title">—</h1>
+      <p class="hero-desc" id="hero-desc">—</p>
+      <div class="hero-meta" id="hero-meta"></div>
+      <div class="hero-actions">
+        <button class="btn-primary" id="btn-play">▶ Iniciar</button>
+        <button class="btn-ghost" id="btn-trophies">🏆 Troféus</button>
       </div>
     </div>
-  </div>
+  </main>
 
-  <div class="carousel-wrap">
+  <div class="home-carousel" id="home-carousel">
     <div class="carousel-track" id="carousel-track"></div>
   </div>
 
-  <div class="menu-hint">← → navegar · Enter iniciar · Esc sair do perfil</div>
+  <div class="home-quickbar">
+    <button class="quick-btn" data-action="library">📚 Biblioteca</button>
+    <button class="quick-btn" data-action="trophies">🏆 Troféus</button>
+    <button class="quick-btn" data-action="settings">⚙️ Configurações</button>
+    <button class="quick-btn" data-action="logout">🚪 Sair do perfil</button>
+  </div>
 </section>
 
 <!-- ================= LAUNCH ================= -->
@@ -81,41 +80,125 @@
   <div class="launch-content">
     <div class="launch-icon" id="launch-icon">🎮</div>
     <h1 id="launch-title">—</h1>
-    <div class="launch-bar"><div class="launch-bar-fill" id="launch-fill"></div></div>
+    <div class="launch-bar"><div class="launch-fill" id="launch-fill"></div></div>
     <p class="launch-status" id="launch-status">Carregando…</p>
-    <p class="launch-play" id="launch-play">Pressione <kbd>Esc</kbd> para voltar ao menu</p>
   </div>
+</section>
+
+<!-- ================= GAME (VORTEX REFLEX) ================= -->
+<section class="screen" id="screen-game">
+  <header class="game-hud">
+    <button class="btn-ghost" id="btn-game-exit">✕ Sair</button>
+    <div class="hud-stat">Pontos <strong id="game-score">0</strong></div>
+    <div class="hud-stat">Tempo <strong id="game-time">30</strong>s</div>
+  </header>
+
+  <div class="game-playfield" id="game-playfield">
+    <div class="game-intro" id="game-intro">
+      <div class="intro-icon">⚡</div>
+      <h2>Vortex Reflex</h2>
+      <p>Clique nos alvos antes que desapareçam.<br/>Você tem <strong>30 segundos</strong> para fazer o máximo de pontos!</p>
+      <button class="btn-primary" id="btn-game-start">Começar</button>
+    </div>
+
+    <div class="game-over" id="game-over">
+      <h2>Fim de jogo!</h2>
+      <p class="final-score">Você fez <strong id="game-final-score">0</strong> pontos</p>
+      <p class="game-reward" id="game-reward"></p>
+      <div class="game-over-actions">
+        <button class="btn-primary" id="btn-game-again">Jogar de novo</button>
+        <button class="btn-ghost" id="btn-game-back">Voltar ao menu</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= SETTINGS ================= -->
+<section class="screen" id="screen-settings">
+  <header class="sub-header">
+    <button class="btn-ghost" id="btn-settings-back">← Voltar</button>
+    <h2>Configurações</h2>
+  </header>
+  <div class="settings-body">
+    <div class="settings-item">
+      <div class="settings-info">
+        <strong>Tema do sistema</strong>
+        <p>Alterna entre modo escuro e claro</p>
+      </div>
+      <div class="theme-switch" id="theme-switch">
+        <button class="theme-opt" data-theme="dark">🌙 Escuro</button>
+        <button class="theme-opt" data-theme="light">☀️ Claro</button>
+      </div>
+    </div>
+    <div class="settings-item">
+      <div class="settings-info">
+        <strong>Som da interface</strong>
+        <p>Bipes ao navegar e alertas</p>
+      </div>
+      <button class="btn-toggle" id="sound-toggle">Ativado</button>
+    </div>
+    <div class="settings-item">
+      <div class="settings-info">
+        <strong>Versão do sistema</strong>
+        <p>vortexOS 4.02 · build 2026.11</p>
+      </div>
+      <span class="settings-badge">Estável</span>
+    </div>
+    <div class="settings-item danger">
+      <div class="settings-info">
+        <strong>Apagar todos os perfis</strong>
+        <p>Remove perfis, troféus e recordes salvos</p>
+      </div>
+      <button class="btn-ghost btn-danger" id="btn-reset">Apagar tudo</button>
+    </div>
+  </div>
+</section>
+
+<!-- ================= TROPHIES ================= -->
+<section class="screen" id="screen-trophies">
+  <header class="sub-header">
+    <button class="btn-ghost" id="btn-trophies-back">← Voltar</button>
+    <h2>🏆 Troféus de <span id="trophies-owner">Jogador</span></h2>
+  </header>
+  <div class="trophies-body" id="trophies-body"></div>
 </section>
 
 <!-- ================= MODAL CRIAR PERFIL ================= -->
 <div class="modal-overlay" id="modal-create">
   <div class="modal">
     <h3>Criar novo perfil</h3>
-
     <label class="field">
       <span>Nome</span>
       <input id="input-name" type="text" maxlength="14" placeholder="Jogador" autocomplete="off" />
     </label>
-
     <div class="field">
       <span>Avatar</span>
       <div class="picker" id="picker-avatar"></div>
     </div>
-
     <div class="field">
       <span>Cor</span>
       <div class="picker" id="picker-color"></div>
     </div>
-
     <div class="modal-actions">
       <button class="btn-ghost" id="btn-cancel">Cancelar</button>
-      <button class="btn" id="btn-confirm">Criar perfil</button>
+      <button class="btn-primary" id="btn-confirm">Criar perfil</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL POWER ================= -->
+<div class="modal-overlay" id="modal-power">
+  <div class="modal modal-sm">
+    <h3>Desligar o Vortex 4?</h3>
+    <p style="color:var(--muted);margin-top:8px;font-size:14px">O console entrará em modo de espera.</p>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="btn-power-cancel">Cancelar</button>
+      <button class="btn-primary" id="btn-power-confirm">Desligar</button>
     </div>
   </div>
 </div>
 
 <div id="toast" class="toast"></div>
-
 <script src="script.js"></script>
 </body>
 </html>
