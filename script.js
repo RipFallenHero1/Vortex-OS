@@ -1,528 +1,410 @@
-// === CONFIGURAÇÃO FIREBASE ===
-const firebaseConfig = {
-  apiKey: "AIzaSyCdivWo9znhaRLQyK01ZXvOQMe1jUB98w4",
-  authDomain: "vortex-os-3f1d8.firebaseapp.com",
-  databaseURL: "https://vortex-os-3f1d8-default-rtdb.firebaseio.com",
-  projectId: "vortex-os-3f1d8",
-  storageBucket: "vortex-os-3f1d8.firebasestorage.app",
-  messagingSenderId: "203433581297",
-  appId: "1:203433581297:web:62bebe9a7bf1e46c276750",
-  measurementId: "G-317ZP7P907"
-};
+/* =========================================================
+   VORTEX 4 — vortexOS 4.02 (demo de interface)
+   ========================================================= */
+const $  = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s).replace(/[&<>"']/g, c => (
+  { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]
+));
 
-if (!firebase.apps.length) {
-  firebase.initializeApp(firebaseConfig);
-}
-
-// === BOOT E INICIALIZAÇÃO ===
-window.addEventListener('load', () => {
-  setTimeout(() => {
-    document.getElementById('boot-screen').classList.add('hidden');
-    document.getElementById('auth-screen').classList.remove('hidden');
-    checkUserRegistrationStatus();
-    initSystemApps();
-  }, 2500);
-});
-
-// === RELÓGIOS ===
-function updateClocks() {
-  const now = new Date();
-  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  const shortTimeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  
-  document.getElementById('clock').textContent = timeStr;
-  document.getElementById('auth-clock').textContent = shortTimeStr;
-}
-setInterval(updateClocks, 1000);
-updateClocks();
-
-// === GERENCIAMENTO DE PERFIL E AUTENTICAÇÃO ===
-let currentUser = {
-  username: 'usuario',
-  displayName: 'Usuário',
-  avatar: '🌀'
-};
-
-const registerForm = document.getElementById('register-form');
-const loginForm = document.getElementById('login-form');
-const switchAccountBtn = document.getElementById('switch-account-btn');
-
-function checkUserRegistrationStatus() {
-  const savedUser = localStorage.getItem('vortex_username');
-  const savedDisplay = localStorage.getItem('vortex_displayname') || savedUser;
-  const savedAvatar = localStorage.getItem('vortex_avatar') || '🌀';
-  
-  if (savedUser) {
-    currentUser = { username: savedUser, displayName: savedDisplay, avatar: savedAvatar };
-    registerForm.classList.add('hidden');
-    loginForm.classList.remove('hidden');
-    document.getElementById('welcome-user').textContent = `Olá, ${savedDisplay}!`;
-    document.getElementById('login-username').value = savedUser;
-    document.getElementById('login-avatar-display').textContent = savedAvatar;
-  } else {
-    registerForm.classList.remove('hidden');
-    loginForm.classList.add('hidden');
+/* ---------------- áudio (bipes de interface) ---------------- */
+let actx = null;
+function initAudio() {
+  if (!actx) {
+    try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; }
   }
+  if (actx && actx.state === 'suspended') actx.resume();
+}
+function beep(freq = 520, dur = 0.07, type = 'sine', vol = 0.03) {
+  if (!actx) return;
+  const o = actx.createOscillator();
+  const g = actx.createGain();
+  o.type = type;
+  o.frequency.value = freq;
+  g.gain.setValueAtTime(vol, actx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + dur);
+  o.connect(g).connect(actx.destination);
+  o.start();
+  o.stop(actx.currentTime + dur);
+}
+window.addEventListener('pointerdown', initAudio, { once: true });
+
+/* ---------------- estado / telas ---------------- */
+let currentScreen = 'screen-boot';
+
+function showScreen(id) {
+  $$('.screen').forEach(s => s.classList.toggle('active', s.id === id));
+  currentScreen = id;
+  if (id === 'screen-menu') requestAnimationFrame(updateCarousel);
 }
 
-registerForm.addEventListener('submit', (e) => {
-  e.preventDefault();
-  const username = document.getElementById('reg-username').value;
-  const pin = document.getElementById('reg-pin').value;
+/* ---------------- dados ---------------- */
+const AVATARS = ['🎮','😎','👾','🐉','🦊','🤖','🐺','🦄','🔥','⭐','🌙','🍕'];
+const COLORS = [
+  ['#00e5ff','#0047ff'],
+  ['#ff2e88','#6a00ff'],
+  ['#ffcc00','#ff5e00'],
+  ['#00ffa3','#00b3ff'],
+  ['#c86bff','#3a00a0'],
+  ['#ff6b6b','#a80000'],
+];
 
-  localStorage.setItem('vortex_username', username);
-  localStorage.setItem('vortex_displayname', username);
-  localStorage.setItem('vortex_avatar', '🌀');
-  localStorage.setItem('vortex_pin', pin);
+const GAMES = [
+  { title:'Neon Drift',     genre:'Corrida',   emoji:'🏎️', c1:'#00e5ff', c2:'#0047ff',
+    desc:'Corra por uma metrópole cyberpunk em alta velocidade. Reflexos rápidos, música alta e derrapagens impossíveis.' },
+  { title:'Void Hunter',    genre:'Ação',      emoji:'🚀', c1:'#ff2e88', c2:'#6a00ff',
+    desc:'Caça recompensas em setores abandonados do espaço. Cada nave inimiga esconde um segredo do Vazio.' },
+  { title:'Pixel Kingdoms', genre:'RPG',       emoji:'⚔️', c1:'#ffcc00', c2:'#ff5e00',
+    desc:'Reconstrua um reino em 8 bits, recrute heróis e derrote o Lorde das Sombras — tudo em turnos clássicos.' },
+  { title:'Abyss Dive',     genre:'Aventura',  emoji:'🌊', c1:'#00ffa3', c2:'#0066ff',
+    desc:'Mergulhe em fossas oceânicas desconhecidas, gerencie oxigênio e descubra ruínas de uma civilização submersa.' },
+  { title:'Ghost Protocol', genre:'Stealth',   emoji:'👻', c1:'#b0b8ff', c2:'#3a2a7a',
+    desc:'Você é o fantasma que ninguém vê. Hackeie, infiltre e desapareça antes que o alarme toque.' },
+  { title:'Storm Riders',   genre:'Esporte',   emoji:'🏂', c1:'#ff9a00', c2:'#ff2d00',
+    desc:'Desça montanhas em tempestades absurdas. Truques impossíveis, física duvidosa e muita adrenalina.' },
+  { title:'Orbit Wars',     genre:'Estratégia',emoji:'🛸', c1:'#7cf5ff', c2:'#0051ff',
+    desc:'Comande frotas orbitais, negocie com colônias e domine o sistema em batalhas por turnos.' },
+  { title:'Rune Legacy',    genre:'RPG',       emoji:'🔮', c1:'#c86bff', c2:'#4a00a0',
+    desc:'Desvende runas ancestrais, combine magias e escreva sua própria lenda em um mundo aberto gigantesco.' },
+];
 
-  currentUser = { username, displayName: username, avatar: '🌀' };
-  enterSystem();
-});
+/* ---------------- perfis ---------------- */
+let profiles = loadProfiles();
+let profileIndex = 0;
+let currentProfile = null;
 
-loginForm.addEventListener('submit', (e) => {
-  e.preventDefault();
-  const usernameInput = document.getElementById('login-username').value;
-  const pinInput = document.getElementById('login-pin').value;
-  
-  const savedUser = localStorage.getItem('vortex_username');
-  const savedPin = localStorage.getItem('vortex_pin');
+function loadProfiles() {
+  try { return JSON.parse(localStorage.getItem('vortex4.profiles')) || []; }
+  catch (e) { return []; }
+}
+function saveProfiles() {
+  localStorage.setItem('vortex4.profiles', JSON.stringify(profiles));
+}
 
-  if (usernameInput === savedUser && pinInput === savedPin) {
-    enterSystem();
-  } else {
-    alert('Usuário ou PIN incorretos!');
-  }
-});
+function renderProfiles() {
+  const list = $('#profiles-list');
+  list.innerHTML = '';
 
-document.getElementById('google-btn').addEventListener('click', () => {
-  const provider = new firebase.auth.GoogleAuthProvider();
-  firebase.auth().signInWithPopup(provider)
-    .then((result) => {
-      const name = result.user.displayName || 'Usuário Google';
-      localStorage.setItem('vortex_username', 'google_user');
-      localStorage.setItem('vortex_displayname', name);
-      localStorage.setItem('vortex_avatar', '🌐');
-      localStorage.setItem('vortex_pin', '1234');
-      currentUser = { username: 'google_user', displayName: name, avatar: '🌐' };
-      enterSystem();
-    })
-    .catch(() => {
-      localStorage.setItem('vortex_username', 'google_user');
-      localStorage.setItem('vortex_displayname', 'Usuário Google');
-      localStorage.setItem('vortex_avatar', '🌐');
-      localStorage.setItem('vortex_pin', '1234');
-      currentUser = { username: 'google_user', displayName: 'Usuário Google', avatar: '🌐' };
-      enterSystem();
+  profiles.forEach((p, i) => {
+    const card = document.createElement('div');
+    card.className = 'profile-card' + (i === profileIndex ? ' selected' : '');
+    card.innerHTML = `
+      <div class="profile-avatar" style="background:linear-gradient(145deg, ${p.color[0]}, ${p.color[1]})">${p.avatar}</div>
+      <span class="profile-name">${esc(p.name)}</span>
+      <button class="profile-del" title="Excluir perfil">✕</button>
+    `;
+    card.addEventListener('click', () => {
+      profileIndex = i;
+      beep(620);
+      renderProfiles();
     });
+    card.addEventListener('dblclick', () => loginAs(i));
+    card.querySelector('.profile-del').addEventListener('click', e => {
+      e.stopPropagation();
+      profiles.splice(i, 1);
+      saveProfiles();
+      profileIndex = Math.max(0, Math.min(profileIndex, profiles.length));
+      beep(240, .13, 'sawtooth');
+      renderProfiles();
+    });
+    list.appendChild(card);
+  });
+
+  // card "novo perfil"
+  const add = document.createElement('div');
+  add.className = 'profile-card' + (profileIndex === profiles.length ? ' selected' : '');
+  add.innerHTML = `
+    <div class="profile-avatar add-avatar">+</div>
+    <span class="profile-name">Novo Perfil</span>
+  `;
+  add.addEventListener('click', () => {
+    profileIndex = profiles.length;
+    renderProfiles();
+    openModal();
+  });
+  list.appendChild(add);
+}
+
+function loginAs(i) {
+  const p = profiles[i];
+  if (!p) return;
+  currentProfile = p;
+
+  $('#user-name').textContent = p.name;
+  const av = $('#user-avatar');
+  av.textContent = p.avatar;
+  av.style.background = `linear-gradient(145deg, ${p.color[0]}, ${p.color[1]})`;
+
+  showScreen('screen-menu');
+  gameIndex = 0;
+  renderCarousel();
+  beep(1040, .12, 'triangle');
+}
+
+function logout() {
+  beep(400, .1, 'sine');
+  profileIndex = Math.max(0, profiles.indexOf(currentProfile));
+  renderProfiles();
+  showScreen('screen-profiles');
+}
+
+/* ---------------- modal criar perfil ---------------- */
+let newAvatar = AVATARS[0];
+let newColor = COLORS[0];
+
+function openModal() {
+  if (profiles.length >= 8) { toast('Limite de 8 perfis atingido 😅'); return; }
+  newAvatar = AVATARS[Math.floor(Math.random() * AVATARS.length)];
+  newColor = COLORS[Math.floor(Math.random() * COLORS.length)];
+  $('#input-name').value = '';
+  buildPickers();
+  $('#modal-create').classList.add('open');
+  setTimeout(() => $('#input-name').focus(), 130);
+  beep(700, .08, 'triangle');
+}
+function closeModal() {
+  $('#modal-create').classList.remove('open');
+}
+function buildPickers() {
+  const pa = $('#picker-avatar');
+  pa.innerHTML = '';
+  AVATARS.forEach(a => {
+    const b = document.createElement('button');
+    b.className = 'pick' + (a === newAvatar ? ' sel' : '');
+    b.textContent = a;
+    b.onclick = () => { newAvatar = a; beep(760); buildPickers(); };
+    pa.appendChild(b);
+  });
+
+  const pc = $('#picker-color');
+  pc.innerHTML = '';
+  COLORS.forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'pick color' + (c === newColor ? ' sel' : '');
+    b.style.background = `linear-gradient(145deg, ${c[0]}, ${c[1]})`;
+    b.onclick = () => { newColor = c; beep(760); buildPickers(); };
+    pc.appendChild(b);
+  });
+}
+
+$('#btn-cancel').addEventListener('click', closeModal);
+$('#modal-create').addEventListener('click', e => {
+  if (e.target.id === 'modal-create') closeModal();
 });
 
-switchAccountBtn.addEventListener('click', () => {
-  loginForm.classList.add('hidden');
-  registerForm.classList.remove('hidden');
+$('#btn-confirm').addEventListener('click', () => {
+  if (profiles.length >= 8) { toast('Limite de 8 perfis 😅'); return; }
+  const name = ($('#input-name').value || '').trim() || 'Jogador' + (profiles.length + 1);
+  profiles.push({ id: Date.now(), name, avatar: newAvatar, color: newColor });
+  saveProfiles();
+  closeModal();
+  beep(900, .12, 'triangle');
+  loginAs(profiles.length - 1);
 });
 
-function enterSystem() {
-  document.getElementById('auth-screen').classList.add('hidden');
-  document.getElementById('desktop').classList.remove('hidden');
-  document.getElementById('taskbar').classList.remove('hidden');
-  
-  updateProfileUI();
-}
+/* ---------------- menu / carrossel ---------------- */
+let gameIndex = 0;
 
-function updateProfileUI() {
-  document.getElementById('current-user-display').textContent = `${currentUser.displayName} (@${currentUser.username})`;
-  document.getElementById('start-user-name').textContent = currentUser.displayName;
-  
-  // App Chrome Badge
-  document.getElementById('chrome-user-name').textContent = currentUser.displayName;
-  document.getElementById('chrome-user-avatar').textContent = currentUser.avatar;
+function renderCarousel() {
+  const track = $('#carousel-track');
+  track.innerHTML = '';
 
-  // App Messenger Badge
-  document.getElementById('msgr-self-avatar').textContent = currentUser.avatar;
-  document.getElementById('msgr-self-display').textContent = currentUser.displayName;
-  document.getElementById('msgr-self-username').textContent = `@${currentUser.username}`;
-
-  // Inputs de Configurações
-  document.getElementById('settings-avatar').value = currentUser.avatar;
-  document.getElementById('settings-displayname').value = currentUser.displayName;
-  document.getElementById('settings-username').value = currentUser.username;
-}
-
-function saveProfileSettings() {
-  const newAvatar = document.getElementById('settings-avatar').value || '🌀';
-  const newDisplay = document.getElementById('settings-displayname').value || currentUser.username;
-  const newUsername = document.getElementById('settings-username').value || currentUser.username;
-
-  currentUser = { username: newUsername, displayName: newDisplay, avatar: newAvatar };
-  
-  localStorage.setItem('vortex_avatar', newAvatar);
-  localStorage.setItem('vortex_displayname', newDisplay);
-  localStorage.setItem('vortex_username', newUsername);
-
-  updateProfileUI();
-  alert('Perfil atualizado com sucesso!');
-}
-
-function lockSystem() {
-  document.getElementById('desktop').classList.add('hidden');
-  document.getElementById('taskbar').classList.add('hidden');
-  document.getElementById('start-menu').classList.add('hidden');
-  document.getElementById('auth-screen').classList.remove('hidden');
-  checkUserRegistrationStatus();
-}
-
-// === APLICATIVOS VORTEX ===
-
-// 1. VORTEX CHROME & DOMÍNIOS .VORT
-let publishedSites = JSON.parse(localStorage.getItem('vortex_sites') || '{}');
-
-function navigateChrome() {
-  const urlInput = document.getElementById('chrome-url').value.trim().toLowerCase();
-  const frame = document.getElementById('chrome-frame');
-  const tabTitle = document.getElementById('chrome-tab-title');
-
-  if (!urlInput) return;
-
-  let domain = urlInput;
-  if (!domain.endsWith('.vort')) domain += '.vort';
-
-  if (publishedSites[domain]) {
-    const site = publishedSites[domain];
-    tabTitle.textContent = domain;
-    frame.srcdoc = `
-      <html>
-        <head><style>${site.css}</style></head>
-        <body>
-          ${site.html}
-          <script>${site.js}<\/script>
-        </body>
-      </html>
+  GAMES.forEach((g, i) => {
+    const card = document.createElement('button');
+    card.className = 'game-card';
+    card.style.setProperty('--c1', g.c1);
+    card.style.setProperty('--c2', g.c2);
+    card.innerHTML = `
+      <div class="game-art">${g.emoji}</div>
+      <span class="game-genre">${g.genre}</span>
+      <span class="game-name">${g.title}</span>
     `;
-  } else {
-    tabTitle.textContent = 'Pesquisa Vortex';
-    frame.srcdoc = `
-      <div style="font-family: sans-serif; text-align: center; padding: 50px; background: #0f071a; color: white; height: 100vh;">
-        <h1>🌀 Vortex Search</h1>
-        <p style="color: #a855f7;">O site <strong>${domain}</strong> não foi encontrado na rede .vort.</p>
-        <p style="font-size: 12px; color: #aaa;">Crie este site usando o <strong>Criador de Sites</strong>!</p>
-      </div>
-    `;
-  }
+    card.addEventListener('click', () => {
+      if (gameIndex === i) launchGame(i);
+      else { selectGame(i); beep(560); }
+    });
+    track.appendChild(card);
+  });
+
+  selectGame(0);
+  requestAnimationFrame(updateCarousel);
 }
 
-function reloadChrome() {
-  navigateChrome();
+function selectGame(i) {
+  gameIndex = (i + GAMES.length) % GAMES.length;
+  $$('.game-card').forEach((c, idx) => c.classList.toggle('selected', idx === gameIndex));
+
+  const g = GAMES[gameIndex];
+  $('#game-badge').textContent = g.genre;
+  $('#game-title').textContent = g.title;
+  $('#game-desc').textContent = g.desc;
+  updateCarousel();
 }
 
-// 2. CRIADOR DE SITES
-function publishSite() {
-  const domainInput = document.getElementById('builder-domain').value.trim().toLowerCase();
-  const html = document.getElementById('builder-html').value;
-  const css = document.getElementById('builder-css').value;
-  const js = document.getElementById('builder-js').value;
+function updateCarousel() {
+  const wrap = $('.carousel-wrap');
+  const track = $('#carousel-track');
+  if (!wrap || !track || !track.children.length) return;
 
-  if (!domainInput) {
-    alert('Digite um nome para o seu domínio!');
+  const cardW = track.children[0].offsetWidth;
+  const gap = 24;
+  const step = cardW + gap;
+  const offset = wrap.clientWidth / 2 - cardW / 2 - gameIndex * step;
+  track.style.transform = `translateX(${offset}px)`;
+}
+
+window.addEventListener('resize', () => {
+  if (currentScreen === 'screen-menu') updateCarousel();
+});
+
+$('#btn-play').addEventListener('click', () => launchGame(gameIndex));
+$('#btn-logout').addEventListener('click', logout);
+
+$$('.tab').forEach(t => t.addEventListener('click', () => {
+  if (t.classList.contains('active')) return;
+  beep(480);
+  toast('Em breve no Vortex 4 😅');
+}));
+
+/* ---------------- lançar "jogo" ---------------- */
+let launchTimer = null;
+
+function launchGame(i) {
+  const g = GAMES[i];
+  if (!g) return;
+
+  const launch = $('#screen-launch');
+  launch.style.setProperty('--lc1', g.c1);
+  launch.style.setProperty('--lc2', g.c2);
+
+  $('#launch-icon').textContent = g.emoji;
+  $('#launch-title').textContent = g.title;
+  $('#launch-fill').style.width = '0%';
+
+  const bar = $('.launch-bar');
+  const status = $('#launch-status');
+  const play = $('#launch-play');
+
+  bar.classList.remove('hide');
+  status.classList.remove('hide');
+  play.classList.remove('show');
+  status.textContent = 'Verificando licença…';
+
+  showScreen('screen-launch');
+  beep(880, .1, 'triangle');
+
+  clearInterval(launchTimer);
+  let p = 0;
+  const msgs = ['Verificando licença…', 'Carregando texturas…', 'Compilando shaders…', 'Sincronizando save…', 'Quase lá…'];
+
+  launchTimer = setInterval(() => {
+    p += Math.random() * 14 + 6;
+
+    if (p >= 100) {
+      p = 100;
+      clearInterval(launchTimer);
+      $('#launch-fill').style.width = '100%';
+      status.textContent = 'Pronto!';
+
+      setTimeout(() => {
+        bar.classList.add('hide');
+        status.classList.add('hide');
+        play.classList.add('show');
+        beep(1180, .16, 'sine');
+      }, 480);
+    } else {
+      $('#launch-fill').style.width = p + '%';
+      status.textContent = msgs[Math.min(msgs.length - 1, Math.floor(p / 22))];
+    }
+  }, 260);
+}
+
+function backToMenu() {
+  clearInterval(launchTimer);
+  showScreen('screen-menu');
+  requestAnimationFrame(updateCarousel);
+  beep(520, .1);
+}
+
+$('#screen-launch').addEventListener('click', () => {
+  if ($('#launch-play').classList.contains('show')) backToMenu();
+});
+
+/* ---------------- boot ---------------- */
+let bootTimer = null;
+
+function startBoot() {
+  requestAnimationFrame(() => { $('.boot-bar-fill').style.width = '100%'; });
+  bootTimer = setTimeout(finishBoot, 4000);
+}
+function finishBoot() {
+  clearTimeout(bootTimer);
+  if (currentScreen !== 'screen-boot') return;
+  renderProfiles();
+  showScreen('screen-profiles');
+  beep(760, .12, 'triangle');
+}
+$('#screen-boot').addEventListener('click', () => { initAudio(); finishBoot(); });
+
+/* ---------------- teclado ---------------- */
+document.addEventListener('keydown', e => {
+  initAudio();
+  const k = e.key;
+
+  // modal aberto tem prioridade
+  if ($('#modal-create').classList.contains('open')) {
+    if (k === 'Escape') closeModal();
+    if (k === 'Enter' && document.activeElement === $('#input-name')) {
+      e.preventDefault();
+      $('#btn-confirm').click();
+    }
     return;
   }
 
-  const fullDomain = domainInput.endsWith('.vort') ? domainInput : `${domainInput}.vort`;
+  switch (currentScreen) {
+    case 'screen-boot':
+      if (k === 'Enter' || k === ' ') finishBoot();
+      break;
 
-  publishedSites[fullDomain] = { html, css, js, author: currentUser.username };
-  localStorage.setItem('vortex_sites', JSON.stringify(publishedSites));
+    case 'screen-profiles': {
+      const total = profiles.length + 1;
+      if (k === 'ArrowRight') { e.preventDefault(); profileIndex = (profileIndex + 1) % total; beep(560); renderProfiles(); }
+      if (k === 'ArrowLeft')  { e.preventDefault(); profileIndex = (profileIndex - 1 + total) % total; beep(560); renderProfiles(); }
+      if (k === 'Enter') {
+        profileIndex === profiles.length ? openModal() : loginAs(profileIndex);
+      }
+      break;
+    }
 
-  alert(`Site publicado com sucesso! Acesse "${fullDomain}" no Vortex Chrome.`);
-}
+    case 'screen-menu':
+      if (k === 'ArrowRight') { e.preventDefault(); selectGame(gameIndex + 1); beep(560); }
+      if (k === 'ArrowLeft')  { e.preventDefault(); selectGame(gameIndex - 1); beep(560); }
+      if (k === 'Enter')      { e.preventDefault(); launchGame(gameIndex); }
+      if (k === 'Escape')     logout();
+      break;
 
-// 3. VORTEX MESSENGER
-let msgrCurrentView = 'dm'; // 'dm' ou id do servidor
-let msgrActiveTarget = 'bot_vortex'; // ID do chat ativo (bot, username do amigo ou 'geral')
-let msgrMessages = JSON.parse(localStorage.getItem('vortex_msgr_chats') || '{"bot_vortex": [], "geral": []}');
-let msgrServers = JSON.parse(localStorage.getItem('vortex_msgr_servers') || '[{"id":"geral","name":"Comunidade Vortex","code":"VTX-COMM"}]');
-let msgrFriends = JSON.parse(localStorage.getItem('vortex_msgr_friends') || '[{"username":"bot_vortex","displayName":"Bot Vortex","avatar":"🤖"}]');
-
-function initSystemApps() {
-  renderMsgrServers();
-  renderMsgrChannels();
-}
-
-function playNotificationSound() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(587.33, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
-    gain.gain.setValueAtTime(0.1, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.3);
-  } catch(e){}
-}
-
-function renderMsgrServers() {
-  const list = document.getElementById('msgr-servers-list');
-  const addBtn = list.querySelector('.add-server');
-  list.querySelectorAll('.server-dynamic').forEach(e => e.remove());
-
-  const dmIcon = document.getElementById('server-icon-dm');
-  if (msgrCurrentView === 'dm') {
-    dmIcon.classList.add('active');
-  } else {
-    dmIcon.classList.remove('active');
+    case 'screen-launch':
+      if (k === 'Escape') backToMenu();
+      break;
   }
+});
 
-  msgrServers.forEach(s => {
-    const el = document.createElement('div');
-    el.className = `server-icon server-dynamic ${msgrCurrentView === s.id ? 'active' : ''}`;
-    el.textContent = s.name.charAt(0).toUpperCase();
-    el.title = `${s.name} (${s.code})`;
-    el.onclick = () => {
-      msgrCurrentView = s.id;
-      msgrActiveTarget = 'geral';
-      renderMsgrServers();
-      renderMsgrChannels();
-    };
-    list.insertBefore(el, addBtn);
-  });
+/* ---------------- relógio + toast ---------------- */
+function tickClock() {
+  const t = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  $$('.clock').forEach(el => el.textContent = t);
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+let toastTimer = null;
+function toast(msg) {
+  const el = $('#toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
 }
 
-function renderMsgrChannels() {
-  const title = document.getElementById('msgr-sidebar-title');
-  const list = document.getElementById('msgr-channels-list');
-  const chatTitle = document.getElementById('msgr-chat-title');
-  list.innerHTML = '';
-
-  if (msgrCurrentView === 'dm') {
-    title.textContent = 'Mensagens Diretas';
-    
-    // Botão para adicionar amigo
-    const addBtn = document.createElement('button');
-    addBtn.className = 'btn-add-friend';
-    addBtn.textContent = '+ Adicionar Amigo';
-    addBtn.onclick = openMsgrFriendModal;
-    list.appendChild(addBtn);
-
-    // Renderiza lista de amigos
-    msgrFriends.forEach(f => {
-      const item = document.createElement('div');
-      item.className = `msgr-item ${msgrActiveTarget === f.username ? 'active' : ''}`;
-      item.textContent = `${f.avatar} ${f.displayName}`;
-      item.onclick = () => {
-        msgrActiveTarget = f.username;
-        renderMsgrChannels();
-      };
-      list.appendChild(item);
-    });
-
-    const activeFriend = msgrFriends.find(f => f.username === msgrActiveTarget);
-    chatTitle.textContent = activeFriend ? `💬 @${activeFriend.displayName}` : '💬 Mensagens Diretas';
-
-  } else {
-    const server = msgrServers.find(s => s.id === msgrCurrentView);
-    title.textContent = server ? server.name : 'Servidor';
-    chatTitle.textContent = `# geral (${server ? server.code : ''})`;
-
-    const chan = document.createElement('div');
-    chan.className = 'msgr-item active';
-    chan.textContent = '# geral';
-    list.appendChild(chan);
-  }
-
-  loadMsgrMessages();
-}
-
-function loadMsgrMessages() {
-  const box = document.getElementById('msgr-messages-box');
-  box.innerHTML = '';
-  
-  const targetKey = msgrCurrentView === 'dm' ? msgrActiveTarget : msgrCurrentView;
-  const msgs = msgrMessages[targetKey] || [];
-
-  msgs.forEach(m => {
-    const el = document.createElement('div');
-    el.className = 'msgr-msg';
-    el.innerHTML = `
-      <span class="msgr-msg-author">${m.avatar || '🌀'} ${m.author}:</span>
-      <span class="msgr-msg-text">${m.text}</span>
-    `;
-    box.appendChild(el);
-  });
-
-  box.scrollTop = box.scrollHeight;
-}
-
-function sendMsgrMessage() {
-  const input = document.getElementById('msgr-input');
-  const text = input.value.trim();
-  if (!text) return;
-
-  const targetKey = msgrCurrentView === 'dm' ? msgrActiveTarget : msgrCurrentView;
-
-  if (!msgrMessages[targetKey]) msgrMessages[targetKey] = [];
-
-  msgrMessages[targetKey].push({
-    author: currentUser.displayName,
-    avatar: currentUser.avatar,
-    text: text
-  });
-
-  localStorage.setItem('vortex_msgr_chats', JSON.stringify(msgrMessages));
-  input.value = '';
-  loadMsgrMessages();
-
-  // Resposta automática se conversar com o Bot Vortex
-  if (msgrCurrentView === 'dm' && msgrActiveTarget === 'bot_vortex') {
-    setTimeout(() => {
-      msgrMessages['bot_vortex'].push({
-        author: 'Bot Vortex',
-        avatar: '🤖',
-        text: `Fala ${currentUser.displayName}! Recebi sua mensagem: "${text}"`
-      });
-      localStorage.setItem('vortex_msgr_chats', JSON.stringify(msgrMessages));
-      loadMsgrMessages();
-      playNotificationSound();
-    }, 1000);
-  }
-}
-
-function switchMsgrView(view) {
-  msgrCurrentView = view;
-  if (view === 'dm') msgrActiveTarget = msgrFriends[0]?.username || 'bot_vortex';
-  renderMsgrServers();
-  renderMsgrChannels();
-}
-
-// === CONTROLE DOS MODAIS INTERNOS ===
-
-// Modal Criar/Entrar Servidor
-function openMsgrServerModal() {
-  document.getElementById('msgr-modal-server').classList.remove('hidden');
-  document.getElementById('msgr-server-input').focus();
-}
-
-function closeMsgrServerModal() {
-  document.getElementById('msgr-modal-server').classList.add('hidden');
-  document.getElementById('msgr-server-input').value = '';
-}
-
-function confirmCreateServer() {
-  const inputVal = document.getElementById('msgr-server-input').value.trim();
-  if (!inputVal) return;
-
-  const existing = msgrServers.find(s => s.code.toLowerCase() === inputVal.toLowerCase());
-  if (existing) {
-    msgrCurrentView = existing.id;
-  } else {
-    const newServer = {
-      id: 'srv_' + Date.now(),
-      name: inputVal,
-      code: 'VTX-' + Math.floor(1000 + Math.random() * 9000)
-    };
-    msgrServers.push(newServer);
-    localStorage.setItem('vortex_msgr_servers', JSON.stringify(msgrServers));
-    msgrCurrentView = newServer.id;
-  }
-
-  closeMsgrServerModal();
-  renderMsgrServers();
-  renderMsgrChannels();
-}
-
-// Modal Adicionar Amigo
-function openMsgrFriendModal() {
-  document.getElementById('msgr-modal-friend').classList.remove('hidden');
-  document.getElementById('msgr-friend-input').focus();
-}
-
-function closeMsgrFriendModal() {
-  document.getElementById('msgr-modal-friend').classList.add('hidden');
-  document.getElementById('msgr-friend-input').value = '';
-}
-
-function confirmAddFriend() {
-  const friendName = document.getElementById('msgr-friend-input').value.trim();
-  if (!friendName) return;
-
-  const cleanUsername = friendName.replace('@', '').toLowerCase();
-
-  // Verifica se já não é amigo
-  const exists = msgrFriends.some(f => f.username === cleanUsername);
-  if (!exists) {
-    const newFriend = {
-      username: cleanUsername,
-      displayName: friendName,
-      avatar: '👤'
-    };
-    msgrFriends.push(newFriend);
-    localStorage.setItem('vortex_msgr_friends', JSON.stringify(msgrFriends));
-    msgrActiveTarget = cleanUsername;
-  }
-
-  closeMsgrFriendModal();
-  renderMsgrChannels();
-}
-
-// === JANELAS E ARRASTE ===
-let highestZIndex = 10;
-
-function openWindow(appId) {
-  const win = document.getElementById(`window-${appId}`);
-  if (win) {
-    win.style.display = 'flex';
-    bringToFront(win);
-  }
-}
-
-function closeWindow(appId) {
-  const win = document.getElementById(`window-${appId}`);
-  if (win) win.style.display = 'none';
-}
-
-function minimizeWindow(appId) { closeWindow(appId); }
-
-function maximizeWindow(appId) {
-  const win = document.getElementById(`window-${appId}`);
-  if (win) win.classList.toggle('maximized');
-}
-
-function bringToFront(win) {
-  highestZIndex++;
-  win.style.zIndex = highestZIndex;
-}
-
-function toggleStartMenu() {
-  document.getElementById('start-menu').classList.toggle('hidden');
-}
-
-let activeWin = null;
-let offsetX = 0, offsetY = 0;
-
-function startDrag(e, winId) {
-  const win = document.getElementById(winId);
-  if (win.classList.contains('maximized')) return;
-
-  activeWin = win;
-  bringToFront(activeWin);
-  
-  offsetX = e.clientX - activeWin.offsetLeft;
-  offsetY = e.clientY - activeWin.offsetTop;
-
-  document.addEventListener('mousemove', drag);
-  document.addEventListener('mouseup', stopDrag);
-}
-
-function drag(e) {
-  if (!activeWin) return;
-  activeWin.style.left = `${e.clientX - offsetX}px`;
-  activeWin.style.top = `${e.clientY - offsetY}px`;
-}
-
-function stopDrag() {
-  activeWin = null;
-  document.removeEventListener('mousemove', drag);
-  document.removeEventListener('mouseup', stopDrag);
-}
+/* ---------------- go! ---------------- */
+startBoot();
